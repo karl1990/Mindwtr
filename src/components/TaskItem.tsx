@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreHorizontal, Calendar as CalendarIcon, Tag, Trash2, ArrowRight } from 'lucide-react';
+import { MoreHorizontal, Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat } from 'lucide-react';
 import { Task, TaskStatus } from '../types';
 import { useTaskStore } from '../store/store';
 import { cn } from '../lib/utils';
@@ -17,6 +17,9 @@ export function TaskItem({ task }: TaskItemProps) {
     const [editStartTime, setEditStartTime] = useState(task.startTime || '');
     const [editProjectId, setEditProjectId] = useState(task.projectId || '');
     const [editContexts, setEditContexts] = useState(task.contexts?.join(', ') || '');
+    const [editDescription, setEditDescription] = useState(task.description || '');
+    const [editLocation, setEditLocation] = useState(task.location || '');
+    const [editRecurrence, setEditRecurrence] = useState(task.recurrence || '');
 
     const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         moveTask(task.id, e.target.value as TaskStatus);
@@ -30,7 +33,10 @@ export function TaskItem({ task }: TaskItemProps) {
                 dueDate: editDueDate || undefined,
                 startTime: editStartTime || undefined,
                 projectId: editProjectId || undefined,
-                contexts: editContexts.split(',').map(c => c.trim()).filter(Boolean)
+                contexts: editContexts.split(',').map(c => c.trim()).filter(Boolean),
+                description: editDescription || undefined,
+                location: editLocation || undefined,
+                recurrence: editRecurrence || undefined
             });
             setIsEditing(false);
         }
@@ -78,6 +84,7 @@ export function TaskItem({ task }: TaskItemProps) {
             <div className="flex items-start gap-3">
                 <input
                     type="checkbox"
+                    aria-label="Mark task as done"
                     checked={task.status === 'done'}
                     onChange={() => moveTask(task.id, task.status === 'done' ? 'inbox' : 'done')}
                     className="mt-1.5 h-4 w-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
@@ -89,16 +96,28 @@ export function TaskItem({ task }: TaskItemProps) {
                             <input
                                 autoFocus
                                 type="text"
+                                aria-label="Task title"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
                                 className="w-full bg-transparent border-b border-primary/50 p-1 text-base font-medium focus:ring-0 focus:border-primary outline-none"
                                 placeholder="Task title"
                             />
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground font-medium">Description</label>
+                                <textarea
+                                    aria-label="Task description"
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    className="text-xs bg-muted/50 border border-border rounded px-2 py-1 min-h-[60px] resize-y"
+                                    placeholder="Add notes..."
+                                />
+                            </div>
                             <div className="flex flex-wrap gap-4">
                                 <div className="flex flex-col gap-1">
                                     <label className="text-xs text-muted-foreground font-medium">Start Time</label>
                                     <input
                                         type="datetime-local"
+                                        aria-label="Start time"
                                         value={editStartTime}
                                         onChange={(e) => setEditStartTime(e.target.value)}
                                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
@@ -108,6 +127,7 @@ export function TaskItem({ task }: TaskItemProps) {
                                     <label className="text-xs text-muted-foreground font-medium">Deadline</label>
                                     <input
                                         type="datetime-local"
+                                        aria-label="Deadline"
                                         value={editDueDate}
                                         onChange={(e) => setEditDueDate(e.target.value)}
                                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
@@ -117,6 +137,7 @@ export function TaskItem({ task }: TaskItemProps) {
                                     <label className="text-xs text-muted-foreground font-medium">Project</label>
                                     <select
                                         value={editProjectId}
+                                        aria-label="Project"
                                         onChange={(e) => setEditProjectId(e.target.value)}
                                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
                                     >
@@ -126,10 +147,37 @@ export function TaskItem({ task }: TaskItemProps) {
                                         ))}
                                     </select>
                                 </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground font-medium">Location</label>
+                                    <input
+                                        type="text"
+                                        aria-label="Location"
+                                        value={editLocation}
+                                        onChange={(e) => setEditLocation(e.target.value)}
+                                        placeholder="e.g. Office"
+                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                    <label className="text-xs text-muted-foreground font-medium">Recurrence</label>
+                                    <select
+                                        value={editRecurrence}
+                                        aria-label="Recurrence"
+                                        onChange={(e) => setEditRecurrence(e.target.value)}
+                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
+                                    >
+                                        <option value="">None</option>
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
                                 <div className="flex flex-col gap-1 w-full">
                                     <label className="text-xs text-muted-foreground font-medium">Contexts (comma separated)</label>
                                     <input
                                         type="text"
+                                        aria-label="Contexts"
                                         value={editContexts}
                                         onChange={(e) => setEditContexts(e.target.value)}
                                         placeholder="@home, @work"
@@ -165,6 +213,12 @@ export function TaskItem({ task }: TaskItemProps) {
                                 {task.title}
                             </div>
 
+                            {task.description && (
+                                <p onClick={() => setIsEditing(true)} className="text-sm text-muted-foreground mt-1 line-clamp-2 cursor-pointer hover:text-foreground">
+                                    {task.description}
+                                </p>
+                            )}
+
                             <div className="flex flex-wrap items-center gap-4 mt-2 text-xs">
                                 {project && (
                                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/50 text-accent-foreground font-medium text-[10px]">
@@ -182,6 +236,17 @@ export function TaskItem({ task }: TaskItemProps) {
                                     <div className={cn("flex items-center gap-1", getUrgencyColor())} title="Deadline">
                                         <CalendarIcon className="w-3 h-3" />
                                         {format(new Date(task.dueDate), 'MMM d, HH:mm')}
+                                    </div>
+                                )}
+                                {task.location && (
+                                    <div className="flex items-center gap-1 text-muted-foreground" title="Location">
+                                        <span className="font-medium">📍 {task.location}</span>
+                                    </div>
+                                )}
+                                {task.recurrence && (
+                                    <div className="flex items-center gap-1 text-purple-600" title="Recurrence">
+                                        <Repeat className="w-3 h-3" />
+                                        <span className="capitalize">{task.recurrence}</span>
                                     </div>
                                 )}
                                 {task.contexts?.length > 0 && (
@@ -208,6 +273,7 @@ export function TaskItem({ task }: TaskItemProps) {
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <select
                             value={task.status}
+                            aria-label="Task status"
                             onChange={handleStatusChange}
                             className="text-xs bg-transparent border border-border rounded px-2 py-1 focus:ring-primary cursor-pointer"
                         >
@@ -220,6 +286,7 @@ export function TaskItem({ task }: TaskItemProps) {
 
                         <button
                             onClick={() => deleteTask(task.id)}
+                            aria-label="Delete task"
                             className="text-muted-foreground hover:text-destructive transition-colors"
                         >
                             <Trash2 className="w-4 h-4" />

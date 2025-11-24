@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Inbox, Calendar, CheckSquare, Layers, Archive, Folder, Plus, Tag, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Calendar, Inbox, CheckSquare, Clock, Archive, Plus, Search, Layers, Tag, CheckCircle2, HelpCircle, Folder } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTaskStore } from '../store/store';
 
@@ -20,11 +19,12 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         { id: 'inbox', label: 'Inbox', icon: Inbox, count: inboxCount },
         { id: 'board', label: 'Board View', icon: Layers },
         { id: 'projects', label: 'Projects', icon: Folder },
-        { id: 'contexts', label: 'Contexts', icon: Tag },
+        { id: 'contexts', label: 'Contexts', icon: Tag, path: 'contexts' },
         { id: 'next', label: 'Next Actions', icon: Layers, count: nextCount },
         { id: 'someday', label: 'Someday/Maybe', icon: Archive },
         { id: 'calendar', label: 'Calendar', icon: Calendar },
-        { id: 'review', label: 'Weekly Review', icon: RefreshCw },
+        { id: 'review', label: 'Weekly Review', icon: CheckCircle2, path: 'review' },
+        { id: 'tutorial', label: 'Tutorial', icon: HelpCircle, path: 'tutorial' },
         { id: 'done', label: 'Done', icon: CheckSquare },
     ];
 
@@ -82,7 +82,10 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
 
             {/* Main Content */}
             <main className="flex-1 overflow-auto">
-                <div className="max-w-4xl mx-auto p-8">
+                <div className={cn(
+                    "mx-auto p-8 h-full",
+                    ['board', 'calendar'].includes(currentView) ? "max-w-full" : "max-w-4xl"
+                )}>
                     {children}
                 </div>
             </main>

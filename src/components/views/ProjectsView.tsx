@@ -5,7 +5,7 @@ import { Plus, Folder, Trash2, Edit2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function ProjectsView() {
-    const { projects, tasks, addProject, updateProject, deleteProject } = useTaskStore();
+    const { projects, tasks, addProject, updateProject, deleteProject, addTask } = useTaskStore();
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
@@ -123,6 +123,34 @@ export function ProjectsView() {
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         </header>
+
+                        <div className="mb-6">
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const form = e.target as HTMLFormElement;
+                                    const input = form.elements.namedItem('taskTitle') as HTMLInputElement;
+                                    if (input.value.trim()) {
+                                        addTask(input.value, { projectId: selectedProject.id, status: 'next' });
+                                        input.value = '';
+                                    }
+                                }}
+                                className="flex gap-2"
+                            >
+                                <input
+                                    name="taskTitle"
+                                    type="text"
+                                    placeholder="Add a task to this project..."
+                                    className="flex-1 bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                                <button
+                                    type="submit"
+                                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                                >
+                                    Add Task
+                                </button>
+                            </form>
+                        </div>
 
                         <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                             {projectTasks.length > 0 ? (

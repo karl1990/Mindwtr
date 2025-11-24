@@ -12,13 +12,14 @@ export interface Project {
 export interface Task {
     id: string;
     title: string;
-    description?: string;
     status: TaskStatus;
     startTime?: string; // ISO date string
     dueDate?: string; // ISO date string
     recurrence?: string; // e.g., 'daily', 'weekly', 'monthly'
     tags: string[];
     contexts: string[]; // e.g., '@home', '@work'
+    description?: string;
+    location?: string;
     projectId?: string;
     createdAt: string;
     updatedAt: string;

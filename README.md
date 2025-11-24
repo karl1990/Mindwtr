@@ -15,6 +15,23 @@ A Getting Things Done (GTD) compliant to-do list application built with React, T
   - **Calendar View**: Schedule and view tasks on a calendar.
 - **Local First**: Data is stored locally in `data.json`.
 
+## Screenshots
+
+### Inbox & Next Actions
+| Inbox | Next Actions |
+|-------|--------------|
+| ![Inbox](screenshots/inbox.png) | ![Next Actions](screenshots/next_actions.png) |
+
+### Organization
+| Kanban Board | Projects |
+|--------------|----------|
+| ![Board](screenshots/board.png) | ![Projects](screenshots/projects.png) |
+
+### Planning
+| Calendar | Weekly Review |
+|----------|---------------|
+| ![Calendar](screenshots/calendar.png) | ![Review](screenshots/review.png) |
+
 ## Tech Stack
 
 - React
@@ -24,24 +41,47 @@ A Getting Things Done (GTD) compliant to-do list application built with React, T
 - Zustand (State Management)
 - @dnd-kit (Drag and Drop)
 - date-fns
-- Express (Backend for local file persistence)
+- Electron (Desktop App)
 
 ## Getting Started
+
+### Running the Desktop App
 
 1.  **Install Dependencies**:
     ```bash
     npm install
     ```
 
-2.  **Start the Development Server**:
+2.  **Launch the Desktop App**:
     ```bash
     npm run dev
     ```
-    This will start both the frontend (Vite) and the backend server concurrently.
+    This will start the Electron desktop application directly on your macOS or Linux system.
 
-3.  **Open the App**:
-    Open [http://localhost:5173](http://localhost:5173) in your browser.
+3.  **Build for Distribution** (Optional):
+    ```bash
+    npm run build
+    ```
+    This creates a distributable version of the app.
 
 ## Data Persistence
 
-Tasks and projects are saved to `data.json` in the project root. This file can be synced across devices using tools like Syncthing.
+Tasks and projects are saved to `data.json` in your application data directory:
+- **macOS**: `~/Library/Application Support/focus-gtd/data.json`
+- **Linux**: `~/.config/focus-gtd/data.json`
+
+This file can be synced across devices using tools like Syncthing.
+
+## Testing
+
+Run the test suite:
+```bash
+npm test
+```
+
+The project includes:
+- Unit tests for the Zustand store
+- Component tests for UI elements
+- Accessibility tests with vitest-axe
+- Weekly Review workflow tests
+

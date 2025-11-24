@@ -6,6 +6,7 @@ import { BoardView } from './components/views/BoardView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { ContextsView } from './components/views/ContextsView';
 import { ReviewView } from './components/views/ReviewView';
+import { TutorialView } from './components/views/TutorialView';
 import { useTaskStore } from './store/store';
 
 function App() {
@@ -38,6 +39,8 @@ function App() {
                 return <ContextsView />;
             case 'review':
                 return <ReviewView />;
+            case 'tutorial':
+                return <TutorialView />;
             default:
                 return <ListView title="Inbox" statusFilter="inbox" />;
         }
