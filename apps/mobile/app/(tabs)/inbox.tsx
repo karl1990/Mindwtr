@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTaskStore, Task, TaskStatus } from '@focus-gtd/core';
 import { TaskList } from '@/components/task-list';
 import { useTheme } from '../../contexts/theme-context';
@@ -10,6 +11,7 @@ import { Colors } from '@/constants/theme';
 const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', '@phone', '@anywhere'];
 
 export default function InboxScreen() {
+  const router = useRouter();
   const { tasks, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();

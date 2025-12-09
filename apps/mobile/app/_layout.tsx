@@ -128,6 +128,16 @@ function RootLayoutContent() {
           />
 
           <Drawer.Screen
+            name="check-focus"
+            options={{
+              drawerLabel: () => null,
+              title: '',
+              drawerItemStyle: { display: 'none' },
+              headerShown: false,
+            }}
+          />
+
+          <Drawer.Screen
             name="settings"
             options={{
               drawerLabel: t('nav.settings'),

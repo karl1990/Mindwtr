@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTaskStore } from '@focus-gtd/core';
 import type { Task } from '@focus-gtd/core';
@@ -15,6 +16,7 @@ const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', 
 import { sortTasks } from '@/utils/task-sorter';
 
 export default function NextActionsScreen() {
+  const router = useRouter();
   const { tasks, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
@@ -209,6 +211,10 @@ export default function NextActionsScreen() {
         task={editingTask}
         onClose={() => setIsModalVisible(false)}
         onSave={onSaveTask}
+        onFocusMode={(taskId) => {
+          setIsModalVisible(false);
+          router.push(`/check-focus?id=${taskId}`);
+        }}
       />
     </View>
   );

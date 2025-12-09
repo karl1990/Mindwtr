@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { useLanguage, Language } from '../../contexts/language-context';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { getVersion } from '@tauri-apps/api/app';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -18,6 +19,7 @@ export function SettingsView() {
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
     const { language, setLanguage } = useLanguage();
     const [saved, setSaved] = useState(false);
+    const [appVersion, setAppVersion] = useState('0.1.0');
 
     // Sync state
     const [syncPath, setSyncPath] = useState<string>('');
@@ -25,6 +27,7 @@ export function SettingsView() {
 
     useEffect(() => {
         loadPreferences();
+        getVersion().then(setAppVersion).catch(console.error);
     }, []);
 
     useEffect(() => {
@@ -359,12 +362,12 @@ export function SettingsView() {
                     <div className="bg-muted/30 rounded-lg p-6 space-y-4 border border-border">
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">{t.version}</span>
-                            <span className="font-mono bg-muted px-2 py-1 rounded text-sm">v0.1.0</span>
+                            <span className="font-mono bg-muted px-2 py-1 rounded text-sm">v{appVersion}</span>
                         </div>
                         <div className="border-t border-border/50"></div>
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">{t.developer}</span>
-                            <span className="font-medium">DongDong</span>
+                            <span className="font-medium">dongdongbh</span>
                         </div>
                         <div className="border-t border-border/50"></div>
                         <div className="flex justify-between items-center">
@@ -386,10 +389,10 @@ export function SettingsView() {
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">{t.github}</span>
                             <button
-                                onClick={() => openLink('https://github.com/dongdongbh')}
-                                className="text-primary hover:underline flex items-center gap-1"
+                                onClick={() => openLink('https://github.com/dongdongbh/Focus-GTD')}
+                                className="text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
                             >
-                                github.com/dongdongbh
+                                github.com/dongdongbh/Focus-GTD
                                 <ExternalLink className="w-3 h-3" />
                             </button>
                         </div>
@@ -405,4 +408,3 @@ export function SettingsView() {
         </div>
     );
 }
-

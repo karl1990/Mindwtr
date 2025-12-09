@@ -1,4 +1,4 @@
-import { Calendar, Inbox, CheckSquare, Archive, Plus, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings } from 'lucide-react';
+import { Calendar, Inbox, CheckSquare, Archive, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTaskStore } from '@focus-gtd/core';
 import { useLanguage } from '../contexts/language-context';
@@ -27,7 +27,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         { id: 'calendar', labelKey: 'nav.calendar', icon: Calendar },
         { id: 'review', labelKey: 'nav.review', icon: CheckCircle2, path: 'review' },
         { id: 'tutorial', labelKey: 'nav.tutorial', icon: HelpCircle, path: 'tutorial' },
-        { id: 'settings', labelKey: 'nav.settings', icon: Settings },
+        // Settings moved to footer
         { id: 'done', labelKey: 'nav.done', icon: CheckSquare },
         { id: 'archived', labelKey: 'nav.archived', icon: Archive },
     ];
@@ -73,13 +73,18 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                     ))}
                 </nav>
 
-                <div className="mt-auto pt-4 border-t border-border">
+                <div className="mt-auto pt-4 border-t border-border space-y-1">
                     <button
-                        onClick={() => onViewChange('inbox')}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => onViewChange('settings')}
+                        className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                            currentView === 'settings'
+                                ? "bg-primary text-primary-foreground"
+                                : "hover:bg-accent hover:text-accent-foreground text-muted-foreground"
+                        )}
                     >
-                        <Plus className="w-4 h-4" />
-                        {t('nav.addTask')}
+                        <Settings className="w-4 h-4" />
+                        {t('nav.settings')}
                     </button>
                 </div>
             </aside>

@@ -9,14 +9,16 @@ interface TaskEditModalProps {
     task: Task | null;
     onClose: () => void;
     onSave: (taskId: string, updates: Partial<Task>) => void;
+    onFocusMode?: (taskId: string) => void;
 }
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'todo', 'next', 'in-progress', 'waiting', 'someday', 'done', 'archived'];
 
-export function TaskEditModal({ visible, task, onClose, onSave }: TaskEditModalProps) {
-    const { tasks } = useTaskStore();
+export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode }: TaskEditModalProps) {
+    const { tasks, updateTask } = useTaskStore();
     const [editedTask, setEditedTask] = useState<Partial<Task>>({});
     const [showDatePicker, setShowDatePicker] = useState<'start' | 'due' | null>(null);
+    const [focusMode, setFocusMode] = useState(false);
 
     // Compute most frequent tags from all tasks
     const suggestedTags = React.useMemo(() => {
@@ -97,12 +99,12 @@ export function TaskEditModal({ visible, task, onClose, onSave }: TaskEditModalP
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <SafeAreaView style={styles.container} edges={['top']}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onClose}>
-                        <Text style={styles.headerBtn}>Cancel</Text>
+                    <TouchableOpacity onPress={() => { if (focusMode) setFocusMode(false); else onClose(); }}>
+                        <Text style={styles.headerBtn}>{focusMode ? '← Back' : 'Cancel'}</Text>
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Edit Task</Text>
+                    <Text style={styles.headerTitle}>{focusMode ? editedTask.title || 'Checklist' : 'Edit Task'}</Text>
                     <View style={styles.headerRight}>
-                        {(editedTask.status === 'next' || editedTask.status === 'todo') && (
+                        {!focusMode && (editedTask.status === 'next' || editedTask.status === 'todo') && (
                             <TouchableOpacity
                                 onPress={() => {
                                     onSave(task.id, { ...editedTask, status: 'in-progress' });
@@ -119,121 +121,253 @@ export function TaskEditModal({ visible, task, onClose, onSave }: TaskEditModalP
                     </View>
                 </View>
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={{ flex: 1 }}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-                >
+                {/* Focus Mode Banner - Conditional */}
+                {!focusMode && editedTask.checklist && editedTask.checklist.length > 0 && (
+                    <View style={{ padding: 16, backgroundColor: '#f0f9ff', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e0f2fe' }}>
+                        <Text style={{ fontSize: 14, color: '#0369a1' }}>Shopping list?</Text>
+                        <TouchableOpacity
+                            style={{ backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#0ea5e9' }}
+                            onPress={() => setFocusMode(true)}
+                        >
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0284c7' }}>Open Checklist Mode</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* FOCUS MODE VIEW */}
+                {focusMode ? (
                     <ScrollView style={styles.content}>
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Title</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editedTask.title}
-                                onChangeText={(text) => setEditedTask(prev => ({ ...prev, title: text }))}
-                            />
-                        </View>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Description</Text>
-                            <TextInput
-                                style={[styles.input, styles.textArea]}
-                                value={editedTask.description || ''}
-                                onChangeText={(text) => setEditedTask(prev => ({ ...prev, description: text }))}
-                                multiline
-                            />
-                        </View>
-
-                        <View style={styles.row}>
-                            <View style={[styles.formGroup, styles.flex1]}>
-                                <Text style={styles.label}>Start Date</Text>
-                                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker('start')}>
-                                    <Text>{formatDate(editedTask.startTime)}</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={[styles.formGroup, styles.flex1]}>
-                                <Text style={styles.label}>Due Date</Text>
-                                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker('due')}>
-                                    <Text>{formatDate(editedTask.dueDate)}</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {showDatePicker && (
-                            <DateTimePicker
-                                value={new Date(
-                                    (showDatePicker === 'start' ? editedTask.startTime : editedTask.dueDate) || Date.now()
-                                )}
-                                mode="date"
-                                display="default"
-                                onChange={onDateChange}
-                            />
-                        )}
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Status</Text>
-                            <View style={styles.statusContainer}>
-                                {STATUS_OPTIONS.map(status => (
+                        <View style={styles.checklistContainer}>
+                            {editedTask.checklist?.map((item, index) => (
+                                <View key={item.id || index} style={styles.checklistItem}>
                                     <TouchableOpacity
-                                        key={status}
-                                        style={[
-                                            styles.statusChip,
-                                            editedTask.status === status && styles.statusChipActive
-                                        ]}
-                                        onPress={() => setEditedTask(prev => ({ ...prev, status }))}
+                                        onPress={() => {
+                                            const newChecklist = [...(editedTask.checklist || [])];
+                                            newChecklist[index].isCompleted = !newChecklist[index].isCompleted;
+                                            setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                        }}
+                                        style={styles.checkboxTouch}
                                     >
-                                        <Text style={[
-                                            styles.statusText,
-                                            editedTask.status === status && styles.statusTextActive
-                                        ]}>
-                                            {status}
-                                        </Text>
+                                        <View style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}>
+                                            {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+                                        </View>
                                     </TouchableOpacity>
-                                ))}
-                            </View>
+                                    <TextInput
+                                        style={[styles.checklistInput, { fontSize: 18, paddingVertical: 8 }, item.isCompleted && styles.completedText]}
+                                        value={item.title}
+                                        onChangeText={(text) => {
+                                            const newChecklist = [...(editedTask.checklist || [])];
+                                            newChecklist[index].title = text;
+                                            setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                        }}
+                                        placeholder="Item name"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            const newChecklist = (editedTask.checklist || []).filter((_, i) => i !== index);
+                                            setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                        }}
+                                        style={styles.deleteBtn}
+                                    >
+                                        <Text style={styles.deleteBtnText}>×</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                            <TouchableOpacity
+                                style={[styles.addChecklistBtn, { paddingVertical: 16 }]}
+                                onPress={() => {
+                                    const newItem = {
+                                        id: Date.now().toString(),
+                                        title: '',
+                                        isCompleted: false
+                                    };
+                                    setEditedTask(prev => ({
+                                        ...prev,
+                                        checklist: [...(prev.checklist || []), newItem]
+                                    }));
+                                }}
+                            >
+                                <Text style={[styles.addChecklistText, { fontSize: 17 }]}>+ Add Item</Text>
+                            </TouchableOpacity>
                         </View>
+                    </ScrollView>
+                ) : (
 
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Contexts (comma separated)</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editedTask.contexts?.join(', ')}
-                                onChangeText={(text) => setEditedTask(prev => ({
-                                    ...prev,
-                                    contexts: text.split(',').map(t => t.trim()).filter(Boolean)
-                                }))}
-                                placeholder="@home, @work"
-                                autoCapitalize="none"
-                            />
-                            <View style={styles.suggestionsContainer}>
-                                <Text style={styles.suggestionLabel}>Quick Add:</Text>
-                                <View style={styles.suggestionTags}>
-                                    {suggestedTags.map(tag => {
-                                        const isActive = editedTask.contexts?.includes(tag);
-                                        return (
-                                            <TouchableOpacity
-                                                key={tag}
-                                                style={[
-                                                    styles.suggestionChip,
-                                                    isActive && styles.suggestionChipActive
-                                                ]}
-                                                onPress={() => toggleContext(tag)}
-                                            >
-                                                <Text style={[
-                                                    styles.suggestionText,
-                                                    isActive && styles.suggestionTextActive
-                                                ]}>{tag}</Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+                    >
+                        <ScrollView style={styles.content}>
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Title</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editedTask.title}
+                                    onChangeText={(text) => setEditedTask(prev => ({ ...prev, title: text }))}
+                                />
+                            </View>
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Status</Text>
+                                <View style={styles.statusContainer}>
+                                    {STATUS_OPTIONS.map(status => (
+                                        <TouchableOpacity
+                                            key={status}
+                                            style={[
+                                                styles.statusChip,
+                                                editedTask.status === status && styles.statusChipActive
+                                            ]}
+                                            onPress={() => setEditedTask(prev => ({ ...prev, status }))}
+                                        >
+                                            <Text style={[
+                                                styles.statusText,
+                                                editedTask.status === status && styles.statusTextActive
+                                            ]}>
+                                                {status}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
                             </View>
-                        </View>
 
-                        {/* Add extra padding at bottom for scrolling past keyboard */}
-                        <View style={{ height: 100 }} />
-                    </ScrollView>
-                </KeyboardAvoidingView>
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Contexts (comma separated)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editedTask.contexts?.join(', ')}
+                                    onChangeText={(text) => setEditedTask(prev => ({
+                                        ...prev,
+                                        contexts: text.split(',').map(t => t.trim()).filter(Boolean)
+                                    }))}
+                                    placeholder="@home, @work"
+                                    autoCapitalize="none"
+                                />
+                                <View style={styles.suggestionsContainer}>
+                                    <Text style={styles.suggestionLabel}>Quick Add:</Text>
+                                    <View style={styles.suggestionTags}>
+                                        {suggestedTags.map(tag => {
+                                            const isActive = editedTask.contexts?.includes(tag);
+                                            return (
+                                                <TouchableOpacity
+                                                    key={tag}
+                                                    style={[
+                                                        styles.suggestionChip,
+                                                        isActive && styles.suggestionChipActive
+                                                    ]}
+                                                    onPress={() => toggleContext(tag)}
+                                                >
+                                                    <Text style={[
+                                                        styles.suggestionText,
+                                                        isActive && styles.suggestionTextActive
+                                                    ]}>{tag}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.row}>
+                                <View style={[styles.formGroup, styles.flex1]}>
+                                    <Text style={styles.label}>Start Date</Text>
+                                    <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker('start')}>
+                                        <Text>{formatDate(editedTask.startTime)}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[styles.formGroup, styles.flex1]}>
+                                    <Text style={styles.label}>Due Date</Text>
+                                    <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker('due')}>
+                                        <Text>{formatDate(editedTask.dueDate)}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={new Date(
+                                        (showDatePicker === 'start' ? editedTask.startTime : editedTask.dueDate) || Date.now()
+                                    )}
+                                    mode="date"
+                                    display="default"
+                                    onChange={onDateChange}
+                                />
+                            )}
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Checklist</Text>
+                                <View style={styles.checklistContainer}>
+                                    {editedTask.checklist?.map((item, index) => (
+                                        <View key={item.id || index} style={styles.checklistItem}>
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    const newChecklist = [...(editedTask.checklist || [])];
+                                                    newChecklist[index].isCompleted = !newChecklist[index].isCompleted;
+                                                    setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                                }}
+                                                style={styles.checkboxTouch}
+                                            >
+                                                <View style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}>
+                                                    {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+                                                </View>
+                                            </TouchableOpacity>
+                                            <TextInput
+                                                style={[styles.checklistInput, item.isCompleted && styles.completedText]}
+                                                value={item.title}
+                                                onChangeText={(text) => {
+                                                    const newChecklist = [...(editedTask.checklist || [])];
+                                                    newChecklist[index].title = text;
+                                                    setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                                }}
+                                                placeholder="Item name"
+                                            />
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    const newChecklist = (editedTask.checklist || []).filter((_, i) => i !== index);
+                                                    setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
+                                                }}
+                                                style={styles.deleteBtn}
+                                            >
+                                                <Text style={styles.deleteBtnText}>×</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                    <TouchableOpacity
+                                        style={styles.addChecklistBtn}
+                                        onPress={() => {
+                                            const newItem = {
+                                                id: Date.now().toString(),
+                                                title: '',
+                                                isCompleted: false
+                                            };
+                                            setEditedTask(prev => ({
+                                                ...prev,
+                                                checklist: [...(prev.checklist || []), newItem]
+                                            }));
+                                        }}
+                                    >
+                                        <Text style={styles.addChecklistText}>+ Add Item</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Description</Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    value={editedTask.description || ''}
+                                    onChangeText={(text) => setEditedTask(prev => ({ ...prev, description: text }))}
+                                    multiline
+                                />
+                            </View>
+
+
+
+                            {/* Add extra padding at bottom for scrolling past keyboard */}
+                            <View style={{ height: 100 }} />
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                )}
             </SafeAreaView>
         </Modal>
     );
@@ -310,6 +444,68 @@ const styles = StyleSheet.create({
     },
     suggestionTextActive: {
         color: '#007AFF',
+        fontWeight: '500',
+    },
+    checklistContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#e5e5e5',
+    },
+    checklistItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    checkboxTouch: {
+        padding: 4,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#007AFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+        backgroundColor: 'transparent',
+    },
+    checkboxChecked: {
+        backgroundColor: '#007AFF',
+    },
+    checkmark: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    checklistInput: {
+        flex: 1,
+        fontSize: 16,
+        padding: 0,
+    },
+    completedText: {
+        textDecorationLine: 'line-through',
+        color: '#999',
+    },
+    deleteBtn: {
+        padding: 8,
+    },
+    deleteBtnText: {
+        fontSize: 20,
+        color: '#999',
+        fontWeight: '300',
+    },
+    addChecklistBtn: {
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    addChecklistText: {
+        color: '#007AFF',
+        fontSize: 15,
         fontWeight: '500',
     },
 });

@@ -86,7 +86,7 @@ Focus-GTD/
 ## Data & Sync
 
 Tasks and projects are stored locally:
-- **Desktop**: `~/.config/tech.dongdongbh.focus-gtd/data.json`
+- **Desktop**: `~/.config/focus-gtd/data.json` (sync folder: `~/Sync/focus-gtd/`)
 - **Mobile**: AsyncStorage
 
 Optional sync folder (e.g., Dropbox, Syncthing) can be configured in Settings for cross-device sync.

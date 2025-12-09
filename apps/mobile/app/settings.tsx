@@ -319,10 +319,10 @@ export default function SettingsPage() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
-                        onPress={() => openLink('https://github.com/dongdongbh')}
+                        onPress={() => openLink('https://github.com/dongdongbh/Focus-GTD')}
                     >
                         <Text style={[styles.settingLabel, { color: tc.text }]}>GitHub</Text>
-                        <Text style={styles.linkText}>github.com/dongdongbh</Text>
+                        <Text style={styles.linkText}>github.com/dongdongbh/Focus-GTD</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

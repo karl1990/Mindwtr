@@ -11,7 +11,13 @@ struct AppConfig {
 }
 
 fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
-    app.path().app_config_dir().unwrap().join("config.json")
+    // Use ~/.config/focus-gtd/config.json for config
+    app.path()
+        .home_dir()
+        .unwrap()
+        .join(".config")
+        .join("focus-gtd")
+        .join("config.json")
 }
 
 fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
@@ -23,7 +29,13 @@ fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
             }
         }
     }
-    app.path().app_config_dir().unwrap().join("data.json")
+    // Default data path: ~/.config/focus-gtd/data.json
+    app.path()
+        .home_dir()
+        .unwrap()
+        .join(".config")
+        .join("focus-gtd")
+        .join("data.json")
 }
 
 fn ensure_data_file(app: &tauri::AppHandle) -> Result<(), String> {
@@ -73,11 +85,12 @@ fn get_sync_path(app: tauri::AppHandle) -> String {
             }
         }
     }
-    // Default sync path
+    // Default sync path: ~/Sync/focus-gtd
     app.path()
-        .app_config_dir()
+        .home_dir()
         .unwrap()
-        .join("sync")
+        .join("Sync")
+        .join("focus-gtd")
         .to_string_lossy()
         .to_string()
 }

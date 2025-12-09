@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat } from 'lucide-react';
+import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus } from 'lucide-react';
 import { Task, TaskStatus } from '@focus-gtd/core';
 import { useTaskStore } from '@focus-gtd/core';
 import { cn } from '../lib/utils';
@@ -198,7 +198,117 @@ export function TaskItem({ task }: TaskItemProps) {
                                         placeholder="@home, @work"
                                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
                                     />
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                                        {['@home', '@work', '@errand', '@computer', '@phone'].map(tag => {
+                                            const currentTags = editContexts.split(',').map(t => t.trim()).filter(Boolean);
+                                            const isActive = currentTags.includes(tag);
+                                            return (
+                                                <button
+                                                    key={tag}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        let newTags;
+                                                        if (isActive) {
+                                                            newTags = currentTags.filter(t => t !== tag);
+                                                        } else {
+                                                            newTags = [...currentTags, tag];
+                                                        }
+                                                        setEditContexts(newTags.join(', '));
+                                                    }}
+                                                    className={cn(
+                                                        "text-[10px] px-2 py-0.5 rounded-full border transition-colors",
+                                                        isActive
+                                                            ? "bg-primary/10 border-primary text-primary"
+                                                            : "bg-transparent border-border text-muted-foreground hover:border-primary/50"
+                                                    )}
+                                                >
+                                                    {tag}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
+                                <div className="flex flex-col gap-2 w-full pt-2 border-t border-border/50">
+                                    <label className="text-xs text-muted-foreground font-medium">Checklist</label>
+                                    <div className="space-y-2">
+                                        {(task.checklist || []).map((item, index) => (
+                                            <div key={item.id || index} className="flex items-center gap-2 group/item">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newList = [...(task.checklist || [])];
+                                                        newList[index].isCompleted = !newList[index].isCompleted;
+                                                        updateTask(task.id, { checklist: newList });
+                                                    }}
+                                                    className={cn(
+                                                        "w-4 h-4 border rounded flex items-center justify-center transition-colors",
+                                                        item.isCompleted
+                                                            ? "bg-primary border-primary text-primary-foreground"
+                                                            : "border-muted-foreground hover:border-primary"
+                                                    )}
+                                                >
+                                                    {item.isCompleted && <Check className="w-3 h-3" />}
+                                                </button>
+                                                <input
+                                                    type="text"
+                                                    value={item.title}
+                                                    onChange={(e) => {
+                                                        const newList = [...(task.checklist || [])];
+                                                        newList[index].title = e.target.value;
+                                                        updateTask(task.id, { checklist: newList });
+                                                    }}
+                                                    className={cn(
+                                                        "flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-primary/50 px-1",
+                                                        item.isCompleted && "text-muted-foreground line-through"
+                                                    )}
+                                                    placeholder="Item name"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newList = (task.checklist || []).filter((_, i) => i !== index);
+                                                        updateTask(task.id, { checklist: newList });
+                                                    }}
+                                                    className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-destructive p-1"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newItem = {
+                                                    id: Date.now().toString(),
+                                                    title: '',
+                                                    isCompleted: false
+                                                };
+                                                updateTask(task.id, {
+                                                    checklist: [...(task.checklist || []), newItem]
+                                                });
+                                            }}
+                                            className="text-xs text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            Add Item
+                                        </button>
+                                    </div>
+                                </div>
+                                {(task.checklist || []).length > 0 && (
+                                    <div className="mt-3 space-y-1 pl-1">
+                                        {(task.checklist || []).map((item, i) => (
+                                            <div key={item.id || i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <div className={cn(
+                                                    "w-3 h-3 border rounded flex items-center justify-center",
+                                                    item.isCompleted ? "bg-muted-foreground/20 border-muted-foreground" : "border-muted-foreground"
+                                                )}>
+                                                    {item.isCompleted && <Check className="w-2 h-2" />}
+                                                </div>
+                                                <span className={cn(item.isCompleted && "line-through")}>{item.title}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex gap-2 pt-1">
                                 <button
@@ -285,12 +395,12 @@ export function TaskItem({ task }: TaskItemProps) {
                 </div>
 
                 {!isEditing && (
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2">
                         <select
                             value={task.status}
                             aria-label="Task status"
                             onChange={handleStatusChange}
-                            className="text-xs bg-transparent border border-border rounded px-2 py-1 focus:ring-primary cursor-pointer"
+                            className="text-xs px-2 py-1 rounded cursor-pointer bg-white text-black border border-slate-400 hover:bg-slate-100"
                         >
                             <option value="inbox">Inbox</option>
                             <option value="next">Next</option>
@@ -302,13 +412,13 @@ export function TaskItem({ task }: TaskItemProps) {
                         <button
                             onClick={() => deleteTask(task.id)}
                             aria-label="Delete task"
-                            className="text-muted-foreground hover:text-destructive transition-colors"
+                            className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/20"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

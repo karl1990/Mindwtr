@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, Animated, Pressable, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
 import { useTaskStore, Task, TaskStatus } from '@focus-gtd/core';
 
 
@@ -185,6 +186,10 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
         task={editingTask}
         onClose={() => setIsModalVisible(false)}
         onSave={onSaveTask}
+        onFocusMode={(taskId) => {
+          setIsModalVisible(false);
+          router.push(`/check-focus?id=${taskId}`);
+        }}
       />
     </View>
   );

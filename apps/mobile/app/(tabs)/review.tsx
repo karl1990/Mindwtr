@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTaskStore } from '@focus-gtd/core';
 import { useState } from 'react';
 import type { Task, TaskStatus } from '@focus-gtd/core';
@@ -49,6 +50,7 @@ import { SwipeableTaskItem } from '@/components/swipeable-task-item';
 import { sortTasks } from '@/utils/task-sorter';
 
 export default function ReviewScreen() {
+  const router = useRouter();
   const { tasks, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { language, t } = useLanguage();
@@ -132,6 +134,10 @@ export default function ReviewScreen() {
         task={editingTask}
         onClose={() => setIsModalVisible(false)}
         onSave={(taskId, updates) => updateTask(taskId, updates)}
+        onFocusMode={(taskId) => {
+          setIsModalVisible(false);
+          router.push(`/check-focus?id=${taskId}`);
+        }}
       />
     </View>
   );
