@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Constants from 'expo-constants';
 import {
     View,
     Text,
@@ -301,7 +302,9 @@ export default function SettingsPage() {
                 <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                     <View style={styles.settingRow}>
                         <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.version')}</Text>
-                        <Text style={[styles.settingValue, { color: tc.secondaryText }]}>0.1.0</Text>
+                        <Text style={[styles.settingValue, { color: tc.secondaryText }]}>
+                            {Constants.expoConfig?.version ?? '0.1.0'}
+                        </Text>
                     </View>
                     <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
                         <Text style={[styles.settingLabel, { color: tc.text }]}>{language === 'zh' ? '许可证' : 'License'}</Text>
