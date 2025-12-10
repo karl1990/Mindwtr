@@ -203,16 +203,37 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const showContextFilter = ['next', 'todo', 'all'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
     const inboxCount = tasks.filter(t => t.status === 'inbox').length;
+    const nextCount = tasks.filter(t => t.status === 'next' && !t.deletedAt).length;
+    const isNextView = statusFilter === 'next';
+    const NEXT_WARNING_THRESHOLD = 15;
 
     return (
         <div className="space-y-6">
             <header className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">{title}</h2>
+                <h2 className="text-3xl font-bold tracking-tight">
+                    {title}
+                    {isNextView && <span className="ml-2 text-lg font-normal text-muted-foreground">({nextCount})</span>}
+                </h2>
                 <span className="text-muted-foreground text-sm">
                     {filteredTasks.length} tasks
                     {selectedContext && <span className="ml-1 text-primary">• {selectedContext}</span>}
                 </span>
             </header>
+
+            {/* Next Actions Warning */}
+            {isNextView && nextCount > NEXT_WARNING_THRESHOLD && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-start gap-3">
+                    <span className="text-amber-500 text-xl">⚠️</span>
+                    <div>
+                        <p className="font-medium text-amber-700 dark:text-amber-400">
+                            {nextCount} items in Next Actions
+                        </p>
+                        <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">
+                            Consider focusing on fewer projects. GTD recommends keeping Next Actions to 10-15 items for clarity.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Inbox Processing Bar */}
             {isInbox && inboxCount > 0 && !isProcessing && (

@@ -11,7 +11,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { Colors } from '@/constants/theme';
 
 export default function ProjectsScreen() {
-  const { projects, addProject, updateProject, deleteProject } = useTaskStore();
+  const { projects, tasks, addProject, updateProject, deleteProject, toggleProjectFocus } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const [newProjectTitle, setNewProjectTitle] = useState('');
@@ -77,7 +77,11 @@ export default function ProjectsScreen() {
       </View>
 
       <FlatList
-        data={projects}
+        data={[...projects].sort((a, b) => {
+          if (a.isFocused && !b.isFocused) return -1;
+          if (!a.isFocused && b.isFocused) return 1;
+          return a.title.localeCompare(b.title);
+        })}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -85,43 +89,70 @@ export default function ProjectsScreen() {
             <Text style={[styles.emptyText, { color: tc.secondaryText }]}>{t('projects.empty')}</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={[styles.projectItem, { backgroundColor: tc.cardBg }]}>
-            <TouchableOpacity
-              style={styles.projectTouchArea}
-              onPress={() => setSelectedProject(item)}
-            >
-              <View style={[styles.projectColor, { backgroundColor: item.color }]} />
-              <View style={styles.projectContent}>
-                <Text style={[styles.projectTitle, { color: tc.text }]}>{item.title}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={[styles.projectMeta, { color: tc.secondaryText }]}>{item.status}</Text>
-                  {item.isSequential && (
-                    <View style={styles.sequentialBadge}>
-                      <Text style={styles.sequentialBadgeText}>Sequential</Text>
-                    </View>
+        renderItem={({ item }) => {
+          const projTasks = tasks.filter(t => t.projectId === item.id && t.status !== 'done' && !t.deletedAt);
+          const nextAction = projTasks.find(t => t.status === 'todo') || projTasks.find(t => t.status === 'next');
+          const focusedCount = projects.filter(p => p.isFocused).length;
+
+          return (
+            <View style={[
+              styles.projectItem,
+              { backgroundColor: tc.cardBg },
+              item.isFocused && { borderColor: '#F59E0B', borderWidth: 1 }
+            ]}>
+              <TouchableOpacity
+                onPress={() => toggleProjectFocus(item.id)}
+                style={styles.focusButton}
+                disabled={!item.isFocused && focusedCount >= 5}
+              >
+                <Text style={[
+                  styles.focusIcon,
+                  item.isFocused ? { opacity: 1 } : { opacity: focusedCount >= 5 ? 0.3 : 0.5 }
+                ]}>
+                  {item.isFocused ? '⭐' : '☆'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.projectTouchArea}
+                onPress={() => setSelectedProject(item)}
+              >
+                <View style={[styles.projectColor, { backgroundColor: item.color }]} />
+                <View style={styles.projectContent}>
+                  <Text style={[styles.projectTitle, { color: tc.text }]}>{item.title}</Text>
+                  {nextAction ? (
+                    <Text style={[styles.projectMeta, { color: tc.secondaryText }]} numberOfLines={1}>
+                      ↳ {nextAction.title}
+                    </Text>
+                  ) : projTasks.length > 0 ? (
+                    <Text style={[styles.projectMeta, { color: '#F59E0B' }]}>
+                      ⚠️ No next action
+                    </Text>
+                  ) : (
+                    <Text style={[styles.projectMeta, { color: tc.secondaryText }]}>
+                      {item.status}
+                    </Text>
                   )}
                 </View>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                Alert.alert(
-                  t('projects.title'),
-                  t('projects.deleteConfirm'),
-                  [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    { text: t('common.delete'), style: 'destructive', onPress: () => deleteProject(item.id) }
-                  ]
-                );
-              }}
-              style={styles.deleteButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.deleteText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    t('projects.title'),
+                    t('projects.deleteConfirm'),
+                    [
+                      { text: t('common.cancel'), style: 'cancel' },
+                      { text: t('common.delete'), style: 'destructive', onPress: () => deleteProject(item.id) }
+                    ]
+                  );
+                }}
+                style={styles.deleteButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.deleteText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }}
       />
 
       <Modal
@@ -381,5 +412,11 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     fontSize: 14,
+  },
+  focusButton: {
+    padding: 8,
+  },
+  focusIcon: {
+    fontSize: 18,
   },
 });

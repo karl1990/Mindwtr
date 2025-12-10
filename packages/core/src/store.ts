@@ -26,6 +26,7 @@ interface TaskStore {
     addProject: (title: string, color: string) => Promise<void>;
     updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
     deleteProject: (id: string) => Promise<void>;
+    toggleProjectFocus: (id: string) => Promise<void>;
 }
 
 // Debounce save helper
@@ -150,5 +151,28 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         set({ projects: visibleProjects, tasks: visibleTasks });
         // Save with all data (including deleted for sync)
         debouncedSave({ tasks: allTasks, projects: allProjects, settings: {} });
+    },
+
+    toggleProjectFocus: async (id: string) => {
+        const projects = get().projects;
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+
+        // If turning on focus, check if we already have 5 focused
+        const focusedCount = projects.filter(p => p.isFocused && !p.deletedAt).length;
+        const isCurrentlyFocused = project.isFocused;
+
+        // Don't allow more than 5 focused projects
+        if (!isCurrentlyFocused && focusedCount >= 5) {
+            return; // Already at max
+        }
+
+        const newProjects = projects.map(p =>
+            p.id === id
+                ? { ...p, isFocused: !p.isFocused, updatedAt: new Date().toISOString() }
+                : p
+        );
+        set({ projects: newProjects });
+        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: {} });
     },
 }));

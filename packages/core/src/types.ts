@@ -8,6 +8,7 @@ export interface Project {
     status: 'active' | 'completed' | 'archived';
     color: string;
     isSequential?: boolean; // If true, only first incomplete task shows in Next Actions
+    isFocused?: boolean; // If true, this project is a priority focus (max 5 allowed)
     supportNotes?: string;
     createdAt: string;
     updatedAt: string;

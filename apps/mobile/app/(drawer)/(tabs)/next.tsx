@@ -178,6 +178,15 @@ export default function NextActionsScreen() {
 
       {renderContextFilter()}
 
+      {/* Next Actions Warning */}
+      {nextTasks.length > 15 && (
+        <View style={[styles.warningBanner, { backgroundColor: isDark ? '#78350F' : '#FEF3C7', borderColor: '#F59E0B' }]}>
+          <Text style={[styles.warningText, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+            ⚠️ {nextTasks.length} items in Next Actions. Consider focusing on fewer projects.
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={nextTasks}
         renderItem={renderNextItem}
@@ -334,6 +343,18 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+    textAlign: 'center',
+  },
+  warningBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  warningText: {
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
   },
 });

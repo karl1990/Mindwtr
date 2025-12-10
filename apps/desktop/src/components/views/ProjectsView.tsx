@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { confirm } from '@tauri-apps/plugin-dialog';
 
 export function ProjectsView() {
-    const { projects, tasks, addProject, updateProject, deleteProject, addTask } = useTaskStore();
+    const { projects, tasks, addProject, updateProject, deleteProject, addTask, toggleProjectFocus } = useTaskStore();
     const { t } = useLanguage();
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
@@ -81,22 +81,69 @@ export function ProjectsView() {
                 )}
 
                 <div className="space-y-1 overflow-y-auto flex-1">
-                    {projects.map(project => (
-                        <div
-                            key={project.id}
-                            onClick={() => setSelectedProjectId(project.id)}
-                            className={cn(
-                                "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors text-sm",
-                                selectedProjectId === project.id ? "bg-accent text-accent-foreground" : "hover:bg-muted/50"
-                            )}
-                        >
-                            <Folder className="w-4 h-4" style={{ color: project.color }} />
-                            <span className="flex-1 truncate">{project.title}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {tasks.filter(t => t.projectId === project.id && t.status !== 'done' && !t.deletedAt).length}
-                            </span>
-                        </div>
-                    ))}
+                    {/* Sort: focused projects first, then by title */}
+                    {[...projects]
+                        .sort((a, b) => {
+                            if (a.isFocused && !b.isFocused) return -1;
+                            if (!a.isFocused && b.isFocused) return 1;
+                            return a.title.localeCompare(b.title);
+                        })
+                        .map(project => {
+                            const projTasks = tasks.filter(t => t.projectId === project.id && t.status !== 'done' && !t.deletedAt);
+                            const nextAction = projTasks.find(t => t.status === 'todo') || projTasks.find(t => t.status === 'next');
+                            const focusedCount = projects.filter(p => p.isFocused).length;
+
+                            return (
+                                <div
+                                    key={project.id}
+                                    className={cn(
+                                        "rounded-lg cursor-pointer transition-colors text-sm border",
+                                        selectedProjectId === project.id
+                                            ? "bg-accent text-accent-foreground border-accent"
+                                            : project.isFocused
+                                                ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                                                : "border-transparent hover:bg-muted/50"
+                                    )}
+                                >
+                                    <div
+                                        className="flex items-center gap-2 p-2"
+                                        onClick={() => setSelectedProjectId(project.id)}
+                                    >
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleProjectFocus(project.id);
+                                            }}
+                                            className={cn(
+                                                "text-sm transition-colors",
+                                                project.isFocused ? "text-amber-500" : "text-muted-foreground hover:text-amber-500",
+                                                !project.isFocused && focusedCount >= 5 && "opacity-30 cursor-not-allowed"
+                                            )}
+                                            title={project.isFocused ? "Remove from focus" : focusedCount >= 5 ? "Max 5 focused projects" : "Add to focus"}
+                                        >
+                                            {project.isFocused ? '⭐' : '☆'}
+                                        </button>
+                                        <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                        <span className="flex-1 truncate">{project.title}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {projTasks.length}
+                                        </span>
+                                    </div>
+                                    {/* Show project's next action */}
+                                    <div className="px-2 pb-2 pl-8">
+                                        {nextAction ? (
+                                            <span className="text-xs text-muted-foreground truncate block">
+                                                ↳ {nextAction.title}
+                                            </span>
+                                        ) : projTasks.length > 0 ? (
+                                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                                                ⚠️ No next action
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })}
 
                     {projects.length === 0 && !isCreating && (
                         <div className="text-sm text-muted-foreground text-center py-8">
