@@ -4,13 +4,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert } from 'react-native';
+import { Alert, AppState, AppStateStatus } from 'react-native';
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
-import { setStorageAdapter, useTaskStore } from '@focus-gtd/core';
+import { setStorageAdapter, useTaskStore, flushPendingSave } from '@focus-gtd/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
@@ -26,6 +26,21 @@ try {
 function RootLayoutContent() {
   const { colorScheme, isDark } = useTheme();
   const [storageWarningShown, setStorageWarningShown] = useState(false);
+  const appState = useRef(AppState.currentState);
+
+  // Flush pending saves when app goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        // App is going to background - flush any pending saves
+        flushPendingSave().catch(console.error);
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
 
   useEffect(() => {
     // Show storage error alert if initialization failed

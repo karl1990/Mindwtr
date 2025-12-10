@@ -35,15 +35,39 @@ interface TaskStore {
 
 // Debounce save helper - captures data snapshot immediately to prevent race conditions
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingData: AppData | null = null;
+
 const debouncedSave = (data: AppData) => {
     // Capture snapshot of data immediately to prevent stale state saves
-    const dataSnapshot = { ...data, tasks: [...data.tasks], projects: [...data.projects] };
+    pendingData = { ...data, tasks: [...data.tasks], projects: [...data.projects] };
 
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
-        storage.saveData(dataSnapshot).catch(console.error);
+        if (pendingData) {
+            storage.saveData(pendingData).catch(console.error);
+            pendingData = null;
+        }
         saveTimeout = null;
     }, 1000);
+};
+
+/**
+ * Immediately save any pending debounced data.
+ * Call this when the app goes to background or is about to be terminated.
+ */
+export const flushPendingSave = async (): Promise<void> => {
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+    if (pendingData) {
+        try {
+            await storage.saveData(pendingData);
+            pendingData = null;
+        } catch (e) {
+            console.error('Failed to flush pending save:', e);
+        }
+    }
 };
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
