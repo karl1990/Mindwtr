@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to Focus GTD will be documented in this file.
+## [0.2.2] - 2025-12-10
+
+### Fixed
+- **Mobile Startup**: Resolved "Unmatched Route" error by adding a root redirect (`app/index.tsx`) to the inbox.
+- **Mobile Logs**: Removed verbose "Polyfill Check" success messages.
+
 ## [0.2.1] - 2025-12-10
 
 ### Fixed

@@ -63,6 +63,6 @@ export function verifyPolyfills() {
             [{ text: 'OK' }]
         );
     } else {
-        console.log('[Polyfill Check] ✅ All checks passed');
+        // console.log('[Polyfill Check] ✅ All checks passed');
     }
 }
