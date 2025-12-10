@@ -12,6 +12,7 @@ export const setStorageAdapter = (adapter: StorageAdapter) => {
 interface TaskStore {
     tasks: Task[];
     projects: Project[];
+    settings: AppData['settings'];
     isLoading: boolean;
     error: string | null;
 
@@ -27,6 +28,9 @@ interface TaskStore {
     updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
     deleteProject: (id: string) => Promise<void>;
     toggleProjectFocus: (id: string) => Promise<void>;
+
+    // Settings Actions
+    updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
 }
 
 // Debounce save helper
@@ -41,6 +45,7 @@ const debouncedSave = (data: AppData) => {
 export const useTaskStore = create<TaskStore>((set, get) => ({
     tasks: [],
     projects: [],
+    settings: {},
     isLoading: false,
     error: null,
 
@@ -51,7 +56,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             // Filter out soft-deleted items for UI display
             const activeTasks = data.tasks.filter(t => !t.deletedAt);
             const activeProjects = (data.projects || []).filter(p => !p.deletedAt);
-            set({ tasks: activeTasks, projects: activeProjects, isLoading: false });
+            // Preserve settings from storage
+            set({ tasks: activeTasks, projects: activeProjects, settings: data.settings || {}, isLoading: false });
         } catch (err) {
             set({ error: 'Failed to fetch data', isLoading: false });
         }
@@ -71,7 +77,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
         const newTasks = [...get().tasks, newTask];
         set({ tasks: newTasks });
-        debouncedSave({ tasks: newTasks, projects: get().projects, settings: {} });
+        debouncedSave({ tasks: newTasks, projects: get().projects, settings: get().settings });
     },
 
     updateTask: async (id: string, updates: Partial<Task>) => {
@@ -81,7 +87,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 : task
         );
         set({ tasks: newTasks });
-        debouncedSave({ tasks: newTasks, projects: get().projects, settings: {} });
+        debouncedSave({ tasks: newTasks, projects: get().projects, settings: get().settings });
     },
 
     deleteTask: async (id: string) => {
@@ -96,7 +102,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const visibleTasks = allTasks.filter(t => !t.deletedAt);
         set({ tasks: visibleTasks });
         // Save with all data (including deleted for sync)
-        debouncedSave({ tasks: allTasks, projects: get().projects, settings: {} });
+        debouncedSave({ tasks: allTasks, projects: get().projects, settings: get().settings });
     },
 
     moveTask: async (id: string, newStatus: TaskStatus) => {
@@ -106,7 +112,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 : task
         );
         set({ tasks: newTasks });
-        debouncedSave({ tasks: newTasks, projects: get().projects, settings: {} });
+        debouncedSave({ tasks: newTasks, projects: get().projects, settings: get().settings });
     },
 
     addProject: async (title: string, color: string) => {
@@ -120,7 +126,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         };
         const newProjects = [...get().projects, newProject];
         set({ projects: newProjects });
-        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: {} });
+        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: get().settings });
     },
 
     updateProject: async (id: string, updates: Partial<Project>) => {
@@ -128,7 +134,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             project.id === id ? { ...project, ...updates, updatedAt: new Date().toISOString() } : project
         );
         set({ projects: newProjects });
-        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: {} });
+        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: get().settings });
     },
 
     deleteProject: async (id: string) => {
@@ -150,7 +156,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const visibleTasks = allTasks.filter(t => !t.deletedAt);
         set({ projects: visibleProjects, tasks: visibleTasks });
         // Save with all data (including deleted for sync)
-        debouncedSave({ tasks: allTasks, projects: allProjects, settings: {} });
+        debouncedSave({ tasks: allTasks, projects: allProjects, settings: get().settings });
     },
 
     toggleProjectFocus: async (id: string) => {
@@ -173,6 +179,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 : p
         );
         set({ projects: newProjects });
-        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: {} });
+        debouncedSave({ tasks: get().tasks, projects: newProjects, settings: get().settings });
+    },
+
+    updateSettings: async (updates: Partial<AppData['settings']>) => {
+        const newSettings = { ...get().settings, ...updates };
+        set({ settings: newSettings });
+        debouncedSave({ tasks: get().tasks, projects: get().projects, settings: newSettings });
     },
 }));

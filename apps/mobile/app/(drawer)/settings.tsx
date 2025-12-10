@@ -32,7 +32,7 @@ const SYNC_PATH_KEY = '@focus_gtd_sync_path';
 export default function SettingsPage() {
     const { themeMode, setThemeMode, isDark } = useTheme();
     const { language, setLanguage, t } = useLanguage();
-    const { tasks, projects, fetchData } = useTaskStore();
+    const { tasks, projects, settings, fetchData } = useTaskStore();
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
     const [syncPath, setSyncPath] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export default function SettingsPage() {
     const handleBackup = async () => {
         setIsSyncing(true);
         try {
-            await exportData({ tasks, projects, settings: {} });
+            await exportData({ tasks, projects, settings });
         } catch (error) {
             console.error(error);
             Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '导出失败' : 'Failed to export data');

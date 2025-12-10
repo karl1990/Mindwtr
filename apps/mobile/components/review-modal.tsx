@@ -272,7 +272,8 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                             <ScrollView style={styles.taskList}>
                                 {activeProjects.map(project => {
                                     const projectTasks = tasks.filter(task => task.projectId === project.id && task.status !== 'done' && !task.deletedAt);
-                                    const hasNextAction = projectTasks.some(task => task.status === 'next');
+                                    // A project has next action if it has tasks in 'next' OR 'todo' (todo = identified next action for project)
+                                    const hasNextAction = projectTasks.some(task => task.status === 'next' || task.status === 'todo');
                                     const isExpanded = expandedProject === project.id;
 
                                     return (
