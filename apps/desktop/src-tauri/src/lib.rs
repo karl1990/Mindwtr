@@ -65,7 +65,7 @@ fn get_data(app: tauri::AppHandle) -> Result<Value, String> {
 #[tauri::command]
 fn save_data(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
     let data_path = get_data_path(&app);
-    fs::write(&data_path, serde_json::to_string_pretty(&data).unwrap())
+    fs::write(&data_path, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(true)
 }

@@ -108,3 +108,20 @@ export function getTaskStaleness(createdAt: string): 'fresh' | 'aging' | 'stale'
     return 'very-stale';
 }
 
+/**
+ * Get the urgency level of a task based on due date
+ * Returns: 'overdue' | 'urgent' (24h) | 'upcoming' (72h) | 'normal' | 'done'
+ */
+export function getTaskUrgency(task: Partial<Task>): 'overdue' | 'urgent' | 'upcoming' | 'normal' | 'done' {
+    if (task.status === 'done') return 'done';
+    if (!task.dueDate) return 'normal';
+
+    const now = new Date();
+    const due = new Date(task.dueDate);
+    const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (diffHours < 0) return 'overdue';
+    if (diffHours < 24) return 'urgent';
+    if (diffHours < 72) return 'upcoming';
+    return 'normal';
+}

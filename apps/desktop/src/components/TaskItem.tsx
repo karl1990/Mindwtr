@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer } from 'lucide-react';
-import { Task, TaskStatus, TimeEstimate, getTaskAgeLabel, getTaskStaleness } from '@focus-gtd/core';
+import { Task, TaskStatus, TimeEstimate, getTaskAgeLabel, getTaskStaleness, getTaskUrgency } from '@focus-gtd/core';
 import { useTaskStore } from '@focus-gtd/core';
 import { cn } from '../lib/utils';
 
@@ -46,17 +46,13 @@ export function TaskItem({ task }: TaskItemProps) {
 
     // Urgency Logic
     const getUrgencyColor = () => {
-        if (task.status === 'done') return 'text-muted-foreground';
-        if (!task.dueDate) return 'text-muted-foreground';
-
-        const now = new Date();
-        const due = new Date(task.dueDate);
-        const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-        if (diffHours < 0) return 'text-destructive font-bold'; // Overdue
-        if (diffHours < 24) return 'text-orange-500 font-medium'; // Due soon
-        if (diffHours < 72) return 'text-yellow-600'; // Due in 3 days
-        return 'text-muted-foreground';
+        const urgency = getTaskUrgency(task);
+        switch (urgency) {
+            case 'overdue': return 'text-destructive font-bold';
+            case 'urgent': return 'text-orange-500 font-medium';
+            case 'upcoming': return 'text-yellow-600';
+            default: return 'text-muted-foreground';
+        }
     };
 
     // State Colors
