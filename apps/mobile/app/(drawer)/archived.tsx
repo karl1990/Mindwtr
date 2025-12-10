@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useTaskStore } from '@focus-gtd/core';
 import type { Task } from '@focus-gtd/core';
-import { useTheme } from '../contexts/theme-context';
-import { useLanguage } from '../contexts/language-context';
+import { useTheme } from '../../contexts/theme-context';
+import { useLanguage } from '../../contexts/language-context';
 import { Colors } from '@/constants/theme';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRef } from 'react';

@@ -9,7 +9,9 @@ import { ReviewView } from './components/views/ReviewView';
 import { TutorialView } from './components/views/TutorialView';
 import { SettingsView } from './components/views/SettingsView';
 import { ArchiveView } from './components/views/ArchiveView';
+import { AgendaView } from './components/views/AgendaView';
 import { useTaskStore } from '@focus-gtd/core';
+import { GlobalSearch } from './components/GlobalSearch';
 
 function App() {
     const [currentView, setCurrentView] = useState('inbox');
@@ -23,6 +25,8 @@ function App() {
         switch (currentView) {
             case 'inbox':
                 return <ListView title="Inbox" statusFilter="inbox" />;
+            case 'agenda':
+                return <AgendaView />;
             case 'next':
                 return <ListView title="Next Actions" statusFilter="next" />;
             case 'someday':
@@ -55,6 +59,7 @@ function App() {
     return (
         <Layout currentView={currentView} onViewChange={setCurrentView}>
             {renderView()}
+            <GlobalSearch onNavigate={(view, _id) => setCurrentView(view)} />
         </Layout>
     );
 }

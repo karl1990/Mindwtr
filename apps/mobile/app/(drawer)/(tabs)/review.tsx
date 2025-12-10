@@ -1,11 +1,12 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTaskStore } from '@focus-gtd/core';
 import { useState } from 'react';
 import type { Task, TaskStatus } from '@focus-gtd/core';
-import { useTheme } from '../../contexts/theme-context';
-import { useLanguage } from '../../contexts/language-context';
+import { useTheme } from '../../../contexts/theme-context';
+import { useLanguage } from '../../../contexts/language-context';
 import { Colors } from '@/constants/theme';
+import { checkReviewTime, ReviewModal } from '../../../components/review-modal';
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
 
@@ -57,6 +58,7 @@ export default function ReviewScreen() {
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   const STATUS_LABELS = getStatusLabels(language as 'en' | 'zh');
 
@@ -81,8 +83,16 @@ export default function ReviewScreen() {
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
       <View style={[styles.header, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
-        <Text style={[styles.title, { color: tc.text }]}>📋 {t('review.title')}</Text>
-        <Text style={[styles.count, { color: tc.secondaryText }]}>{filteredTasks.length} {t('common.tasks')}</Text>
+        <View>
+          <Text style={[styles.title, { color: tc.text }]}>📋 {language === 'zh' ? '回顾任务' : 'Review'}</Text>
+          <Text style={[styles.count, { color: tc.secondaryText }]}>{filteredTasks.length} {language === 'zh' ? '个任务' : 'tasks'}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.weeklyReviewButton}
+          onPress={() => setShowReviewModal(true)}
+        >
+          <Text style={styles.weeklyReviewButtonText}>🔄 {language === 'zh' ? '周回顾' : 'Weekly Review'}</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView horizontal style={[styles.filterBar, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]} showsHorizontalScrollIndicator={false}>
@@ -138,6 +148,11 @@ export default function ReviewScreen() {
           setIsModalVisible(false);
           router.push(`/check-focus?id=${taskId}`);
         }}
+      />
+
+      <ReviewModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
       />
     </View>
   );
@@ -195,5 +210,16 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
+  },
+  weeklyReviewButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  weeklyReviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,12 +1,19 @@
 import { View, Text, SectionList, Pressable, StyleSheet } from 'react-native';
-import { useTaskStore } from '@focus-gtd/core';
-import type { Task } from '@focus-gtd/core';
-import { useState, useCallback, useMemo } from 'react';
-import { useTheme } from '../../contexts/theme-context';
-import { useLanguage } from '../../contexts/language-context';
+import { useRef, useMemo, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
+import { useTaskStore, Task, Project } from '@focus-gtd/core';
+import { useTheme } from '../../../contexts/theme-context';
+import { useLanguage } from '../../../contexts/language-context';
 import { Colors } from '@/constants/theme';
+import { SwipeableTaskItem } from '../../../components/swipeable-task-item';
 
-function TaskCard({ task, onPress, tc }: { task: Task; onPress: () => void; tc: any }) {
+function TaskCard({ task, onPress, onToggleFocus, tc, focusedCount }: {
+  task: Task;
+  onPress: () => void;
+  onToggleFocus?: () => void;
+  tc: any;
+  focusedCount?: number;
+}) {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'in-progress': '#EF4444',
@@ -31,13 +38,29 @@ function TaskCard({ task, onPress, tc }: { task: Task; onPress: () => void; tc: 
   const isDueToday = task.dueDate &&
     new Date(task.dueDate).toDateString() === new Date().toDateString();
 
+  // Can focus if: already focused, or we have room for more
+  const canFocus = task.isFocusedToday || (focusedCount !== undefined && focusedCount < 3);
+
   return (
-    <Pressable style={[styles.taskCard, { backgroundColor: tc.cardBg }]} onPress={onPress}>
+    <Pressable style={[styles.taskCard, { backgroundColor: tc.cardBg }, task.isFocusedToday && styles.focusedCard]} onPress={onPress}>
       <View style={[styles.statusBar, { backgroundColor: getStatusColor(task.status) }]} />
       <View style={styles.taskContent}>
-        <Text style={[styles.taskTitle, { color: tc.text }]} numberOfLines={2}>
-          {task.title}
-        </Text>
+        <View style={styles.taskTitleRow}>
+          <Text style={[styles.taskTitle, { color: tc.text, flex: 1 }]} numberOfLines={2}>
+            {task.isFocusedToday && '⭐ '}{task.title}
+          </Text>
+          {onToggleFocus && (
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); onToggleFocus(); }}
+              style={[styles.focusButton, !canFocus && styles.focusButtonDisabled]}
+              disabled={!canFocus}
+            >
+              <Text style={styles.focusButtonText}>
+                {task.isFocusedToday ? '⭐' : '☆'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
 
         {task.description && (
           <Text style={[styles.taskDescription, { color: tc.secondaryText }]} numberOfLines={1}>
@@ -92,24 +115,29 @@ export default function AgendaScreen() {
   };
 
   const sections = useMemo(() => {
-    const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'archived');
+    const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'archived' && !t.deletedAt);
 
-    const inProgressTasks = activeTasks.filter(t => t.status === 'in-progress');
+    // Today's Focus: tasks marked as isFocusedToday
+    const focusedTasks = activeTasks.filter(t => t.isFocusedToday);
+
+    const inProgressTasks = activeTasks.filter(t => t.status === 'in-progress' && !t.isFocusedToday);
     const overdueTasks = activeTasks.filter(t =>
-      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'in-progress'
+      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'in-progress' && !t.isFocusedToday
     );
     const todayTasks = activeTasks.filter(t =>
       t.dueDate &&
       new Date(t.dueDate).toDateString() === new Date().toDateString() &&
-      t.status !== 'in-progress'
+      t.status !== 'in-progress' && !t.isFocusedToday
     );
-    const nextTasks = activeTasks.filter(t => t.status === 'next').slice(0, 5);
+    const nextTasks = activeTasks.filter(t => t.status === 'next' && !t.isFocusedToday).slice(0, 5);
     const upcomingTasks = activeTasks
-      .filter(t => t.dueDate && new Date(t.dueDate) > new Date() && t.status !== 'in-progress')
+      .filter(t => t.dueDate && new Date(t.dueDate) > new Date() && t.status !== 'in-progress' && !t.isFocusedToday)
       .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
       .slice(0, 5);
 
     const result = [];
+    // Today's Focus always at the top (max 3)
+    if (focusedTasks.length > 0) result.push({ title: `🎯 ${t('agenda.todaysFocus') || "Today's Focus"}`, data: focusedTasks.slice(0, 3) });
     if (inProgressTasks.length > 0) result.push({ title: `🔄 ${t('agenda.inProgress')}`, data: inProgressTasks });
     if (overdueTasks.length > 0) result.push({ title: `🔴 ${t('agenda.overdue')}`, data: overdueTasks });
     if (todayTasks.length > 0) result.push({ title: `🟡 ${t('agenda.dueToday')}`, data: todayTasks });
@@ -118,6 +146,26 @@ export default function AgendaScreen() {
 
     return result;
   }, [tasks, t]);
+
+  // Count focused tasks (max 3)
+  const focusedCount = tasks.filter(t => t.isFocusedToday && !t.deletedAt && t.status !== 'done' && t.status !== 'archived').length;
+
+  const handleToggleFocus = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // If already focused, unfocus it
+    if (task.isFocusedToday) {
+      updateTask(taskId, { isFocusedToday: false });
+    } else {
+      // Only allow 3 focused tasks max
+      if (focusedCount >= 3) {
+        // Optionally show alert - for now just don't add
+        return;
+      }
+      updateTask(taskId, { isFocusedToday: true });
+    }
+  }, [tasks, focusedCount, updateTask]);
 
   const handleTaskPress = useCallback((task: Task) => {
     setSelectedTask(task);
@@ -131,8 +179,14 @@ export default function AgendaScreen() {
   };
 
   const renderItem = useCallback(({ item }: { item: Task }) => (
-    <TaskCard task={item} onPress={() => handleTaskPress(item)} tc={tc} />
-  ), [handleTaskPress, tc]);
+    <TaskCard
+      task={item}
+      onPress={() => handleTaskPress(item)}
+      onToggleFocus={() => handleToggleFocus(item.id)}
+      focusedCount={focusedCount}
+      tc={tc}
+    />
+  ), [handleTaskPress, handleToggleFocus, focusedCount, tc]);
 
   const renderSectionHeader = useCallback(({ section: { title } }: { section: { title: string } }) => (
     <View style={[styles.sectionHeaderContainer, { backgroundColor: tc.bg }]}>
@@ -410,5 +464,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  // Focus-related styles
+  focusedCard: {
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.3,
+  },
+  taskTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  focusButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  focusButtonDisabled: {
+    opacity: 0.3,
+  },
+  focusButtonText: {
+    fontSize: 20,
   },
 });

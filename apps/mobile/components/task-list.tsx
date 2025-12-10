@@ -25,7 +25,6 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   // Dynamic colors based on theme
@@ -45,13 +44,9 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
       if (t.deletedAt) return false;
       const matchesStatus = statusFilter === 'all' ? true : t.status === statusFilter;
       const matchesProject = projectId ? t.projectId === projectId : true;
-      const matchesSearch = searchQuery
-        ? t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-        : true;
-      return matchesStatus && matchesProject && matchesSearch;
+      return matchesStatus && matchesProject;
     });
-  }, [tasks, statusFilter, projectId, searchQuery]);
+  }, [tasks, statusFilter, projectId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -151,15 +146,6 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
         </View>
       )}
 
-      <TextInput
-        style={[styles.searchInput, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border, color: themeColors.text }]}
-        placeholder={t('common.search') || 'Search tasks...'}
-        placeholderTextColor={themeColors.placeholder}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        clearButtonMode="while-editing"
-      />
-
       <FlatList
         data={filteredTasks}
         renderItem={renderTask}
@@ -177,7 +163,7 @@ export function TaskList({ statusFilter, title, allowAdd = true, projectId }: Ta
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {searchQuery ? 'No matching tasks' : `No tasks in ${title}`}
+              {`No tasks in ${title}`}
             </Text>
           </View>
         }

@@ -93,8 +93,10 @@ export default function FocusChecklistPage() {
                             <TouchableOpacity
                                 onPress={() => handleToggle(index)}
                                 style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                activeOpacity={0.6}
                             >
-                                {item.isCompleted && <Check color="#fff" size={16} />}
+                                {item.isCompleted && <Check color="#fff" size={18} />}
                             </TouchableOpacity>
 
                             <TextInput
@@ -173,8 +175,8 @@ const styles = StyleSheet.create({
         borderBottomColor: '#f5f5f5',
     },
     checkbox: {
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         borderRadius: 6,
         borderWidth: 2,
         borderColor: '#007AFF',

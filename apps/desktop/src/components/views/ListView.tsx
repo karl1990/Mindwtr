@@ -1,23 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Play, X, Trash2, Moon, User, CheckCircle } from 'lucide-react';
-import { useTaskStore, TaskStatus, Task } from '@focus-gtd/core';
+import { useTaskStore, TaskStatus, Task, PRESET_CONTEXTS } from '@focus-gtd/core';
 import { TaskItem } from '../TaskItem';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
 import { sortTasks } from '../../lib/task-sorter';
 
-// GTD preset contexts
-const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', '@phone', '@anywhere'];
 
 interface ListViewProps {
     title: string;
     statusFilter: TaskStatus | 'all';
 }
 
-type ProcessingStep = 'actionable' | 'twomin' | 'decide' | 'context';
+type ProcessingStep = 'actionable' | 'twomin' | 'decide' | 'context' | 'project' | 'waiting-note';
 
 export function ListView({ title, statusFilter }: ListViewProps) {
-    const { tasks, addTask, updateTask, deleteTask, moveTask } = useTaskStore();
+    const { tasks, projects, addTask, updateTask, deleteTask, moveTask } = useTaskStore();
     const { t } = useLanguage();
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [selectedContext, setSelectedContext] = useState<string | null>(null);
@@ -27,13 +25,30 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingTask, setProcessingTask] = useState<Task | null>(null);
     const [processingStep, setProcessingStep] = useState<ProcessingStep>('actionable');
+    const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
+    const [waitingNote, setWaitingNote] = useState('');
 
     const allContexts = useMemo(() => {
         const taskContexts = tasks.flatMap(t => t.contexts || []);
         return Array.from(new Set([...PRESET_CONTEXTS, ...taskContexts])).sort();
     }, [tasks]);
 
-    // ... (in ListView)
+    // For sequential projects, get only the first (oldest) task to show in Next view
+    const sequentialProjectFirstTasks = useMemo(() => {
+        const sequentialProjects = projects.filter(p => p.isSequential);
+        const firstTaskIds = new Set<string>();
+
+        for (const project of sequentialProjects) {
+            const projectTasks = tasks
+                .filter(t => t.projectId === project.id && t.status === 'next' && !t.deletedAt)
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+            if (projectTasks.length > 0) {
+                firstTaskIds.add(projectTasks[0].id);
+            }
+        }
+        return firstTaskIds;
+    }, [tasks, projects]);
 
     const filteredTasks = useMemo(() => {
         const filtered = tasks.filter(t => {
@@ -52,12 +67,21 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             }
             // Just respect statusFilter.
 
+            // Sequential project filter: for 'next' status, only show first task from sequential projects
+            if (statusFilter === 'next' && t.projectId) {
+                const project = projects.find(p => p.id === t.projectId);
+                if (project?.isSequential) {
+                    // Only include if this is the first task
+                    if (!sequentialProjectFirstTasks.has(t.id)) return false;
+                }
+            }
+
             if (selectedContext && !t.contexts?.includes(selectedContext)) return false;
             return true;
         });
 
         return sortTasks(filtered);
-    }, [tasks, statusFilter, selectedContext]);
+    }, [tasks, projects, statusFilter, selectedContext, sequentialProjectFirstTasks]);
 
     const contextCounts = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -83,18 +107,23 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         if (inboxTasks.length > 0) {
             setProcessingTask(inboxTasks[0]);
             setProcessingStep('actionable');
+            setSelectedContexts([]);
             setIsProcessing(true);
         }
     };
 
     const processNext = () => {
-        const inboxTasks = tasks.filter(t => t.status === 'inbox');
+        // Exclude the current task being processed (its status may not have updated in state yet)
+        const currentTaskId = processingTask?.id;
+        const inboxTasks = tasks.filter(t => t.status === 'inbox' && t.id !== currentTaskId);
         if (inboxTasks.length > 0) {
             setProcessingTask(inboxTasks[0]);
             setProcessingStep('actionable');
+            setSelectedContexts([]);
         } else {
             setIsProcessing(false);
             setProcessingTask(null);
+            setSelectedContexts([]);
         }
     };
 
@@ -120,19 +149,52 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const handleTwoMinNo = () => setProcessingStep('decide');
 
     const handleDelegate = () => {
+        setWaitingNote('');
+        setProcessingStep('waiting-note');
+    };
+
+    const handleConfirmWaiting = () => {
         if (processingTask) {
-            moveTask(processingTask.id, 'waiting');
+            updateTask(processingTask.id, {
+                status: 'waiting',
+                description: waitingNote || processingTask.description
+            });
         }
+        setWaitingNote('');
         processNext();
     };
 
-    const handleDefer = () => setProcessingStep('context');
+    const handleDefer = () => {
+        setSelectedContexts([]);
+        setProcessingStep('context');
+    };
 
-    const handleSetContext = (context: string | null) => {
+    const toggleContext = (ctx: string) => {
+        setSelectedContexts(prev =>
+            prev.includes(ctx) ? prev.filter(c => c !== ctx) : [...prev, ctx]
+        );
+    };
+
+    const addCustomContext = () => {
+        if (customContext.trim()) {
+            const ctx = `@${customContext.trim().replace(/^@/, '')}`;
+            if (!selectedContexts.includes(ctx)) {
+                setSelectedContexts(prev => [...prev, ctx]);
+            }
+            setCustomContext('');
+        }
+    };
+
+    const handleConfirmContexts = () => {
+        setProcessingStep('project');
+    };
+
+    const handleSetProject = (projectId: string | null) => {
         if (processingTask) {
             updateTask(processingTask.id, {
-                status: 'next',
-                contexts: context ? [context] : []
+                status: 'todo',
+                contexts: selectedContexts,
+                projectId: projectId || undefined
             });
         }
         processNext();
@@ -258,56 +320,141 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                         </div>
                     )}
 
+                    {processingStep === 'waiting-note' && (
+                        <div className="space-y-4">
+                            <p className="text-center font-medium">👤 {t('process.waitingFor') || 'Who/what are you waiting for?'}</p>
+                            <p className="text-center text-sm text-muted-foreground">
+                                {t('process.waitingForDesc') || 'Add a note to remember what you\'re waiting on'}
+                            </p>
+                            <textarea
+                                value={waitingNote}
+                                onChange={(e) => setWaitingNote(e.target.value)}
+                                placeholder="e.g., Waiting for John to review the document..."
+                                className="w-full bg-muted border border-border rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-primary resize-none"
+                                rows={3}
+                            />
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleConfirmWaiting}
+                                    className="flex-1 py-3 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80"
+                                >
+                                    Skip
+                                </button>
+                                <button
+                                    onClick={handleConfirmWaiting}
+                                    className="flex-1 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600"
+                                >
+                                    ✓ Done
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {processingStep === 'context' && (
                         <div className="space-y-4">
                             <p className="text-center font-medium">{t('process.context')}</p>
                             <p className="text-center text-sm text-muted-foreground">
-                                {t('process.contextDesc')}
+                                {t('process.contextDesc')} (Select multiple or none)
                             </p>
+
+                            {/* Selected contexts display */}
+                            {selectedContexts.length > 0 && (
+                                <div className="flex flex-wrap gap-2 justify-center p-3 bg-primary/10 rounded-lg">
+                                    <span className="text-xs text-primary font-medium">Selected:</span>
+                                    {selectedContexts.map(ctx => (
+                                        <span key={ctx} className="px-2 py-1 bg-primary text-primary-foreground rounded-full text-xs">
+                                            {ctx}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Custom context input */}
                             <div className="flex gap-2">
                                 <input
                                     type="text"
-                                    placeholder={t('process.newContextPlaceholder')}
+                                    placeholder={t('process.newContextPlaceholder') || 'Add new context...'}
                                     value={customContext}
                                     onChange={(e) => setCustomContext(e.target.value)}
                                     className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && customContext.trim()) {
-                                            handleSetContext(`@${customContext.trim().replace(/^@/, '')}`);
-                                            setCustomContext('');
+                                        if (e.key === 'Enter') {
+                                            addCustomContext();
                                         }
                                     }}
                                 />
                                 <button
-                                    onClick={() => {
-                                        if (customContext.trim()) {
-                                            handleSetContext(`@${customContext.trim().replace(/^@/, '')}`);
-                                            setCustomContext('');
-                                        }
-                                    }}
+                                    onClick={addCustomContext}
                                     disabled={!customContext.trim()}
-                                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 disabled:opacity-50"
                                 >
-                                    {t('process.addContext')}
+                                    +
                                 </button>
                             </div>
-                            <div className="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto">
-                                <button
-                                    onClick={() => handleSetContext(null)}
-                                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-full text-sm font-medium hover:bg-secondary/80"
-                                >
-                                    {t('process.skip')}
-                                </button>
-                                {allContexts.map(ctx => (
-                                    <button
-                                        key={ctx}
-                                        onClick={() => handleSetContext(ctx)}
-                                        className="px-4 py-2 bg-muted rounded-full text-sm font-medium hover:bg-muted/80"
-                                    >
-                                        {ctx}
-                                    </button>
-                                ))}
-                            </div>
+
+                            {/* Existing contexts - toggle selection */}
+                            {allContexts.length > 0 && (
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                    {allContexts.map(ctx => (
+                                        <button
+                                            key={ctx}
+                                            onClick={() => toggleContext(ctx)}
+                                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedContexts.includes(ctx)
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted hover:bg-muted/80'
+                                                }`}
+                                        >
+                                            {ctx}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Next button - go to project step */}
+                            <button
+                                onClick={handleConfirmContexts}
+                                className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
+                            >
+                                {selectedContexts.length > 0
+                                    ? `Next → (${selectedContexts.length} context${selectedContexts.length > 1 ? 's' : ''} selected)`
+                                    : 'Next → (No context)'}
+                            </button>
+                        </div>
+                    )}
+
+                    {processingStep === 'project' && (
+                        <div className="space-y-4">
+                            <p className="text-center font-medium">{t('process.project') || 'Assign to a project?'}</p>
+                            <p className="text-center text-sm text-muted-foreground">
+                                {t('process.projectDesc') || 'Optional - link this task to a project'}
+                            </p>
+
+                            {/* No project option */}
+                            <button
+                                onClick={() => handleSetProject(null)}
+                                className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                            >
+                                ✓ Done - No project needed
+                            </button>
+
+                            {/* Project list */}
+                            {projects.length > 0 && (
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {projects.map(project => (
+                                        <button
+                                            key={project.id}
+                                            onClick={() => handleSetProject(project.id)}
+                                            className="w-full flex items-center gap-3 p-3 bg-muted rounded-lg hover:bg-muted/80 text-left"
+                                        >
+                                            <div
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: project.color || '#6B7280' }}
+                                            />
+                                            <span>{project.title}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -351,22 +498,25 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 </div>
             )}
 
-            <form onSubmit={handleAddTask} className="relative">
-                <input
-                    type="text"
-                    placeholder={`Add a task to ${title}...`}
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    className="w-full bg-card border border-border rounded-lg py-3 pl-4 pr-12 shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                />
-                <button
-                    type="submit"
-                    disabled={!newTaskTitle.trim()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </form>
+            {/* Only show add task for inbox/next/todo - other views are read-only */}
+            {['inbox', 'next', 'todo'].includes(statusFilter) && (
+                <form onSubmit={handleAddTask} className="relative">
+                    <input
+                        type="text"
+                        placeholder={`Add a task to ${title}...`}
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        className="w-full bg-card border border-border rounded-lg py-3 pl-4 pr-12 shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    />
+                    <button
+                        type="submit"
+                        disabled={!newTaskTitle.trim()}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </button>
+                </form>
+            )}
 
             <div className="space-y-3">
                 {filteredTasks.length === 0 ? (

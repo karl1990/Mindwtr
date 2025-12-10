@@ -1,4 +1,4 @@
-import { Calendar, Inbox, CheckSquare, Archive, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings } from 'lucide-react';
+import { Calendar, Inbox, CheckSquare, Archive, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings, Target, Search } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTaskStore } from '@focus-gtd/core';
 import { useLanguage } from '../contexts/language-context';
@@ -18,8 +18,20 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     const inboxCount = activeTasks.filter(t => t.status === 'inbox').length;
     const nextCount = activeTasks.filter(t => t.status === 'next').length;
 
+    // Trigger global search by simulating Cmd+K
+    const triggerSearch = () => {
+        const event = new KeyboardEvent('keydown', {
+            key: 'k',
+            metaKey: true,
+            ctrlKey: true,
+            bubbles: true
+        });
+        window.dispatchEvent(event);
+    };
+
     const navItems = [
         { id: 'inbox', labelKey: 'nav.inbox', icon: Inbox, count: inboxCount },
+        { id: 'agenda', labelKey: 'nav.agenda', icon: Target },
         { id: 'board', labelKey: 'nav.board', icon: Layers },
         { id: 'projects', labelKey: 'nav.projects', icon: Folder },
         { id: 'contexts', labelKey: 'nav.contexts', icon: Tag, path: 'contexts' },
@@ -38,12 +50,22 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         <div className="flex h-screen bg-background text-foreground">
             {/* Sidebar */}
             <aside className="w-64 border-r border-border bg-card p-4 flex flex-col">
-                <div className="flex items-center gap-2 px-2 mb-8">
+                <div className="flex items-center gap-2 px-2 mb-4">
                     <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <CheckSquare className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <h1 className="text-xl font-bold">{t('app.name')}</h1>
                 </div>
+
+                {/* Search Button */}
+                <button
+                    onClick={triggerSearch}
+                    className="w-full flex items-center gap-3 px-3 py-2 mb-4 rounded-md text-sm font-medium transition-colors bg-muted/50 hover:bg-accent hover:text-accent-foreground text-muted-foreground"
+                >
+                    <Search className="w-4 h-4" />
+                    <span className="flex-1 text-left">{t('search.placeholder') || 'Search...'}</span>
+                    <span className="text-xs opacity-50">⌘K</span>
+                </button>
 
                 <nav className="space-y-1 flex-1">
                     {navItems.map((item) => (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus } from 'lucide-react';
-import { Task, TaskStatus } from '@focus-gtd/core';
+import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer } from 'lucide-react';
+import { Task, TaskStatus, TimeEstimate, getTaskAgeLabel, getTaskStaleness } from '@focus-gtd/core';
 import { useTaskStore } from '@focus-gtd/core';
 import { cn } from '../lib/utils';
 
@@ -20,6 +20,7 @@ export function TaskItem({ task }: TaskItemProps) {
     const [editDescription, setEditDescription] = useState(task.description || '');
     const [editLocation, setEditLocation] = useState(task.location || '');
     const [editRecurrence, setEditRecurrence] = useState(task.recurrence || '');
+    const [editTimeEstimate, setEditTimeEstimate] = useState<TimeEstimate | ''>(task.timeEstimate || '');
 
     const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         moveTask(task.id, e.target.value as TaskStatus);
@@ -36,7 +37,8 @@ export function TaskItem({ task }: TaskItemProps) {
                 contexts: editContexts.split(',').map(c => c.trim()).filter(Boolean),
                 description: editDescription || undefined,
                 location: editLocation || undefined,
-                recurrence: editRecurrence || undefined
+                recurrence: editRecurrence || undefined,
+                timeEstimate: editTimeEstimate || undefined
             });
             setIsEditing(false);
         }
@@ -186,6 +188,22 @@ export function TaskItem({ task }: TaskItemProps) {
                                         <option value="weekly">Weekly</option>
                                         <option value="monthly">Monthly</option>
                                         <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                    <label className="text-xs text-muted-foreground font-medium">Time Estimate</label>
+                                    <select
+                                        value={editTimeEstimate}
+                                        aria-label="Time estimate"
+                                        onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
+                                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full"
+                                    >
+                                        <option value="">No estimate</option>
+                                        <option value="5min">5 minutes</option>
+                                        <option value="15min">15 minutes</option>
+                                        <option value="30min">30 minutes</option>
+                                        <option value="1hr">1 hour</option>
+                                        <option value="2hr+">2+ hours</option>
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1 w-full">
@@ -389,13 +407,40 @@ export function TaskItem({ task }: TaskItemProps) {
                                         {task.tags.join(', ')}
                                     </div>
                                 )}
+                                {/* Task Age Indicator */}
+                                {task.status !== 'done' && getTaskAgeLabel(task.createdAt) && (
+                                    <div className={cn(
+                                        "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full",
+                                        getTaskStaleness(task.createdAt) === 'fresh' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                                        getTaskStaleness(task.createdAt) === 'aging' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+                                        getTaskStaleness(task.createdAt) === 'stale' && 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+                                        getTaskStaleness(task.createdAt) === 'very-stale' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                    )} title="Task age">
+                                        <Clock className="w-3 h-3" />
+                                        {getTaskAgeLabel(task.createdAt)}
+                                    </div>
+                                )}
+                                {/* Time Estimate Badge */}
+                                {task.timeEstimate && (
+                                    <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" title="Estimated time">
+                                        <Timer className="w-3 h-3" />
+                                        {task.timeEstimate === '5min' && '5m'}
+                                        {task.timeEstimate === '15min' && '15m'}
+                                        {task.timeEstimate === '30min' && '30m'}
+                                        {task.timeEstimate === '1hr' && '1h'}
+                                        {task.timeEstimate === '2hr+' && '2h+'}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
 
                 {!isEditing && (
-                    <div className="flex items-center gap-2">
+                    <div
+                        className="flex items-center gap-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
                         <select
                             value={task.status}
                             aria-label="Task status"
@@ -403,7 +448,9 @@ export function TaskItem({ task }: TaskItemProps) {
                             className="text-xs px-2 py-1 rounded cursor-pointer bg-white text-black border border-slate-400 hover:bg-slate-100"
                         >
                             <option value="inbox">Inbox</option>
+                            <option value="todo">Todo</option>
                             <option value="next">Next</option>
+                            <option value="in-progress">In Progress</option>
                             <option value="someday">Someday</option>
                             <option value="waiting">Waiting</option>
                             <option value="done">Done</option>

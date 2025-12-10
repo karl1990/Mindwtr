@@ -86,13 +86,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     deleteTask: async (id: string) => {
         // Soft-delete: set deletedAt instead of removing
         const now = new Date().toISOString();
-        const newTasks = get().tasks.map((task) =>
+        const allTasks = get().tasks.map((task) =>
             task.id === id
                 ? { ...task, deletedAt: now, updatedAt: now }
                 : task
         );
-        set({ tasks: newTasks });
-        debouncedSave({ tasks: newTasks, projects: get().projects, settings: {} });
+        // Filter for UI state (hide deleted)
+        const visibleTasks = allTasks.filter(t => !t.deletedAt);
+        set({ tasks: visibleTasks });
+        // Save with all data (including deleted for sync)
+        debouncedSave({ tasks: allTasks, projects: get().projects, settings: {} });
     },
 
     moveTask: async (id: string, newStatus: TaskStatus) => {
@@ -130,18 +133,22 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     deleteProject: async (id: string) => {
         // Soft-delete: set deletedAt instead of removing
         const now = new Date().toISOString();
-        const newProjects = get().projects.map((project) =>
+        const allProjects = get().projects.map((project) =>
             project.id === id
                 ? { ...project, deletedAt: now, updatedAt: now }
                 : project
         );
         // Also soft-delete tasks that belonged to this project
-        const newTasks = get().tasks.map(task =>
+        const allTasks = get().tasks.map(task =>
             task.projectId === id && !task.deletedAt
                 ? { ...task, deletedAt: now, updatedAt: now }
                 : task
         );
-        set({ projects: newProjects, tasks: newTasks });
-        debouncedSave({ tasks: newTasks, projects: newProjects, settings: {} });
+        // Filter for UI state (hide deleted)
+        const visibleProjects = allProjects.filter(p => !p.deletedAt);
+        const visibleTasks = allTasks.filter(t => !t.deletedAt);
+        set({ projects: visibleProjects, tasks: visibleTasks });
+        // Save with all data (including deleted for sync)
+        debouncedSave({ tasks: allTasks, projects: allProjects, settings: {} });
     },
 }));

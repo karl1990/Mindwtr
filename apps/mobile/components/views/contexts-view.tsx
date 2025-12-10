@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
-import { useTaskStore } from '@focus-gtd/core';
+import { useTaskStore, PRESET_CONTEXTS } from '@focus-gtd/core';
 import type { Task } from '@focus-gtd/core';
 import { useState } from 'react';
 import { useTheme } from '../../contexts/theme-context';
@@ -28,9 +28,7 @@ export function ContextsView() {
     inputBg: isDark ? '#374151' : '#F3F4F6',
   };
 
-  // Extract all unique contexts from tasks
-  const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', '@phone', '@anywhere'];
-
+  // Combine preset contexts with contexts from tasks
   const allContexts = Array.from(
     new Set([...PRESET_CONTEXTS, ...tasks.flatMap((t) => t.contexts || [])])
   ).sort();
@@ -236,26 +234,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    maxHeight: 70,
+    maxHeight: 48,
   },
   contextsBarContent: {
-    padding: 12,
-    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+    alignItems: 'center',
   },
   contextButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: '#F3F4F6',
   },
   contextButtonActive: {
     backgroundColor: '#3B82F6',
   },
   contextButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#4B5563',
   },
@@ -263,17 +263,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   contextBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    minWidth: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 18,
     alignItems: 'center',
   },
   contextBadgeText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#374151',
   },
   content: {
     flex: 1,

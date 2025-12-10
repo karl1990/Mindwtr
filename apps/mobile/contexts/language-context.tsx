@@ -86,6 +86,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Board
         'board.title': 'Board View',
         'board.todo': 'Todo',
+        'board.next': 'Next',
         'board.inProgress': 'In Progress',
         'board.done': 'Done',
         'board.noTasks': 'No tasks',
@@ -129,6 +130,7 @@ const translations: Record<Language, Record<string, string>> = {
         'projects.add': 'Add',
         'projects.empty': 'No projects yet',
         'projects.back': '← Back',
+        'project.notes': 'Project Notes',
 
         // Settings
         'settings.title': 'Settings',
@@ -157,12 +159,34 @@ const translations: Record<Language, Record<string, string>> = {
         'common.edit': 'Edit',
         'common.add': 'Add',
         'common.all': 'All',
+        'common.search': 'Search...',
+
+        // Search
+        'search.title': 'Search',
+        'search.placeholder': 'Search tasks and projects...',
 
         // Archived
         'archived.title': 'Archived',
         'archived.empty': 'No archived tasks',
         'archived.emptyHint': 'Tasks you archive will appear here',
         'contexts.search': 'Search contexts...',
+
+        // Today's Focus (Daily Dashboard)
+        'agenda.todaysFocus': "Today's Focus",
+
+        // Task Age
+        'taskAge.day': 'day old',
+        'taskAge.days': 'days old',
+        'taskAge.week': 'week old',
+        'taskAge.weeks': 'weeks old',
+        'taskAge.month': 'month old',
+        'taskAge.months': 'months old',
+
+        // Energy Contexts
+        'context.energy.focused': 'Focused',
+        'context.energy.lowenergy': 'Low Energy',
+        'context.energy.creative': 'Creative',
+        'context.energy.routine': 'Routine',
     },
     zh: {
         // App
@@ -240,6 +264,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Board
         'board.title': '看板',
         'board.todo': '待办',
+        'board.next': '下一步',
         'board.inProgress': '进行中',
         'board.done': '已完成',
         'board.noTasks': '没有任务',
@@ -317,6 +342,29 @@ const translations: Record<Language, Record<string, string>> = {
         'archived.empty': '没有归档的任务',
         'archived.emptyHint': '你归档的任务将会显示在这里',
         'contexts.search': '搜索情境...',
+
+        // Today's Focus (Daily Dashboard)
+        'agenda.todaysFocus': '今日焦点',
+
+        // Task Age
+        'taskAge.day': '天前',
+        'taskAge.days': '天前',
+        'taskAge.week': '周前',
+        'taskAge.weeks': '周前',
+        'taskAge.month': '个月前',
+        'taskAge.months': '个月前',
+
+        // Search
+        'search.title': '搜索',
+        'search.placeholder': '搜索任务和项目...',
+        'common.search': '搜索...',
+        'project.notes': '项目备注',
+
+        // Energy Contexts
+        'context.energy.focused': '专注',
+        'context.energy.lowenergy': '低能量',
+        'context.energy.creative': '创意',
+        'context.energy.routine': '常规',
     },
 };
 

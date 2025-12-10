@@ -1,10 +1,14 @@
 export type TaskStatus = 'inbox' | 'todo' | 'next' | 'in-progress' | 'waiting' | 'someday' | 'done' | 'archived';
 
+export type TimeEstimate = '5min' | '15min' | '30min' | '1hr' | '2hr+';
+
 export interface Project {
     id: string;
     title: string;
     status: 'active' | 'completed' | 'archived';
     color: string;
+    isSequential?: boolean; // If true, only first incomplete task shows in Next Actions
+    supportNotes?: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted
@@ -29,6 +33,8 @@ export interface Task {
     description?: string;
     location?: string;
     projectId?: string;
+    isFocusedToday?: boolean; // Marked as today's priority (Top 3 focus)
+    timeEstimate?: TimeEstimate; // Estimated time to complete
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted

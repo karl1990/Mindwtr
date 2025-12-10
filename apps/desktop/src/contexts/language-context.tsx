@@ -23,6 +23,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.someday': 'Someday/Maybe',
         'nav.calendar': 'Calendar',
         'nav.review': 'Weekly Review',
+        'nav.agenda': 'Agenda',
         'nav.tutorial': 'Tutorial',
         'nav.settings': 'Settings',
         'nav.done': 'Done',
@@ -188,6 +189,32 @@ const translations: Record<Language, Record<string, string>> = {
         'common.edit': 'Edit',
         'common.add': 'Add',
         'common.all': 'All',
+
+        // Agenda
+        'agenda.title': 'Agenda',
+        'agenda.active': 'active items',
+        'agenda.todaysFocus': "Today's Focus",
+        'agenda.inProgress': 'In Progress',
+        'agenda.overdue': 'Overdue',
+        'agenda.dueToday': 'Due Today',
+        'agenda.nextActions': 'Next Actions',
+        'agenda.upcoming': 'Upcoming',
+        'agenda.allClear': 'All Clear!',
+        'agenda.noTasks': 'No urgent tasks right now.',
+
+        // Task Age
+        'taskAge.day': 'day old',
+        'taskAge.days': 'days old',
+        'taskAge.week': 'week old',
+        'taskAge.weeks': 'weeks old',
+        'taskAge.month': 'month old',
+        'taskAge.months': 'months old',
+
+        // Energy Contexts
+        'context.energy.focused': 'Focused',
+        'context.energy.lowenergy': 'Low Energy',
+        'context.energy.creative': 'Creative',
+        'context.energy.routine': 'Routine',
     },
     zh: {
         // App
@@ -203,6 +230,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.someday': '将来/也许',
         'nav.calendar': '日历',
         'nav.review': '每周回顾',
+        'nav.agenda': '日程',
         'nav.tutorial': '教程',
         'nav.settings': '设置',
         'nav.done': '已完成',
@@ -369,6 +397,32 @@ const translations: Record<Language, Record<string, string>> = {
         'common.edit': '编辑',
         'common.add': '添加',
         'common.all': '全部',
+
+        // Agenda
+        'agenda.title': '日程',
+        'agenda.active': '个活动项目',
+        'agenda.todaysFocus': '今日焦点',
+        'agenda.inProgress': '进行中',
+        'agenda.overdue': '已逾期',
+        'agenda.dueToday': '今日到期',
+        'agenda.nextActions': '下一步行动',
+        'agenda.upcoming': '即将到来',
+        'agenda.allClear': '全部完成！',
+        'agenda.noTasks': '目前没有紧急任务。',
+
+        // Task Age
+        'taskAge.day': '天前',
+        'taskAge.days': '天前',
+        'taskAge.week': '周前',
+        'taskAge.weeks': '周前',
+        'taskAge.month': '个月前',
+        'taskAge.months': '个月前',
+
+        // Energy Contexts
+        'context.energy.focused': '专注',
+        'context.energy.lowenergy': '低能量',
+        'context.energy.creative': '创意',
+        'context.energy.routine': '常规',
     },
 };
 

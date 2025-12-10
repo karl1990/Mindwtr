@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '../contexts/theme-context';
-import { useLanguage, Language } from '../contexts/language-context';
+import { useTheme } from '../../contexts/theme-context';
+import { useLanguage, Language } from '../../contexts/language-context';
 import { Colors } from '@/constants/theme';
 import { useTaskStore, mergeAppData } from '@focus-gtd/core';
-import { mobileStorage } from '../lib/storage-adapter';
-import { pickAndParseSyncFile, exportData, readSyncFile, writeSyncFile } from '../lib/storage-file';
+import { mobileStorage } from '../../lib/storage-adapter';
+import { pickAndParseSyncFile, exportData, readSyncFile, writeSyncFile } from '../../lib/storage-file';
 
 type SettingsScreen = 'main' | 'appearance' | 'language' | 'sync' | 'about';
 

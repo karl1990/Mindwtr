@@ -6,6 +6,14 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
+// 0. CRITICAL: Load polyfill shim BEFORE any other module
+config.serializer = {
+    ...config.serializer,
+    getModulesRunBeforeMainModule: () => [
+        require.resolve('./shims/url-polyfill.js'),
+    ],
+};
+
 // 1. Watch all files within the monorepo
 config.watchFolders = [workspaceRoot];
 
@@ -20,10 +28,17 @@ config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
 // 4. Custom resolver to handle workspace packages and problematic modules
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-    // Mock whatwg-url-without-unicode which doesn't work well in React Native
-    if (moduleName === 'whatwg-url-without-unicode') {
+    // Intercept ALL URL polyfill imports and redirect to our custom shim
+    // This completely bypasses the problematic packages
+    if (
+        moduleName === 'react-native-url-polyfill' ||
+        moduleName === 'react-native-url-polyfill/auto' ||
+        moduleName.startsWith('react-native-url-polyfill/') ||
+        moduleName === 'whatwg-url-without-unicode' ||
+        moduleName.startsWith('whatwg-url-without-unicode/')
+    ) {
         return {
-            filePath: path.resolve(projectRoot, 'whatwg-url-mock.js'),
+            filePath: path.resolve(projectRoot, 'shims/url-polyfill.js'),
             type: 'sourceFile',
         };
     }

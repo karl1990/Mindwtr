@@ -1,23 +1,20 @@
 import React, { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useTaskStore } from '@focus-gtd/core';
-import type { Task } from '@focus-gtd/core';
+import { useTaskStore, PRESET_CONTEXTS, Task } from '@focus-gtd/core';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TaskEditModal } from '@/components/task-edit-modal';
-import { useTheme } from '../../contexts/theme-context';
-import { useLanguage } from '../../contexts/language-context';
+import { TaskList } from '../../../components/task-list';
+import { useTheme } from '../../../contexts/theme-context';
+import { useLanguage } from '../../../contexts/language-context';
 import { Colors } from '@/constants/theme';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
-
-// GTD preset contexts
-const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', '@phone', '@anywhere'];
 
 import { sortTasks } from '@/utils/task-sorter';
 
 export default function NextActionsScreen() {
   const router = useRouter();
-  const { tasks, updateTask, deleteTask } = useTaskStore();
+  const { tasks, projects, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -40,10 +37,32 @@ export default function NextActionsScreen() {
     ...tasks.flatMap(t => t.contexts || [])
   ])).sort();
 
+  // For sequential projects, find the first (oldest) next task per project
+  const sequentialProjectFirstTasks = React.useMemo(() => {
+    const sequentialProjects = projects.filter(p => p.isSequential);
+    const firstTaskIds = new Set<string>();
+
+    for (const project of sequentialProjects) {
+      const projectTasks = tasks
+        .filter(t => t.projectId === project.id && t.status === 'next' && !t.deletedAt)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      if (projectTasks.length > 0) {
+        firstTaskIds.add(projectTasks[0].id);
+      }
+    }
+    return firstTaskIds;
+  }, [tasks, projects]);
+
   const nextTasks = sortTasks(tasks.filter(t => {
     if (t.deletedAt) return false;
     if (t.status !== 'next') return false;
     if (selectedContext && !t.contexts?.includes(selectedContext)) return false;
+    // Sequential project filter
+    if (t.projectId) {
+      const project = projects.find(p => p.id === t.projectId);
+      if (project?.isSequential && !sequentialProjectFirstTasks.has(t.id)) return false;
+    }
     return true;
   }));
 
@@ -88,7 +107,6 @@ export default function NextActionsScreen() {
       >
         <Text style={[
           styles.contextChipText,
-          { color: tc.secondaryText },
           selectedContext === null && styles.contextChipTextActive
         ]}>
           {t('common.all')}
@@ -111,7 +129,6 @@ export default function NextActionsScreen() {
           >
             <Text style={[
               styles.contextChipText,
-              { color: tc.secondaryText },
               selectedContext === context && styles.contextChipTextActive
             ]}>
               {context} {count > 0 && `(${count})`}
@@ -239,26 +256,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   contextBar: {
-    borderBottomWidth: 1,
-    maxHeight: 56,
+    minHeight: 50,
+    flexGrow: 0,
+    zIndex: 10,
+    elevation: 5,
   },
   contextBarContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    gap: 6,
+    alignItems: 'center',
   },
   contextChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    marginRight: 6,
   },
   contextChipActive: {
     backgroundColor: '#3B82F6',
   },
   contextChipText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000000',
+    textDecorationLine: 'none',
   },
   contextChipTextActive: {
     color: '#FFFFFF',

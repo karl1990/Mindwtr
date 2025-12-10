@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Modal, StyleSheet, TouchableOpacity, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Task, TaskStatus, useTaskStore } from '@focus-gtd/core';
+import { Task, TaskStatus, TimeEstimate, useTaskStore } from '@focus-gtd/core';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 interface TaskEditModalProps {
@@ -13,6 +13,14 @@ interface TaskEditModalProps {
 }
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'todo', 'next', 'in-progress', 'waiting', 'someday', 'done', 'archived'];
+const TIME_ESTIMATE_OPTIONS: { value: TimeEstimate | ''; label: string }[] = [
+    { value: '', label: 'None' },
+    { value: '5min', label: '5m' },
+    { value: '15min', label: '15m' },
+    { value: '30min', label: '30m' },
+    { value: '1hr', label: '1h' },
+    { value: '2hr+', label: '2h+' },
+];
 
 export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode }: TaskEditModalProps) {
     const { tasks, updateTask } = useTaskStore();
@@ -147,6 +155,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode }: T
                                             setEditedTask(prev => ({ ...prev, checklist: newChecklist }));
                                         }}
                                         style={styles.checkboxTouch}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        activeOpacity={0.6}
                                     >
                                         <View style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}>
                                             {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
@@ -293,6 +303,30 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode }: T
                                     onChange={onDateChange}
                                 />
                             )}
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.label}>Time Estimate</Text>
+                                <View style={styles.statusContainer}>
+                                    {TIME_ESTIMATE_OPTIONS.map(opt => (
+                                        <TouchableOpacity
+                                            key={opt.value || 'none'}
+                                            style={[
+                                                styles.statusChip,
+                                                editedTask.timeEstimate === opt.value && styles.statusChipActive,
+                                                !opt.value && !editedTask.timeEstimate && styles.statusChipActive
+                                            ]}
+                                            onPress={() => setEditedTask(prev => ({ ...prev, timeEstimate: opt.value || undefined }))}
+                                        >
+                                            <Text style={[
+                                                styles.statusText,
+                                                (editedTask.timeEstimate === opt.value || (!opt.value && !editedTask.timeEstimate)) && styles.statusTextActive
+                                            ]}>
+                                                {opt.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
 
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>Checklist</Text>
@@ -464,14 +498,14 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
+        width: 28,
+        height: 28,
+        borderRadius: 6,
         borderWidth: 2,
         borderColor: '#007AFF',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 8,
+        marginRight: 10,
         backgroundColor: 'transparent',
     },
     checkboxChecked: {

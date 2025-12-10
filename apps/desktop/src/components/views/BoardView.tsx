@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { sortTasks } from '../../lib/task-sorter';
 
 const getColumns = (t: (key: string) => string): { id: TaskStatus; label: string }[] => [
+    { id: 'inbox', label: t('list.inbox') || 'Inbox' },
     { id: 'todo', label: t('list.todo') },
     { id: 'next', label: t('list.next') },
     { id: 'in-progress', label: t('list.inProgress') },

@@ -1,14 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTaskStore, Task, TaskStatus } from '@focus-gtd/core';
-import { TaskList } from '@/components/task-list';
-import { useTheme } from '../../contexts/theme-context';
-import { useLanguage } from '../../contexts/language-context';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useTaskStore, Task, TaskStatus, PRESET_CONTEXTS } from '@focus-gtd/core';
+import { TaskList } from '../../../components/task-list';
+import { useTheme } from '../../../contexts/theme-context';
+import { useLanguage } from '../../../contexts/language-context';
 import { Colors } from '@/constants/theme';
 
-// GTD preset contexts
-const PRESET_CONTEXTS = ['@home', '@work', '@errands', '@agendas', '@computer', '@phone', '@anywhere'];
 
 export default function InboxScreen() {
   const router = useRouter();
@@ -17,9 +15,10 @@ export default function InboxScreen() {
   const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [processingStep, setProcessingStep] = useState<'actionable' | 'twomin' | 'decide' | 'context' | 'project'>('actionable');
+  const [processingStep, setProcessingStep] = useState<'actionable' | 'twomin' | 'decide' | 'context' | 'project' | 'waiting-note'>('actionable');
   const [newContext, setNewContext] = useState('');
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
+  const [waitingNote, setWaitingNote] = useState('');
 
   const tc = {
     bg: isDark ? Colors.dark.background : Colors.light.background,
@@ -61,7 +60,7 @@ export default function InboxScreen() {
     moveToNext();
   };
 
-  const [selectedContext, setSelectedContext] = useState<string | null>(null);
+  const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
 
   const handleNotActionable = (action: 'trash' | 'someday' | 'reference') => {
     if (!currentTask) return;
@@ -94,27 +93,53 @@ export default function InboxScreen() {
     if (!currentTask) return;
 
     if (decision === 'delegate') {
-      updateTask(currentTask.id, { status: 'waiting' });
-      moveToNext();
+      setWaitingNote('');
+      setProcessingStep('waiting-note');
     } else {
       setProcessingStep('context');
     }
   };
 
-  const handleSetContext = (context: string | null) => {
-    setSelectedContext(context);
+  const handleConfirmWaitingMobile = () => {
+    if (currentTask) {
+      updateTask(currentTask.id, {
+        status: 'waiting',
+        description: waitingNote || currentTask.description
+      });
+    }
+    setWaitingNote('');
+    moveToNext();
+  };
+
+  const toggleContext = (ctx: string) => {
+    setSelectedContexts(prev =>
+      prev.includes(ctx) ? prev.filter(c => c !== ctx) : [...prev, ctx]
+    );
+  };
+
+  const addCustomContextMobile = () => {
+    if (newContext.trim()) {
+      const ctx = `@${newContext.trim().replace(/^@/, '')}`;
+      if (!selectedContexts.includes(ctx)) {
+        setSelectedContexts(prev => [...prev, ctx]);
+      }
+      setNewContext('');
+    }
+  };
+
+  const handleConfirmContextsMobile = () => {
     setProcessingStep('project');
   };
 
   const handleSetProject = (projectId: string | null) => {
     if (!currentTask) return;
 
-    const contexts = selectedContext ? [selectedContext] : [];
     updateTask(currentTask.id, {
-      status: 'todo',  // Goes to Todo, user can promote to Next manually
-      contexts,
+      status: 'todo',
+      contexts: selectedContexts,
       projectId: projectId || undefined
     });
+    setSelectedContexts([]);
     moveToNext();
   };
 
@@ -254,29 +279,113 @@ export default function InboxScreen() {
               </View>
             )}
 
+            {processingStep === 'waiting-note' && (
+              <View style={styles.stepContent}>
+                <Text style={[styles.stepQuestion, { color: tc.text }]}>
+                  👤 Who/what are you waiting for?
+                </Text>
+                <Text style={[styles.stepHint, { color: tc.secondaryText }]}>
+                  Add a note to remember what you're waiting on
+                </Text>
+
+                <TextInput
+                  style={[styles.waitingInput, { borderColor: tc.border, color: tc.text }]}
+                  placeholder="e.g., Waiting for John to review..."
+                  placeholderTextColor={tc.secondaryText}
+                  value={waitingNote}
+                  onChangeText={setWaitingNote}
+                  multiline
+                  numberOfLines={3}
+                />
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: tc.border }]}
+                    onPress={handleConfirmWaitingMobile}
+                  >
+                    <Text style={[styles.buttonText, { color: tc.text }]}>Skip</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: '#F59E0B' }]}
+                    onPress={handleConfirmWaitingMobile}
+                  >
+                    <Text style={styles.buttonPrimaryText}>✓ Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {processingStep === 'context' && (
               <View style={styles.stepContent}>
                 <Text style={[styles.stepQuestion, { color: tc.text }]}>
-                  {t('inbox.whereDoIt')}
+                  {t('inbox.whereDoIt')} (Select multiple or none)
                 </Text>
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.contextScroll}>
+                {/* Selected contexts display */}
+                {selectedContexts.length > 0 && (
+                  <View style={[styles.selectedContextsContainer, { backgroundColor: '#3B82F620' }]}>
+                    <Text style={{ fontSize: 12, color: '#3B82F6', marginBottom: 4 }}>Selected:</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {selectedContexts.map(ctx => (
+                        <View key={ctx} style={{ backgroundColor: '#3B82F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                          <Text style={{ color: '#FFF', fontSize: 12 }}>{ctx}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Custom context input */}
+                <View style={styles.customContextContainer}>
+                  <TextInput
+                    style={[styles.contextInput, { borderColor: tc.border, color: tc.text }]}
+                    placeholder="Add new context..."
+                    placeholderTextColor={tc.secondaryText}
+                    value={newContext}
+                    onChangeText={setNewContext}
+                    onSubmitEditing={addCustomContextMobile}
+                  />
                   <TouchableOpacity
-                    style={[styles.contextChip, { backgroundColor: '#3B82F6' }]}
-                    onPress={() => handleSetContext(null)}
+                    style={styles.addContextButton}
+                    onPress={addCustomContextMobile}
+                    disabled={!newContext.trim()}
                   >
-                    <Text style={styles.contextChipText}>No context</Text>
+                    <Text style={styles.addContextButtonText}>+</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Preset contexts - toggle selection */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.contextScroll}>
                   {PRESET_CONTEXTS.map(ctx => (
                     <TouchableOpacity
                       key={ctx}
-                      style={[styles.contextChip, { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }]}
-                      onPress={() => handleSetContext(ctx)}
+                      style={[
+                        styles.contextChip,
+                        selectedContexts.includes(ctx)
+                          ? { backgroundColor: '#3B82F6' }
+                          : { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }
+                      ]}
+                      onPress={() => toggleContext(ctx)}
                     >
-                      <Text style={[styles.contextChipText, { color: tc.text }]}>{ctx}</Text>
+                      <Text style={[
+                        styles.contextChipText,
+                        { color: selectedContexts.includes(ctx) ? '#FFF' : tc.text }
+                      ]}>{ctx}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+
+                {/* Done button */}
+                <TouchableOpacity
+                  style={[styles.bigButton, styles.buttonPrimary, { marginTop: 16 }]}
+                  onPress={handleConfirmContextsMobile}
+                >
+                  <Text style={styles.bigButtonText}>
+                    {selectedContexts.length > 0
+                      ? `Done (${selectedContexts.length} context${selectedContexts.length > 1 ? 's' : ''} selected)`
+                      : 'Done - No context needed'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -576,5 +685,19 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     marginRight: 12,
+  },
+  selectedContextsContainer: {
+    padding: 12,
+    borderRadius: 12,
+    marginVertical: 8,
+  },
+  waitingInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginVertical: 8,
   },
 });

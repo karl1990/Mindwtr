@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import type { Task } from '@focus-gtd/core';
+import { Task, getTaskAgeLabel, getTaskStaleness } from '@focus-gtd/core';
 import { useRef, useState } from 'react';
 
 function getStatusColor(status: string): string {
@@ -129,6 +129,35 @@ export function SwipeableTaskItem({
                                         {ctx}
                                     </Text>
                                 ))}
+                            </View>
+                        )}
+                        {/* Task Age Indicator */}
+                        {task.status !== 'done' && getTaskAgeLabel(task.createdAt) && (
+                            <View style={[
+                                styles.ageBadge,
+                                getTaskStaleness(task.createdAt) === 'fresh' && styles.ageFresh,
+                                getTaskStaleness(task.createdAt) === 'aging' && styles.ageAging,
+                                getTaskStaleness(task.createdAt) === 'stale' && styles.ageStale,
+                                getTaskStaleness(task.createdAt) === 'very-stale' && styles.ageVeryStale,
+                            ]}>
+                                <Text style={[
+                                    styles.ageText,
+                                    getTaskStaleness(task.createdAt) === 'fresh' && styles.ageTextFresh,
+                                    getTaskStaleness(task.createdAt) === 'aging' && styles.ageTextAging,
+                                    getTaskStaleness(task.createdAt) === 'stale' && styles.ageTextStale,
+                                    getTaskStaleness(task.createdAt) === 'very-stale' && styles.ageTextVeryStale,
+                                ]}>⏱ {getTaskAgeLabel(task.createdAt)}</Text>
+                            </View>
+                        )}
+                        {/* Time Estimate Badge */}
+                        {task.timeEstimate && (
+                            <View style={styles.timeBadge}>
+                                <Text style={styles.timeText}>
+                                    ⏱ {task.timeEstimate === '5min' ? '5m' :
+                                        task.timeEstimate === '15min' ? '15m' :
+                                            task.timeEstimate === '30min' ? '30m' :
+                                                task.timeEstimate === '1hr' ? '1h' : '2h+'}
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -322,5 +351,59 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         textTransform: 'capitalize',
+    },
+    // Task Age Indicator styles
+    ageBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+    },
+    ageFresh: {
+        backgroundColor: '#D1FAE5',
+    },
+    ageAging: {
+        backgroundColor: '#FEF3C7',
+    },
+    ageStale: {
+        backgroundColor: '#FFEDD5',
+    },
+    ageVeryStale: {
+        backgroundColor: '#FEE2E2',
+    },
+    ageText: {
+        fontSize: 10,
+        fontWeight: '500',
+    },
+    ageTextFresh: {
+        color: '#047857',
+    },
+    ageTextAging: {
+        color: '#B45309',
+    },
+    ageTextStale: {
+        color: '#C2410C',
+    },
+    ageTextVeryStale: {
+        color: '#DC2626',
+    },
+    timeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginTop: 6,
+        marginLeft: 6,
+        alignSelf: 'flex-start',
+        backgroundColor: '#DBEAFE',
+    },
+    timeText: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: '#1D4ED8',
     },
 });
