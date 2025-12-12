@@ -4,8 +4,8 @@ import { TaskItem } from '../TaskItem';
 import { Plus, Folder, Trash2, ListOrdered, ChevronRight, ChevronDown, CheckCircle, Archive as ArchiveIcon, RotateCcw, Paperclip, Link2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
-import { confirm, open } from '@tauri-apps/plugin-dialog';
 import { Markdown } from '../Markdown';
+import { isTauriRuntime } from '../../lib/runtime';
 
 function toDateTimeLocalValue(dateStr: string | undefined): string {
     if (!dateStr) return '';
@@ -84,6 +84,11 @@ export function ProjectsView() {
 
     const addProjectFileAttachment = async () => {
         if (!selectedProject) return;
+        if (!isTauriRuntime()) {
+            alert(t('attachments.fileNotSupported'));
+            return;
+        }
+        const { open } = await import('@tauri-apps/plugin-dialog');
         const selected = await open({
             multiple: false,
             directory: false,
@@ -294,10 +299,14 @@ export function ProjectsView() {
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
-                                                const confirmed = await confirm(t('projects.completeConfirm'), {
-                                                    title: t('projects.title'),
-                                                    kind: 'warning'
-                                                });
+                                                const confirmed = isTauriRuntime()
+                                                    ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                                                        confirm(t('projects.completeConfirm'), {
+                                                            title: t('projects.title'),
+                                                            kind: 'warning',
+                                                        }),
+                                                    )
+                                                    : window.confirm(t('projects.completeConfirm'));
                                                 if (confirmed) {
                                                     updateProject(selectedProject.id, { status: 'completed' });
                                                 }
@@ -312,10 +321,14 @@ export function ProjectsView() {
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
-                                                const confirmed = await confirm(t('projects.archiveConfirm'), {
-                                                    title: t('projects.title'),
-                                                    kind: 'warning'
-                                                });
+                                                const confirmed = isTauriRuntime()
+                                                    ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                                                        confirm(t('projects.archiveConfirm'), {
+                                                            title: t('projects.title'),
+                                                            kind: 'warning',
+                                                        }),
+                                                    )
+                                                    : window.confirm(t('projects.archiveConfirm'));
                                                 if (confirmed) {
                                                     updateProject(selectedProject.id, { status: 'archived' });
                                                 }
@@ -341,10 +354,14 @@ export function ProjectsView() {
                                     onClick={async (e) => {
                                         e.stopPropagation();
                                         e.preventDefault();
-                                        const confirmed = await confirm(t('projects.deleteConfirm'), {
-                                            title: t('projects.title'),
-                                            kind: 'warning'
-                                        });
+                                        const confirmed = isTauriRuntime()
+                                            ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                                                confirm(t('projects.deleteConfirm'), {
+                                                    title: t('projects.title'),
+                                                    kind: 'warning',
+                                                }),
+                                            )
+                                            : window.confirm(t('projects.deleteConfirm'));
                                         if (confirmed) {
                                             deleteProject(selectedProject.id);
                                             setSelectedProjectId(null);

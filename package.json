@@ -10,11 +10,15 @@
     "react-dom": "19.1.0"
   },
   "scripts": {
-    "desktop:dev": "bun run --filter gtd-todo-app dev",
-    "desktop:build": "bun run --filter gtd-todo-app build",
+    "desktop:dev": "bun run --filter mindwtr dev",
+    "desktop:web": "bun run --filter mindwtr dev:vite",
+    "desktop:build": "bun run --filter mindwtr build",
+    "desktop:web:build": "bun run --filter mindwtr build:vite",
     "mobile:start": "bun run --filter mobile start",
     "mobile:android": "bun run --filter mobile android",
     "mobile:ios": "bun run --filter mobile ios",
+    "mindwtr:cli": "bun run scripts/mindwtr-cli.ts --",
+    "mindwtr:api": "bun run scripts/mindwtr-api.ts --",
     "set-version": "bun run scripts/set-version.ts"
   },
   "dependencies": {

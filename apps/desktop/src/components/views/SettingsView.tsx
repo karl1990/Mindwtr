@@ -3,11 +3,10 @@ import { Moon, Sun, Monitor, Globe, Check, ExternalLink, RefreshCw, Keyboard, Be
 import { cn } from '../../lib/utils';
 import { useLanguage, Language } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
-import { open } from '@tauri-apps/plugin-dialog';
-import { getVersion } from '@tauri-apps/api/app';
 import { SyncService } from '../../lib/sync-service';
 import { checkForUpdates, UpdateInfo, GITHUB_RELEASES_URL } from '../../lib/update-service';
 import { useTaskStore, safeFormatDate } from '@mindwtr/core';
+import { isTauriRuntime } from '../../lib/runtime';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -40,14 +39,24 @@ export function SettingsView() {
     // Sync state
     const [syncPath, setSyncPath] = useState<string>('');
     const [isSyncing, setIsSyncing] = useState(false);
-    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav'>(() => SyncService.getSyncBackend());
+    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud'>(() => SyncService.getSyncBackend());
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
+    const [cloudUrl, setCloudUrl] = useState('');
+    const [cloudToken, setCloudToken] = useState('');
 
     useEffect(() => {
         loadPreferences();
-        getVersion().then(setAppVersion).catch(console.error);
+        if (!isTauriRuntime()) {
+            setAppVersion('web');
+            return;
+        }
+
+        import('@tauri-apps/api/app')
+            .then(({ getVersion }) => getVersion())
+            .then(setAppVersion)
+            .catch(console.error);
     }, []);
 
     useEffect(() => {
@@ -58,6 +67,9 @@ export function SettingsView() {
         setWebdavUrl(cfg.url);
         setWebdavUsername(cfg.username);
         setWebdavPassword(cfg.password);
+        const cloudCfg = SyncService.getCloudConfig();
+        setCloudUrl(cloudCfg.url);
+        setCloudToken(cloudCfg.token);
     }, []);
 
     useEffect(() => {
@@ -83,6 +95,9 @@ export function SettingsView() {
 
     const handleChangeSyncLocation = async () => {
         try {
+            if (!isTauriRuntime()) return;
+
+            const { open } = await import('@tauri-apps/plugin-dialog');
             const selected = await open({
                 directory: true,
                 multiple: false,
@@ -109,6 +124,12 @@ export function SettingsView() {
                 username: webdavUsername.trim(),
                 password: webdavPassword,
             });
+        } else if (syncBackend === 'cloud') {
+            if (!cloudUrl.trim() || !cloudToken.trim()) return;
+            SyncService.setCloudConfig({
+                url: cloudUrl.trim(),
+                token: cloudToken.trim(),
+            });
         } else if (!syncPath) {
             return;
         }
@@ -132,7 +153,7 @@ export function SettingsView() {
         }
     };
 
-    const handleSetSyncBackend = (backend: 'file' | 'webdav') => {
+    const handleSetSyncBackend = (backend: 'file' | 'webdav' | 'cloud') => {
         setSyncBackend(backend);
         SyncService.setSyncBackend(backend);
         showSaved();
@@ -143,6 +164,14 @@ export function SettingsView() {
             url: webdavUrl.trim(),
             username: webdavUsername.trim(),
             password: webdavPassword,
+        });
+        showSaved();
+    };
+
+    const handleSaveCloud = () => {
+        SyncService.setCloudConfig({
+            url: cloudUrl.trim(),
+            token: cloudToken.trim(),
         });
         showSaved();
     };
@@ -223,11 +252,16 @@ export function SettingsView() {
             syncBackend: 'Sync backend',
             syncBackendFile: 'File',
             syncBackendWebdav: 'WebDAV',
+            syncBackendCloud: 'Cloud',
             webdavUrl: 'WebDAV URL',
             webdavUsername: 'Username',
             webdavPassword: 'Password',
             webdavSave: 'Save WebDAV',
             webdavHint: 'Use a full URL to your sync JSON file (e.g., https://example.com/remote.php/dav/files/user/mindwtr-sync.json).',
+            cloudUrl: 'Cloud URL',
+            cloudToken: 'Access token',
+            cloudSave: 'Save Cloud',
+            cloudHint: 'Use your cloud endpoint URL (e.g., https://example.com/v1/data).',
             lastSync: 'Last sync',
             lastSyncNever: 'Never',
             lastSyncSuccess: 'Sync completed',
@@ -293,11 +327,16 @@ export function SettingsView() {
             syncBackend: '同步后端',
             syncBackendFile: '文件',
             syncBackendWebdav: 'WebDAV',
+            syncBackendCloud: '云端',
             webdavUrl: 'WebDAV 地址',
             webdavUsername: '用户名',
             webdavPassword: '密码',
             webdavSave: '保存 WebDAV',
             webdavHint: '请输入同步 JSON 文件的完整 URL（例如 https://example.com/remote.php/dav/files/user/mindwtr-sync.json）。',
+            cloudUrl: '云端地址',
+            cloudToken: '访问令牌',
+            cloudSave: '保存云端配置',
+            cloudHint: '请填写云端同步端点（例如 https://example.com/v1/data）。',
             lastSync: '上次同步',
             lastSyncNever: '从未同步',
             lastSyncSuccess: '同步完成',
@@ -632,6 +671,17 @@ export function SettingsView() {
                                 >
                                     {t.syncBackendWebdav}
                                 </button>
+                                <button
+                                    onClick={() => handleSetSyncBackend('cloud')}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors border",
+                                        syncBackend === 'cloud'
+                                            ? "bg-primary/10 text-primary border-primary ring-1 ring-primary"
+                                            : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                                    )}
+                                >
+                                    {t.syncBackendCloud}
+                                </button>
                             </div>
                         </div>
 
@@ -719,7 +769,46 @@ export function SettingsView() {
                             </div>
                         )}
 
-                        {(syncBackend === 'webdav' ? !!webdavUrl.trim() : !!syncPath) && (
+                        {syncBackend === 'cloud' && (
+                            <div className="space-y-3">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-medium">{t.cloudUrl}</label>
+                                    <input
+                                        type="text"
+                                        value={cloudUrl}
+                                        onChange={(e) => setCloudUrl(e.target.value)}
+                                        placeholder="https://example.com/v1/data"
+                                        className="bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <p className="text-xs text-muted-foreground">{t.cloudHint}</p>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-medium">{t.cloudToken}</label>
+                                    <input
+                                        type="password"
+                                        value={cloudToken}
+                                        onChange={(e) => setCloudToken(e.target.value)}
+                                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={handleSaveCloud}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
+                                    >
+                                        {t.cloudSave}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {(syncBackend === 'webdav'
+                            ? !!webdavUrl.trim()
+                            : syncBackend === 'cloud'
+                                ? !!cloudUrl.trim() && !!cloudToken.trim()
+                                : !!syncPath) && (
                             <div className="pt-2">
                                 <button
                                     onClick={handleSync}

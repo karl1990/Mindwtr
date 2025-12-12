@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { useTaskStore, parseQuickAdd, Task } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { cn } from '../lib/utils';
+import { isTauriRuntime } from '../lib/runtime';
 
 export function QuickAddModal() {
     const { addTask, projects } = useTaskStore();
@@ -12,13 +12,19 @@ export function QuickAddModal() {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (!(window as any).__TAURI__) return;
+        if (!isTauriRuntime()) return;
+
         let unlisten: (() => void) | undefined;
-        listen('quick-add', () => {
-            setIsOpen(true);
-        }).then((fn) => {
-            unlisten = fn;
-        }).catch(console.error);
+        import('@tauri-apps/api/event')
+            .then(({ listen }) =>
+                listen('quick-add', () => {
+                    setIsOpen(true);
+                }),
+            )
+            .then((fn) => {
+                unlisten = fn;
+            })
+            .catch(console.error);
 
         return () => {
             if (unlisten) unlisten();

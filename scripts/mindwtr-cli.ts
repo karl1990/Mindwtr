@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { dirname } from 'path';
 
 import {
     createNextRecurringTask,
@@ -11,6 +11,8 @@ import {
     type Task,
     type TaskStatus,
 } from '@mindwtr/core';
+
+import { resolveMindwtrDataPath } from './mindwtr-paths';
 
 type Flags = Record<string, string | boolean>;
 
@@ -43,13 +45,16 @@ function usage(exitCode: number) {
         'mindwtr-cli',
         '',
         'Usage:',
-        '  bun run scripts/mindwtr-cli.ts -- --data <path> add "<text>"',
-        '  bun run scripts/mindwtr-cli.ts -- --data <path> list [--all] [--status <status>] [--query "<q>"]',
-        '  bun run scripts/mindwtr-cli.ts -- --data <path> complete <taskId>',
-        '  bun run scripts/mindwtr-cli.ts -- --data <path> search "<q>"',
+        '  bun run scripts/mindwtr-cli.ts -- add "<text>"',
+        '  bun run scripts/mindwtr-cli.ts -- list [--all] [--status <status>] [--query "<q>"]',
+        '  bun run scripts/mindwtr-cli.ts -- complete <taskId>',
+        '  bun run scripts/mindwtr-cli.ts -- search "<q>"',
+        '',
+        'Options:',
+        '  --data <path>  Override data.json location',
         '',
         'Environment:',
-        '  MINDWTR_DATA  Default data file path (if --data is omitted)',
+        '  MINDWTR_DATA  Override data.json location (if --data is omitted)',
     ];
     console.log(lines.join('\n'));
     process.exit(exitCode);
@@ -95,13 +100,7 @@ async function main() {
 
     if (flags.help || positional.length === 0) usage(0);
 
-    const dataPath = (flags.data as string | undefined) || process.env.MINDWTR_DATA;
-    if (!dataPath) {
-        console.error('Missing --data <path> (or MINDWTR_DATA).');
-        usage(1);
-    }
-
-    const filePath = resolve(String(dataPath));
+    const filePath = resolveMindwtrDataPath(flags.data as string | undefined);
     const data = loadAppData(filePath);
 
     const cmd = positional[0];
@@ -222,4 +221,3 @@ main().catch((err) => {
     console.error(err);
     process.exit(1);
 });
-

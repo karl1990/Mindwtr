@@ -1,11 +1,11 @@
 import { useState, memo } from 'react';
 
 import { Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Plus, Clock, Timer, Paperclip, Link2 } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
 import { useTaskStore, Attachment, Task, TaskStatus, TimeEstimate, generateUUID, getTaskAgeLabel, getTaskStaleness, getTaskUrgency, getStatusColor, Project, safeFormatDate, safeParseDate, getChecklistProgress, getUnblocksCount, stripMarkdown } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/language-context';
 import { Markdown } from './Markdown';
+import { isTauriRuntime } from '../lib/runtime';
 
 // Convert stored ISO or datetime-local strings into datetime-local input values.
 function toDateTimeLocalValue(dateStr: string | undefined): string {
@@ -69,6 +69,11 @@ export const TaskItem = memo(function TaskItem({
     };
 
     const addFileAttachment = async () => {
+        if (!isTauriRuntime()) {
+            alert(t('attachments.fileNotSupported'));
+            return;
+        }
+        const { open } = await import('@tauri-apps/plugin-dialog');
         const selected = await open({
             multiple: false,
             directory: false,

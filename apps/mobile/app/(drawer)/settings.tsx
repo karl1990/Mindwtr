@@ -30,6 +30,8 @@ import {
     WEBDAV_URL_KEY,
     WEBDAV_USERNAME_KEY,
     WEBDAV_PASSWORD_KEY,
+    CLOUD_URL_KEY,
+    CLOUD_TOKEN_KEY,
 } from '../../lib/sync-service';
 
 type SettingsScreen = 'main' | 'appearance' | 'language' | 'notifications' | 'sync' | 'about';
@@ -46,10 +48,12 @@ export default function SettingsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
     const [syncPath, setSyncPath] = useState<string | null>(null);
-    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav'>('file');
+    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud'>('file');
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
+    const [cloudUrl, setCloudUrl] = useState('');
+    const [cloudToken, setCloudToken] = useState('');
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
     const [digestTimePicker, setDigestTimePicker] = useState<'morning' | 'evening' | null>(null);
 
@@ -90,6 +94,8 @@ export default function SettingsPage() {
             WEBDAV_URL_KEY,
             WEBDAV_USERNAME_KEY,
             WEBDAV_PASSWORD_KEY,
+            CLOUD_URL_KEY,
+            CLOUD_TOKEN_KEY,
         ]).then((entries) => {
             const entryMap = new Map(entries);
             const path = entryMap.get(SYNC_PATH_KEY);
@@ -97,12 +103,16 @@ export default function SettingsPage() {
             const url = entryMap.get(WEBDAV_URL_KEY);
             const username = entryMap.get(WEBDAV_USERNAME_KEY);
             const password = entryMap.get(WEBDAV_PASSWORD_KEY);
+            const cloudUrlValue = entryMap.get(CLOUD_URL_KEY);
+            const cloudTokenValue = entryMap.get(CLOUD_TOKEN_KEY);
 
             if (path) setSyncPath(path);
-            setSyncBackend(backend === 'webdav' ? 'webdav' : 'file');
+            setSyncBackend(backend === 'webdav' ? 'webdav' : backend === 'cloud' ? 'cloud' : 'file');
             if (url) setWebdavUrl(url);
             if (username) setWebdavUsername(username);
             if (password) setWebdavPassword(password);
+            if (cloudUrlValue) setCloudUrl(cloudUrlValue);
+            if (cloudTokenValue) setCloudToken(cloudTokenValue);
         }).catch(console.error);
     }, []);
 
@@ -511,7 +521,11 @@ export default function SettingsPage() {
                             <View style={styles.settingInfo}>
                                 <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.syncBackend')}</Text>
                                 <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                    {syncBackend === 'webdav' ? t('settings.syncBackendWebdav') : t('settings.syncBackendFile')}
+                                    {syncBackend === 'webdav'
+                                        ? t('settings.syncBackendWebdav')
+                                        : syncBackend === 'cloud'
+                                            ? t('settings.syncBackendCloud')
+                                            : t('settings.syncBackendFile')}
                                 </Text>
                             </View>
                             <View style={styles.backendToggle}>
@@ -541,6 +555,20 @@ export default function SettingsPage() {
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'webdav' ? tc.tint : tc.secondaryText }]}>
                                         {t('settings.syncBackendWebdav')}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.backendOption,
+                                        { borderColor: tc.border, backgroundColor: syncBackend === 'cloud' ? tc.filterBg : 'transparent' },
+                                    ]}
+                                    onPress={() => {
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(console.error);
+                                        setSyncBackend('cloud');
+                                    }}
+                                >
+                                    <Text style={[styles.backendOptionText, { color: syncBackend === 'cloud' ? tc.tint : tc.secondaryText }]}>
+                                        {t('settings.syncBackendCloud')}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -704,6 +732,104 @@ export default function SettingsPage() {
                                         </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                             {language === 'zh' ? '读取并合并 WebDAV 数据' : 'Read and merge WebDAV data'}
+                                        </Text>
+                                    </View>
+                                    {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
+                                </TouchableOpacity>
+
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                            {language === 'zh' ? '上次同步' : 'Last Sync'}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {settings.lastSyncAt
+                                                ? new Date(settings.lastSyncAt).toLocaleString()
+                                                : (language === 'zh' ? '从未同步' : 'Never')}
+                                            {settings.lastSyncStatus === 'error' && (language === 'zh' ? '（失败）' : ' (failed)')}
+                                        </Text>
+                                        {settings.lastSyncStats && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {(language === 'zh' ? '冲突' : 'Conflicts')}: {(settings.lastSyncStats.tasks.conflicts || 0) + (settings.lastSyncStats.projects.conflicts || 0)}
+                                            </Text>
+                                        )}
+                                        {settings.lastSyncStatus === 'error' && settings.lastSyncError && (
+                                            <Text style={[styles.settingDescription, { color: '#EF4444' }]}>
+                                                {settings.lastSyncError}
+                                            </Text>
+                                        )}
+                                    </View>
+                                </View>
+                            </View>
+                        </>
+                    )}
+
+                    {syncBackend === 'cloud' && (
+                        <>
+                            <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 16 }]}>
+                                {t('settings.syncBackendCloud')}
+                            </Text>
+                            <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
+                                <View style={styles.inputGroup}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudUrl')}</Text>
+                                    <TextInput
+                                        value={cloudUrl}
+                                        onChangeText={setCloudUrl}
+                                        placeholder="https://example.com/v1/data"
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
+                                    />
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {t('settings.cloudHint')}
+                                    </Text>
+                                </View>
+
+                                <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudToken')}</Text>
+                                    <TextInput
+                                        value={cloudToken}
+                                        onChangeText={setCloudToken}
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        secureTextEntry
+                                        style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
+                                    />
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={() => {
+                                        AsyncStorage.multiSet([
+                                            [CLOUD_URL_KEY, cloudUrl.trim()],
+                                            [CLOUD_TOKEN_KEY, cloudToken.trim()],
+                                        ]).catch(console.error);
+                                    }}
+                                    disabled={!cloudUrl.trim() || !cloudToken.trim()}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() && cloudToken.trim() ? tc.tint : tc.secondaryText }]}>
+                                            {t('settings.cloudSave')}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {t('settings.cloudUrl')}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={handleSync}
+                                    disabled={isSyncing || !cloudUrl.trim() || !cloudToken.trim()}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() && cloudToken.trim() ? tc.tint : tc.secondaryText }]}>
+                                            {language === 'zh' ? '同步' : 'Sync'}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {language === 'zh' ? '读取并合并云端数据' : 'Read and merge cloud data'}
                                         </Text>
                                     </View>
                                     {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}

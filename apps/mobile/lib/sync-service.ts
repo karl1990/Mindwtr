@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mergeAppDataWithStats, AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson } from '@mindwtr/core';
+import { mergeAppDataWithStats, AppData, MergeStats, useTaskStore, cloudGetJson, cloudPutJson, webdavGetJson, webdavPutJson } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { readSyncFile, writeSyncFile } from './storage-file';
 
@@ -8,9 +8,12 @@ export const SYNC_BACKEND_KEY = '@mindwtr_sync_backend';
 export const WEBDAV_URL_KEY = '@mindwtr_webdav_url';
 export const WEBDAV_USERNAME_KEY = '@mindwtr_webdav_username';
 export const WEBDAV_PASSWORD_KEY = '@mindwtr_webdav_password';
+export const CLOUD_URL_KEY = '@mindwtr_cloud_url';
+export const CLOUD_TOKEN_KEY = '@mindwtr_cloud_token';
 
 export async function performMobileSync(syncPathOverride?: string): Promise<{ success: boolean; stats?: MergeStats; error?: string }> {
-  const backend = (await AsyncStorage.getItem(SYNC_BACKEND_KEY)) === 'webdav' ? 'webdav' : 'file';
+  const rawBackend = await AsyncStorage.getItem(SYNC_BACKEND_KEY);
+  const backend = rawBackend === 'webdav' ? 'webdav' : rawBackend === 'cloud' ? 'cloud' : 'file';
 
   let wroteLocal = false;
   try {
@@ -21,6 +24,11 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       const username = (await AsyncStorage.getItem(WEBDAV_USERNAME_KEY)) || '';
       const password = (await AsyncStorage.getItem(WEBDAV_PASSWORD_KEY)) || '';
       incomingData = await webdavGetJson<AppData>(url, { username, password });
+    } else if (backend === 'cloud') {
+      const url = await AsyncStorage.getItem(CLOUD_URL_KEY);
+      const token = await AsyncStorage.getItem(CLOUD_TOKEN_KEY);
+      if (!url || !token) return { success: false, error: 'Cloud sync not configured' };
+      incomingData = await cloudGetJson<AppData>(url, { token });
     } else {
       const syncPath = syncPathOverride || await AsyncStorage.getItem(SYNC_PATH_KEY);
       if (!syncPath) {
@@ -55,6 +63,11 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       const username = (await AsyncStorage.getItem(WEBDAV_USERNAME_KEY)) || '';
       const password = (await AsyncStorage.getItem(WEBDAV_PASSWORD_KEY)) || '';
       await webdavPutJson(url, finalData, { username, password });
+    } else if (backend === 'cloud') {
+      const url = await AsyncStorage.getItem(CLOUD_URL_KEY);
+      const token = await AsyncStorage.getItem(CLOUD_TOKEN_KEY);
+      if (!url || !token) return { success: false, error: 'Cloud sync not configured' };
+      await cloudPutJson(url, finalData, { token });
     } else {
       const syncPath = syncPathOverride || await AsyncStorage.getItem(SYNC_PATH_KEY);
       if (!syncPath) return { success: false, error: 'No sync file configured' };
