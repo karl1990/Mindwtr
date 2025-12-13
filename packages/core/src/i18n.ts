@@ -376,7 +376,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
         // Settings
         'settings.title': 'Settings',
-        'settings.subtitle': 'Customize your Focus GTD experience',
+        'settings.subtitle': 'Customize your Mindwtr experience',
         'settings.appearance': 'Appearance',
         'settings.system': 'System',
         'settings.systemDesc': 'Follow system preference',
@@ -921,7 +921,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
         // Settings
         'settings.title': '设置',
-        'settings.subtitle': '自定义您的 Focus GTD 体验',
+        'settings.subtitle': '自定义您的 Mindwtr 体验',
         'settings.appearance': '外观',
         'settings.system': '系统',
         'settings.systemDesc': '跟随系统设置',

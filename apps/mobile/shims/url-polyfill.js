@@ -93,7 +93,7 @@ class FallbackURL {
      * returning '' is safer and prevents the crash, though function will assume it failed or got nothing.
      */
     static createObjectURL() {
-        console.warn('[Focus-GTD] URL.createObjectURL called but not supported by shim. Returning empty string to prevent crash.');
+        console.warn('[Mindwtr] URL.createObjectURL called but not supported by shim. Returning empty string to prevent crash.');
         return '';
     }
     static revokeObjectURL() { }

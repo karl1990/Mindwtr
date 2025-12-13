@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Version bump script for Focus GTD monorepo
+# Version bump script for Mindwtr monorepo
 # Usage: ./scripts/bump-version.sh 0.2.5
 #        ./scripts/bump-version.sh  (prompts for version)
 
