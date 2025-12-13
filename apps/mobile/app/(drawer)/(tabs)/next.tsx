@@ -10,7 +10,6 @@ import { useLanguage } from '../../../contexts/language-context';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
-import { ScreenHeader } from '@/components/screen-header';
 
 
 export default function NextActionsScreen() {
@@ -176,16 +175,6 @@ export default function NextActionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
-      <ScreenHeader
-        title={t('next.title')}
-        subtitle={
-          selectedContext
-            ? `${nextTasks.length} ${t('next.ready')} • ${selectedContext}`
-            : `${nextTasks.length} ${t('next.ready')}`
-        }
-        tc={tc}
-      />
-
       {renderContextFilter()}
 
       {/* Next Actions Warning */}

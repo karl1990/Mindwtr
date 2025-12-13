@@ -96,8 +96,10 @@ export default function DrawerLayout() {
         name="(tabs)"
         options={{
           drawerLabel: t('nav.main'),
-          title: t('app.name'),
-          headerShown: true,
+          title: '',
+          headerTitle: '',
+          headerRight: () => null,
+          headerShadowVisible: false,
         }}
       />
       <Drawer.Screen

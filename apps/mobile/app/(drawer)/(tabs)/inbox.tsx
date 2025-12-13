@@ -506,6 +506,7 @@ export default function InboxScreen() {
       <TaskList
         statusFilter="inbox"
         title={t('inbox.title')}
+        showHeader={false}
         enableBulkActions={false}
         showSort={false}
         showQuickAddHelp={false}

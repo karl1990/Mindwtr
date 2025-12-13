@@ -241,16 +241,6 @@ export function BoardView() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <View style={[styles.header, {
-        backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
-        borderBottomColor: isDark ? '#374151' : '#E5E7EB'
-      }]}>
-        <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>{t('board.title')}</Text>
-        <Text style={[styles.subtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
-          {t('board.hint')}
-        </Text>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={styles.boardScroll}
@@ -288,22 +278,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
   },
   boardScroll: {
     flex: 1,

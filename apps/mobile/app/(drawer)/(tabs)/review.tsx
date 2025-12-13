@@ -10,7 +10,6 @@ import { DailyReviewModal } from '@/components/daily-review-modal';
 
 import { TaskEditModal } from '@/components/task-edit-modal';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
-import { ScreenHeader } from '@/components/screen-header';
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
 
@@ -101,24 +100,19 @@ export default function ReviewScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
-      <ScreenHeader
-        title={t('review.title')}
-        subtitle={`${filteredTasks.length} ${t('common.tasks')}`}
-        tc={tc}
-        right={(
-          <TouchableOpacity
-            style={[
-              styles.selectButton,
-              { borderColor: tc.border, backgroundColor: selectionMode ? tc.filterBg : 'transparent' }
-            ]}
-            onPress={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
-          >
-            <Text style={[styles.selectButtonText, { color: tc.text }]}>
-              {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
-            </Text>
-          </TouchableOpacity>
-        )}
-      >
+      <View style={[styles.toolbar, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.selectButton,
+            { borderColor: tc.border, backgroundColor: selectionMode ? tc.filterBg : 'transparent' }
+          ]}
+          onPress={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
+        >
+          <Text style={[styles.selectButtonText, { color: tc.text }]}>
+            {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+          </Text>
+        </TouchableOpacity>
+
         <View style={styles.headerButtonsRow}>
           <TouchableOpacity
             style={[styles.guideButton, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
@@ -133,7 +127,7 @@ export default function ReviewScreen() {
             <Text style={styles.guideButtonPrimaryText}>{t('review.openGuide')}</Text>
           </TouchableOpacity>
         </View>
-      </ScreenHeader>
+      </View>
 
       <ScrollView horizontal style={[styles.filterBar, { backgroundColor: tc.cardBg, borderBottomColor: tc.border }]} showsHorizontalScrollIndicator={false}>
         <Pressable
@@ -330,6 +324,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    gap: 10,
   },
   filterBar: {
     paddingHorizontal: 16,

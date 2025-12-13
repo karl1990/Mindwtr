@@ -11,11 +11,11 @@ import { useTheme } from '../contexts/theme-context';
 import { useLanguage } from '../contexts/language-context';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import { ScreenHeader } from './screen-header';
 
 export interface TaskListProps {
   statusFilter: TaskStatus | 'all';
   title: string;
+  showHeader?: boolean;
   allowAdd?: boolean;
   projectId?: string;
   enableBulkActions?: boolean;
@@ -29,6 +29,7 @@ export interface TaskListProps {
 export function TaskList({
   statusFilter,
   title,
+  showHeader = true,
   allowAdd = true,
   projectId,
   enableBulkActions = true,
@@ -174,11 +175,16 @@ export function TaskList({
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
-      <ScreenHeader
-        title={title}
-        subtitle={`${filteredTasks.length} ${t('common.tasks')}`}
-        tc={themeColors}
-        right={(
+      {showHeader ? (
+        <View style={[styles.header, { borderBottomColor: themeColors.border, backgroundColor: themeColors.cardBg }]}>
+          <View style={styles.headerTopRow}>
+            <Text style={[styles.title, { color: themeColors.text }]} accessibilityRole="header" numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={[styles.count, { color: themeColors.secondaryText }]} accessibilityLabel={`${filteredTasks.length} tasks`}>
+              {filteredTasks.length} {t('common.tasks')}
+            </Text>
+          </View>
           <View style={styles.headerActions}>
             {showSort && (
               <TouchableOpacity
@@ -209,8 +215,10 @@ export function TaskList({
               </TouchableOpacity>
             )}
           </View>
-        )}
-      />
+        </View>
+      ) : headerAccessory ? (
+        <View style={styles.headerAccessoryRow}>{headerAccessory}</View>
+      ) : null}
 
       {enableBulkActions && selectionMode && (
         <View style={[styles.bulkBar, { backgroundColor: themeColors.cardBg, borderBottomColor: themeColors.border }]}>
@@ -398,12 +406,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  title: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  count: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
     gap: 10,
+  },
+  headerAccessoryRow: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+    alignItems: 'flex-end',
   },
   sortButton: {
     borderWidth: 1,

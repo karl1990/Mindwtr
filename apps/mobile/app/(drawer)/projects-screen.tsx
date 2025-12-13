@@ -12,6 +12,7 @@ import { TaskList } from '../../components/task-list';
 import { useLanguage } from '../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from '../../components/markdown-text';
+import { ListSectionHeader, defaultListContentStyle } from '@/components/list-layout';
 
 export default function ProjectsScreen() {
   const { projects, tasks, addProject, updateProject, deleteProject, toggleProjectFocus } = useTaskStore();
@@ -173,11 +174,6 @@ export default function ProjectsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
-      <View style={[styles.header, { borderBottomColor: tc.border }]}>
-        <Text style={[styles.title, { color: tc.text }]}>{t('projects.title')}</Text>
-        <Text style={[styles.count, { color: tc.secondaryText }]}>{projects.length} {t('projects.count')}</Text>
-      </View>
-
       <View style={[styles.inputContainer, { borderBottomColor: tc.border }]}>
         <TextInput
           style={[styles.input, { borderColor: tc.border, backgroundColor: tc.inputBg, color: tc.text }]}
@@ -213,11 +209,9 @@ export default function ProjectsScreen() {
       <SectionList
         sections={groupedProjects}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={defaultListContentStyle}
         renderSectionHeader={({ section }) => (
-          <Text style={[styles.sectionHeader, { color: tc.secondaryText }]}>
-            {section.title}
-          </Text>
+          <ListSectionHeader title={section.title} tc={tc} />
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -538,6 +532,7 @@ export default function ProjectsScreen() {
 	                <TaskList
 	                  statusFilter="all"
 	                  title={selectedProject.title}
+	                  showHeader={false}
                   projectId={selectedProject.id}
                   allowAdd={true}
                 />
@@ -595,22 +590,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  count: {
-    fontSize: 14,
-    color: '#666',
-  },
   inputContainer: {
     padding: 16,
     gap: 12,
@@ -652,16 +631,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  listContent: {
-    padding: 16,
-  },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    marginTop: 10,
   },
   projectItem: {
     flexDirection: 'row',
