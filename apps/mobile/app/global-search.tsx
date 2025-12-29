@@ -38,10 +38,12 @@ export default function SearchScreen() {
     const { tasks: taskResults, projects: projectResults } = trimmedQuery === ''
         ? { tasks: [] as Task[], projects: [] as Project[] }
         : searchAll(_allTasks, projects, trimmedQuery);
+    const totalResults = projectResults.length + taskResults.length;
     const results = trimmedQuery === '' ? [] : [
         ...projectResults.map(p => ({ type: 'project' as const, item: p })),
         ...taskResults.map(t => ({ type: 'task' as const, item: t })),
     ].slice(0, 50);
+    const isTruncated = totalResults > results.length;
 
     const savedSearches = settings?.savedSearches || [];
     const canSave = trimmedQuery.length > 0;
@@ -122,6 +124,11 @@ export default function SearchScreen() {
             {trimmedQuery !== '' && (
                 <Text style={[styles.helpText, { color: tc.secondaryText }]}>
                     {t('search.helpOperators')}
+                </Text>
+            )}
+            {trimmedQuery !== '' && isTruncated && (
+                <Text style={[styles.helpText, { color: tc.secondaryText }]}>
+                    {t('search.showingFirst', { shown: results.length, total: totalResults })}
                 </Text>
             )}
 
