@@ -56,7 +56,7 @@ export const TaskItem = memo(function TaskItem({
     isMultiSelected = false,
     onToggleSelect,
 }: TaskItemProps) {
-    const { updateTask, deleteTask, moveTask, projects, tasks, settings, duplicateTask, resetTaskChecklist } = useTaskStore();
+    const { updateTask, deleteTask, moveTask, projects, tasks, settings, duplicateTask, resetTaskChecklist, highlightTaskId, setHighlightTask } = useTaskStore();
     const { t, language } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [isChecklistOpen, setIsChecklistOpen] = useState(false);
@@ -85,6 +85,15 @@ export const TaskItem = memo(function TaskItem({
     const [isAIWorking, setIsAIWorking] = useState(false);
     const aiEnabled = settings?.ai?.enabled === true;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const isHighlighted = highlightTaskId === task.id;
+
+    useEffect(() => {
+        if (!isHighlighted) return;
+        const timer = setTimeout(() => {
+            setHighlightTask(null);
+        }, 3500);
+        return () => clearTimeout(timer);
+    }, [isHighlighted, setHighlightTask]);
 
     const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
@@ -421,7 +430,8 @@ export const TaskItem = memo(function TaskItem({
             onClickCapture={() => onSelect?.()}
             className={cn(
                 "group bg-card border border-border rounded-lg p-4 hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 border-l-4",
-                isSelected && "ring-2 ring-primary/40"
+                isSelected && "ring-2 ring-primary/40",
+                isHighlighted && "ring-2 ring-primary/70 border-primary/40"
             )}
             style={{ borderLeftColor: getStatusColor(task.status).border }}
         >

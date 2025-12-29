@@ -13,7 +13,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
-    const { _allTasks, projects, settings, updateSettings } = useTaskStore();
+    const { _allTasks, projects, settings, updateSettings, setHighlightTask } = useTaskStore();
     const { t } = useLanguage();
 
     // Toggle search with Cmd+K / Ctrl+K
@@ -82,6 +82,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         } else {
             // Map task status to appropriate view
             const task = result.item as Task;
+            setHighlightTask(task.id);
             const statusViewMap: Record<string, string> = {
                 'inbox': 'inbox',
                 'next': 'next',
