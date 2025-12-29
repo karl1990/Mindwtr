@@ -80,11 +80,12 @@ function asStatus(value: unknown): TaskStatus | null {
 
 const MAX_BODY_BYTES = Number(process.env.MINDWTR_API_MAX_BODY_BYTES || 1_000_000);
 const encoder = new TextEncoder();
+const corsOrigin = process.env.MINDWTR_API_CORS_ORIGIN || '*';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
     const headers = new Headers(init.headers);
     headers.set('Content-Type', 'application/json; charset=utf-8');
-    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Allow-Origin', corsOrigin);
     headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     headers.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     return new Response(JSON.stringify(body, null, 2), { ...init, headers });
