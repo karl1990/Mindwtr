@@ -83,7 +83,10 @@ const COPILOT_SCHEMA: GeminiSchema = {
 
 async function requestGemini(config: AIProviderConfig, prompt: { system: string; user: string }, schema?: GeminiSchema) {
     const endpoint = config.endpoint || GEMINI_BASE_URL;
-    const url = `${endpoint}/${config.model}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+    if (!config.apiKey) {
+        throw new Error('Gemini API key is required.');
+    }
+    const url = `${endpoint}/${config.model}:generateContent`;
     const thinkingBudget = typeof config.thinkingBudget === 'number' && config.thinkingBudget > 0
         ? Math.floor(config.thinkingBudget)
         : undefined;
@@ -112,6 +115,7 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'x-goog-api-key': config.apiKey,
         },
         body: JSON.stringify(body),
     });

@@ -73,7 +73,9 @@ const createStorage = (): StorageAdapter => {
             }
             try {
                 const data = JSON.parse(jsonValue) as AppData;
-                updateAndroidWidgetFromData(data).catch(() => {});
+                updateAndroidWidgetFromData(data).catch((error) => {
+                    console.warn('[Widgets] Failed to update Android widget from storage load', error);
+                });
                 return data;
             } catch (e) {
                 // JSON parse error - data corrupted, throw so user is notified

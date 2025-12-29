@@ -33,6 +33,8 @@ function RootLayoutContent() {
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const widgetRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isActive = useRef(true);
 
   // Auto-sync on data changes with debounce
   useEffect(() => {
@@ -43,6 +45,7 @@ function RootLayoutContent() {
         clearTimeout(syncDebounceTimer.current);
       }
       syncDebounceTimer.current = setTimeout(() => {
+        if (!isActive.current) return;
         const now = Date.now();
         if (now - lastAutoSyncAt.current > 5_000) {
           lastAutoSyncAt.current = now;
@@ -66,6 +69,7 @@ function RootLayoutContent() {
   // Sync on foreground/background transitions
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (!isActive.current) return;
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // Coming back to foreground - sync to get latest data
         const now = Date.now();
@@ -74,7 +78,11 @@ function RootLayoutContent() {
           performMobileSync().catch(console.error);
         }
         updateAndroidWidgetFromStore().catch(console.error);
-        setTimeout(() => {
+        if (widgetRefreshTimer.current) {
+          clearTimeout(widgetRefreshTimer.current);
+        }
+        widgetRefreshTimer.current = setTimeout(() => {
+          if (!isActive.current) return;
           updateAndroidWidgetFromStore().catch(console.error);
         }, 800);
       }
@@ -93,6 +101,10 @@ function RootLayoutContent() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription?.remove();
+      isActive.current = false;
+      if (widgetRefreshTimer.current) {
+        clearTimeout(widgetRefreshTimer.current);
+      }
       // Flush on unmount/reload as well
       flushPendingSave().catch(console.error);
     };
@@ -121,7 +133,11 @@ function RootLayoutContent() {
           startMobileNotifications().catch(console.error);
         }
         updateAndroidWidgetFromStore().catch(console.error);
-        setTimeout(() => {
+        if (widgetRefreshTimer.current) {
+          clearTimeout(widgetRefreshTimer.current);
+        }
+        widgetRefreshTimer.current = setTimeout(() => {
+          if (!isActive.current) return;
           updateAndroidWidgetFromStore().catch(console.error);
         }, 800);
       } catch (e) {

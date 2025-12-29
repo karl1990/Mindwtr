@@ -38,43 +38,68 @@ function App() {
             startDesktopNotifications().catch(console.error);
         }
 
+        let isActive = true;
         let lastAutoSync = 0;
         let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+        let initialSyncTimer: ReturnType<typeof setTimeout> | null = null;
+        let syncInFlight: Promise<void> | null = null;
+        let syncQueued = false;
 
-        const autoSync = async () => {
-            if (!isTauriRuntime()) return;
-            const now = Date.now();
-            if (now - lastAutoSync < 5_000) return;
-
+        const canSync = async () => {
             const backend = await SyncService.getSyncBackend();
             if (backend === 'file') {
                 const path = await SyncService.getSyncPath();
-                if (!path) return;
-            } else if (backend === 'webdav') {
-                const { url } = await SyncService.getWebDavConfig();
-                if (!url) return;
-            } else {
-                const { url, token } = await SyncService.getCloudConfig();
-                if (!url || !token) return;
+                return Boolean(path);
             }
+            if (backend === 'webdav') {
+                const { url } = await SyncService.getWebDavConfig();
+                return Boolean(url);
+            }
+            const { url, token } = await SyncService.getCloudConfig();
+            return Boolean(url && token);
+        };
+
+        const performSync = async () => {
+            if (!isActive || !isTauriRuntime()) return;
+            const now = Date.now();
+            if (now - lastAutoSync < 5_000) return;
+            if (!(await canSync())) return;
 
             lastAutoSync = now;
             await flushPendingSave().catch(console.error);
             await SyncService.performSync();
         };
 
+        const queueSync = async () => {
+            if (!isActive || !isTauriRuntime()) return;
+            if (syncInFlight) {
+                syncQueued = true;
+                return;
+            }
+            syncInFlight = performSync()
+                .catch(console.error)
+                .finally(() => {
+                    syncInFlight = null;
+                    if (syncQueued && isActive) {
+                        syncQueued = false;
+                        void queueSync();
+                    }
+                });
+            await syncInFlight;
+        };
+
         const focusListener = () => {
             // On focus, use 30s throttle to avoid excessive syncs
             const now = Date.now();
             if (now - lastAutoSync > 30_000) {
-                autoSync().catch(console.error);
+                queueSync().catch(console.error);
             }
         };
 
         const blurListener = () => {
             // Sync when window loses focus
             flushPendingSave().catch(console.error);
-            autoSync().catch(console.error);
+            queueSync().catch(console.error);
         };
 
         // Auto-sync on data changes with debounce
@@ -84,22 +109,30 @@ function App() {
                 clearTimeout(syncDebounceTimer);
             }
             syncDebounceTimer = setTimeout(() => {
-                autoSync().catch(console.error);
+                if (!isActive) return;
+                queueSync().catch(console.error);
             }, 5000);
         });
 
         // Background/on-resume sync (focus/blur) and initial auto-sync
         window.addEventListener('focus', focusListener);
         window.addEventListener('blur', blurListener);
-        setTimeout(() => autoSync().catch(console.error), 1500);
+        initialSyncTimer = setTimeout(() => {
+            if (!isActive) return;
+            queueSync().catch(console.error);
+        }, 1500);
 
         return () => {
+            isActive = false;
             window.removeEventListener('beforeunload', handleUnload);
             window.removeEventListener('focus', focusListener);
             window.removeEventListener('blur', blurListener);
             storeUnsubscribe();
             if (syncDebounceTimer) {
                 clearTimeout(syncDebounceTimer);
+            }
+            if (initialSyncTimer) {
+                clearTimeout(initialSyncTimer);
             }
             stopDesktopNotifications();
         };

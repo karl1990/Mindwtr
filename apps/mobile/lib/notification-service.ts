@@ -20,6 +20,10 @@ let Notifications: NotificationsApi | null = null;
 
 const LANGUAGE_STORAGE_KEY = 'mindwtr-language';
 
+const logNotificationError = (message: string, error: unknown) => {
+  console.warn(`[Notifications] ${message}`, error);
+};
+
 async function loadNotifications(): Promise<NotificationsApi | null> {
   if (Notifications) return Notifications;
 
@@ -77,14 +81,14 @@ async function ensurePermission(api: NotificationsApi) {
 
 async function cancelDailyDigests(api: NotificationsApi) {
   for (const id of scheduledDigestByKind.values()) {
-    await api.cancelScheduledNotificationAsync(id).catch(() => { });
+    await api.cancelScheduledNotificationAsync(id).catch((error) => logNotificationError('Failed to cancel daily digest', error));
   }
   scheduledDigestByKind.clear();
 }
 
 async function cancelWeeklyReview(api: NotificationsApi) {
   if (!scheduledWeeklyReviewId) return;
-  await api.cancelScheduledNotificationAsync(scheduledWeeklyReviewId).catch(() => { });
+  await api.cancelScheduledNotificationAsync(scheduledWeeklyReviewId).catch((error) => logNotificationError('Failed to cancel weekly review', error));
   scheduledWeeklyReviewId = null;
 }
 
@@ -195,25 +199,53 @@ async function scheduleForTask(api: NotificationsApi, task: Task, when: Date) {
   scheduledByTask.set(task.id, { scheduledAtIso: when.toISOString(), notificationId: id });
 }
 
+async function cancelTaskNotification(api: NotificationsApi, taskId: string, entry: ScheduledEntry) {
+  await api.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError(`Failed to cancel task reminder (${taskId})`, error));
+  scheduledByTask.delete(taskId);
+}
+
 async function rescheduleAll(api: NotificationsApi) {
   const now = new Date();
-  const { tasks } = useTaskStore.getState();
+  const { tasks, settings } = useTaskStore.getState();
+  if (settings.notificationsEnabled === false) {
+    for (const [taskId, entry] of scheduledByTask.entries()) {
+      await cancelTaskNotification(api, taskId, entry);
+    }
+    return;
+  }
+
+  const activeTaskIds = new Set<string>();
 
   for (const task of tasks) {
     const next = getNextScheduledAt(task, now);
-    if (!next) continue;
-    if (next.getTime() <= now.getTime()) continue;
+    if (!next || next.getTime() <= now.getTime()) {
+      const existing = scheduledByTask.get(task.id);
+      if (existing) {
+        await cancelTaskNotification(api, task.id, existing);
+      }
+      continue;
+    }
 
     const existing = scheduledByTask.get(task.id);
     const nextIso = next.toISOString();
 
-    if (existing && existing.scheduledAtIso === nextIso) continue;
+    if (existing && existing.scheduledAtIso === nextIso) {
+      activeTaskIds.add(task.id);
+      continue;
+    }
 
     if (existing) {
-      await api.cancelScheduledNotificationAsync(existing.notificationId).catch(() => { });
+      await cancelTaskNotification(api, task.id, existing);
     }
 
     await scheduleForTask(api, task, next);
+    activeTaskIds.add(task.id);
+  }
+
+  for (const [taskId, entry] of scheduledByTask.entries()) {
+    if (!activeTaskIds.has(taskId)) {
+      await cancelTaskNotification(api, taskId, entry);
+    }
   }
 }
 
@@ -246,7 +278,7 @@ export async function startMobileNotifications() {
       buttonTitle: 'Open',
       options: { opensAppToForeground: true },
     },
-  ]).catch(() => { });
+  ]).catch((error) => logNotificationError('Failed to register notification category', error));
 
   await rescheduleAll(api);
   await rescheduleDailyDigest(api);
@@ -276,13 +308,13 @@ export async function stopMobileNotifications() {
 
   if (Notifications) {
     for (const entry of scheduledByTask.values()) {
-      await Notifications.cancelScheduledNotificationAsync(entry.notificationId).catch(() => { });
+      await Notifications.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError('Failed to cancel task reminder', error));
     }
     for (const id of scheduledDigestByKind.values()) {
-      await Notifications.cancelScheduledNotificationAsync(id).catch(() => { });
+      await Notifications.cancelScheduledNotificationAsync(id).catch((error) => logNotificationError('Failed to cancel daily digest', error));
     }
     if (scheduledWeeklyReviewId) {
-      await Notifications.cancelScheduledNotificationAsync(scheduledWeeklyReviewId).catch(() => { });
+      await Notifications.cancelScheduledNotificationAsync(scheduledWeeklyReviewId).catch((error) => logNotificationError('Failed to cancel weekly review', error));
     }
   }
 

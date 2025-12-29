@@ -108,35 +108,21 @@ interface TaskStore {
     updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
 }
 
-// Debounce save helper - captures data snapshot immediately to prevent stale state saves
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+// Save queue helper - coalesces writes while ensuring the latest snapshot is persisted quickly.
 let pendingData: AppData | null = null;
 let pendingOnError: ((msg: string) => void) | null = null;
+let saveInFlight: Promise<void> | null = null;
 
 /**
- * Save data with a debounce delay.
- * Captures current state snapshot immediately to avoid race conditions.
+ * Save data with write coalescing.
+ * Captures a snapshot immediately and serializes writes to avoid lost updates.
  * @param data Snapshot of data to save (must include ALL items including tombstones)
  * @param onError Callback for save failures
  */
 const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
-    // Capture snapshot of data immediately to prevent stale state saves
     pendingData = { ...data, tasks: [...data.tasks], projects: [...data.projects] };
     if (onError) pendingOnError = onError;
-
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        if (pendingData) {
-            const onErrorCallback = pendingOnError;
-            storage.saveData(pendingData).catch(e => {
-                console.error(e);
-                if (onErrorCallback) onErrorCallback('Failed to save data');
-            });
-            pendingData = null;
-            pendingOnError = null;
-        }
-        saveTimeout = null;
-    }, 1000);
+    void flushPendingSave();
 };
 
 /**
@@ -144,23 +130,23 @@ const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
  * Call this when the app goes to background or is about to be terminated.
  */
 export const flushPendingSave = async (): Promise<void> => {
-    if (saveTimeout) {
-        clearTimeout(saveTimeout);
-        saveTimeout = null;
-    }
-    if (pendingData) {
-        try {
-            await storage.saveData(pendingData);
-            pendingData = null;
-            pendingOnError = null;
-        } catch (e) {
-            console.error('Failed to flush pending save:', e);
-            if (pendingOnError) {
-                pendingOnError('Failed to save data on exit');
-                pendingOnError = null;
-            }
+    if (saveInFlight || !pendingData) return;
+    const dataToSave = pendingData;
+    const onErrorCallback = pendingOnError;
+    pendingData = null;
+    pendingOnError = null;
+    saveInFlight = storage.saveData(dataToSave).catch((e) => {
+        console.error('Failed to flush pending save:', e);
+        if (onErrorCallback) {
+            onErrorCallback('Failed to save data');
         }
-    }
+    }).finally(() => {
+        saveInFlight = null;
+        if (pendingData) {
+            void flushPendingSave();
+        }
+    });
+    await saveInFlight;
 };
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
