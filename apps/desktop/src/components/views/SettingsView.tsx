@@ -30,7 +30,7 @@ import { useKeybindings } from '../../contexts/keybinding-context';
 import { useLanguage, type Language } from '../../contexts/language-context';
 import { isTauriRuntime } from '../../lib/runtime';
 import { SyncService } from '../../lib/sync-service';
-import { clearLog, getLogPath, logInfo } from '../../lib/app-log';
+import { clearLog, getLogPath, logDiagnosticsEnabled } from '../../lib/app-log';
 import { ExternalCalendarService } from '../../lib/external-calendar-service';
 import { checkForUpdates, type UpdateInfo, GITHUB_RELEASES_URL } from '../../lib/update-service';
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
@@ -173,9 +173,13 @@ export function SettingsView() {
     }, []);
 
     useEffect(() => {
-        if (!loggingEnabled || didWriteLogRef.current) return;
+        if (!loggingEnabled) {
+            didWriteLogRef.current = false;
+            return;
+        }
+        if (didWriteLogRef.current) return;
         didWriteLogRef.current = true;
-        logInfo('Debug logging enabled', { scope: 'diagnostics' }).catch(console.warn);
+        logDiagnosticsEnabled().catch(console.warn);
     }, [loggingEnabled]);
 
     useEffect(() => {
@@ -311,7 +315,7 @@ export function SettingsView() {
             },
         }).then(showSaved).catch(console.error);
         if (nextEnabled) {
-            await logInfo('Debug logging enabled', { scope: 'diagnostics' });
+            await logDiagnosticsEnabled();
         }
     };
 

@@ -19,6 +19,10 @@ type LogEntry = {
     context?: Record<string, string>;
 };
 
+type AppendLogOptions = {
+    force?: boolean;
+};
+
 const SENSITIVE_KEYS = ['token', 'access_token', 'password', 'pass', 'apikey', 'api_key', 'key', 'auth', 'authorization', 'username', 'user'];
 
 function redactSensitiveText(value: string): string {
@@ -77,8 +81,8 @@ function isLoggingEnabled(): boolean {
     return useTaskStore.getState().settings.diagnostics?.loggingEnabled === true;
 }
 
-async function appendLogLine(entry: LogEntry): Promise<string | null> {
-    if (!isLoggingEnabled()) return null;
+async function appendLogLine(entry: LogEntry, options?: AppendLogOptions): Promise<string | null> {
+    if (!options?.force && !isLoggingEnabled()) return null;
     if (!isTauriRuntime()) return null;
     try {
         await ensureLogDir();
@@ -87,9 +91,11 @@ async function appendLogLine(entry: LogEntry): Promise<string | null> {
             const { invoke } = await import('@tauri-apps/api/core');
             return await invoke<string>('append_log_line', { line });
         } catch (error) {
+            console.warn('Failed to invoke append_log_line', error);
             try {
                 await writeTextFile(LOG_FILE, line, { baseDir: BaseDirectory.Data, append: true });
             } catch (writeError) {
+                console.warn('Failed to append log file', writeError);
                 await writeTextFile(LOG_FILE, line, { baseDir: BaseDirectory.Data });
             }
             return await getLogPath();
@@ -124,6 +130,7 @@ export async function logError(
     error: unknown,
     context: { scope: string; step?: string; url?: string; extra?: Record<string, string> }
 ): Promise<string | null> {
+    if (!isLoggingEnabled()) return null;
     const rawMessage = error instanceof Error ? error.message : String(error);
     const rawStack = error instanceof Error ? error.stack : undefined;
     const message = redactSensitiveText(rawMessage);
@@ -145,6 +152,7 @@ export async function logInfo(
     message: string,
     context?: { scope?: string; extra?: Record<string, string> }
 ): Promise<string | null> {
+    if (!isLoggingEnabled()) return null;
     const safeMessage = redactSensitiveText(message);
     return appendLogLine({
         ts: new Date().toISOString(),
@@ -153,6 +161,18 @@ export async function logInfo(
         message: safeMessage,
         context: sanitizeContext(context?.extra),
     });
+}
+
+export async function logDiagnosticsEnabled(): Promise<string | null> {
+    return appendLogLine(
+        {
+            ts: new Date().toISOString(),
+            level: 'info',
+            scope: 'diagnostics',
+            message: 'Debug logging enabled',
+        },
+        { force: true }
+    );
 }
 
 export async function logSyncError(
