@@ -17,7 +17,7 @@ function toDateTimeLocalValue(dateStr: string | undefined): string {
 }
 
 export function ProjectsView() {
-    const { projects, tasks, addProject, updateProject, deleteProject, addTask, toggleProjectFocus } = useTaskStore();
+    const { projects, tasks, areas, addArea, updateArea, deleteArea, addProject, updateProject, deleteProject, addTask, toggleProjectFocus } = useTaskStore();
     const { t } = useLanguage();
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
@@ -28,15 +28,50 @@ export function ProjectsView() {
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [showLinkPrompt, setShowLinkPrompt] = useState(false);
     const [showDeferredProjects, setShowDeferredProjects] = useState(false);
+    const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
+    const [showAreaManager, setShowAreaManager] = useState(false);
+    const [newAreaName, setNewAreaName] = useState('');
+    const [newAreaColor, setNewAreaColor] = useState('#94a3b8');
+    const [showQuickAreaPrompt, setShowQuickAreaPrompt] = useState(false);
+    const [pendingAreaAssignProjectId, setPendingAreaAssignProjectId] = useState<string | null>(null);
+    const [tagDraft, setTagDraft] = useState('');
     const ALL_AREAS = '__all__';
     const NO_AREA = '__none__';
-    const [areaDraft, setAreaDraft] = useState('');
+    const ALL_TAGS = '__all__';
+    const NO_TAGS = '__none__';
     const [selectedArea, setSelectedArea] = useState(ALL_AREAS);
+    const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
     const projectColorInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         setAttachmentError(null);
     }, [selectedProjectId]);
+
+    const sortedAreas = useMemo(() => {
+        return [...areas].sort((a, b) => a.order - b.order);
+    }, [areas]);
+
+    const areaById = useMemo(() => {
+        return new Map(sortedAreas.map((area) => [area.id, area]));
+    }, [sortedAreas]);
+
+    const normalizeTag = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+        return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    };
+
+    const parseTagInput = (input: string) => {
+        const values = input
+            .split(',')
+            .map((tag) => normalizeTag(tag))
+            .filter(Boolean);
+        return Array.from(new Set(values));
+    };
+
+    const toggleAreaCollapse = (areaId: string) => {
+        setCollapsedAreas((prev) => ({ ...prev, [areaId]: !prev[areaId] }));
+    };
 
     // Group tasks by project to avoid O(N*M) filtering
     const tasksByProject = projects.reduce((acc, project) => {
@@ -54,16 +89,30 @@ export function ProjectsView() {
 
     const areaOptions = useMemo(() => {
         const visibleProjects = projects.filter(p => !p.deletedAt);
-        const areas = new Set<string>();
+        const hasNoArea = visibleProjects.some((project) => !project.areaId || !areaById.has(project.areaId));
+        return {
+            list: sortedAreas,
+            hasNoArea,
+        };
+    }, [projects, sortedAreas, areaById]);
+
+    const tagOptions = useMemo(() => {
+        const visibleProjects = projects.filter(p => !p.deletedAt);
+        const tags = new Set<string>();
+        let hasNoTags = false;
         visibleProjects.forEach((project) => {
-            const area = project.areaTitle?.trim();
-            if (area) areas.add(area);
-            else areas.add(NO_AREA);
+            const list = project.tagIds || [];
+            if (list.length === 0) {
+                hasNoTags = true;
+                return;
+            }
+            list.forEach((tag) => tags.add(tag));
         });
-        const sorted = Array.from(areas).filter(area => area !== NO_AREA).sort((a, b) => a.localeCompare(b));
-        if (areas.has(NO_AREA)) sorted.push(NO_AREA);
-        return sorted;
-    }, [projects, NO_AREA]);
+        return {
+            list: Array.from(tags).sort(),
+            hasNoTags,
+        };
+    }, [projects]);
 
     const { groupedActiveProjects, groupedDeferredProjects } = useMemo(() => {
         const visibleProjects = projects.filter(p => !p.deletedAt);
@@ -74,29 +123,41 @@ export function ProjectsView() {
         });
         const filtered = sorted.filter((project) => {
             if (selectedArea === ALL_AREAS) return true;
-            if (selectedArea === NO_AREA) return !project.areaTitle?.trim();
-            return project.areaTitle?.trim() === selectedArea;
+            if (selectedArea === NO_AREA) return !project.areaId || !areaById.has(project.areaId);
+            return project.areaId === selectedArea;
+        });
+        const filteredByTag = filtered.filter((project) => {
+            const tags = project.tagIds || [];
+            if (selectedTag === ALL_TAGS) return true;
+            if (selectedTag === NO_TAGS) return tags.length === 0;
+            return tags.includes(selectedTag);
         });
 
-        const noAreaLabel = t('common.none');
         const groupByArea = (list: typeof filtered) => {
             const groups = new Map<string, typeof filtered>();
             for (const project of list) {
-                const area = project.areaTitle?.trim() || noAreaLabel;
-                if (!groups.has(area)) groups.set(area, []);
-                groups.get(area)!.push(project);
+                const areaId = project.areaId && areaById.has(project.areaId) ? project.areaId : NO_AREA;
+                if (!groups.has(areaId)) groups.set(areaId, []);
+                groups.get(areaId)!.push(project);
             }
-            return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+            const ordered: Array<[string, typeof filtered]> = [];
+            sortedAreas.forEach((area) => {
+                const entries = groups.get(area.id);
+                if (entries && entries.length > 0) ordered.push([area.id, entries]);
+            });
+            const noAreaEntries = groups.get(NO_AREA);
+            if (noAreaEntries && noAreaEntries.length > 0) ordered.push([NO_AREA, noAreaEntries]);
+            return ordered;
         };
 
-        const active = filtered.filter((project) => project.status === 'active');
-        const deferred = filtered.filter((project) => project.status !== 'active');
+        const active = filteredByTag.filter((project) => project.status === 'active');
+        const deferred = filteredByTag.filter((project) => project.status !== 'active');
 
         return {
             groupedActiveProjects: groupByArea(active),
             groupedDeferredProjects: groupByArea(deferred),
         };
-    }, [projects, t, selectedArea, ALL_AREAS, NO_AREA]);
+    }, [projects, selectedArea, selectedTag, ALL_AREAS, NO_AREA, ALL_TAGS, NO_TAGS, areaById, sortedAreas]);
 
     const handleCreateProject = (e: React.FormEvent) => {
         e.preventDefault();
@@ -122,11 +183,11 @@ export function ProjectsView() {
 
     useEffect(() => {
         if (!selectedProject) {
-            setAreaDraft('');
+            setTagDraft('');
             return;
         }
-        setAreaDraft(selectedProject.areaTitle || '');
-    }, [selectedProject?.id, selectedProject?.areaTitle]);
+        setTagDraft((selectedProject.tagIds || []).join(', '));
+    }, [selectedProject?.id, selectedProject?.tagIds]);
 
     const openAttachment = (attachment: Attachment) => {
         if (attachment.kind === 'link') {
@@ -204,11 +265,34 @@ export function ProjectsView() {
                         className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
                     >
                         <option value={ALL_AREAS}>{t('projects.allAreas')}</option>
-                        {areaOptions.map((area) => (
-                            <option key={area} value={area}>
-                                {area === NO_AREA ? t('projects.noArea') : area}
+                        {areaOptions.list.map((area) => (
+                            <option key={area.id} value={area.id}>
+                                {area.name}
                             </option>
                         ))}
+                        {areaOptions.hasNoArea && (
+                            <option value={NO_AREA}>{t('projects.noArea')}</option>
+                        )}
+                    </select>
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {t('projects.tagFilter')}
+                    </label>
+                    <select
+                        value={selectedTag}
+                        onChange={(e) => setSelectedTag(e.target.value)}
+                        className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+                    >
+                        <option value={ALL_TAGS}>{t('projects.allTags')}</option>
+                        {tagOptions.list.map((tag) => (
+                            <option key={tag} value={tag}>
+                                {tag}
+                            </option>
+                        ))}
+                        {tagOptions.hasNoTags && (
+                            <option value={NO_TAGS}>{t('projects.noTags')}</option>
+                        )}
                     </select>
                 </div>
 
@@ -255,12 +339,31 @@ export function ProjectsView() {
                             {t('projects.activeSection')}
                         </div>
                     )}
-                    {groupedActiveProjects.map(([area, areaProjects]) => (
-                        <div key={area} className="space-y-1">
-                            <div className="px-2 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                {area}
-                            </div>
-                            {areaProjects.map(project => {
+                    {groupedActiveProjects.map(([areaId, areaProjects]) => {
+                        const area = areaById.get(areaId);
+                        const areaLabel = area ? area.name : t('projects.noArea');
+                        const isCollapsed = collapsedAreas[areaId] ?? false;
+
+                        return (
+                            <div key={areaId} className="space-y-1">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleAreaCollapse(areaId)}
+                                    className="w-full flex items-center justify-between px-2 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {area?.color && (
+                                            <span
+                                                className="w-2 h-2 rounded-full border border-border/50"
+                                                style={{ backgroundColor: area.color }}
+                                            />
+                                        )}
+                                        {area?.icon && <span className="text-[10px]">{area.icon}</span>}
+                                        {areaLabel}
+                                    </span>
+                                    {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </button>
+                                {!isCollapsed && areaProjects.map(project => {
                                 const projTasks = tasksByProject[project.id] || [];
                                 let nextAction = undefined;
                                 let nextCandidate = undefined;
@@ -275,58 +378,59 @@ export function ProjectsView() {
                                 nextAction = nextAction || nextCandidate;
                                 const focusedCount = projects.filter(p => p.isFocused).length;
 
-                                return (
-                                    <div
-                                        key={project.id}
-                                        className={cn(
-                                            "rounded-lg cursor-pointer transition-colors text-sm border",
-                                            selectedProjectId === project.id
-                                                ? "bg-accent text-accent-foreground border-accent"
-                                                : project.isFocused
-                                                    ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
-                                                    : "border-transparent hover:bg-muted/50"
-                                        )}
-                                    >
+                                    return (
                                         <div
-                                            className="flex items-center gap-2 p-2"
-                                            onClick={() => setSelectedProjectId(project.id)}
+                                            key={project.id}
+                                            className={cn(
+                                                "rounded-lg cursor-pointer transition-colors text-sm border",
+                                                selectedProjectId === project.id
+                                                    ? "bg-accent text-accent-foreground border-accent"
+                                                    : project.isFocused
+                                                        ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                                                        : "border-transparent hover:bg-muted/50"
+                                            )}
                                         >
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleProjectFocus(project.id);
-                                                }}
-                                                className={cn(
-                                                    "text-sm transition-colors",
-                                                    project.isFocused ? "text-amber-500" : "text-muted-foreground hover:text-amber-500",
-                                                    !project.isFocused && focusedCount >= 5 && "opacity-30 cursor-not-allowed"
-                                                )}
-                                                title={project.isFocused ? "Remove from focus" : focusedCount >= 5 ? "Max 5 focused projects" : "Add to focus"}
+                                            <div
+                                                className="flex items-center gap-2 p-2"
+                                                onClick={() => setSelectedProjectId(project.id)}
                                             >
-                                                {project.isFocused ? '⭐' : '☆'}
-                                            </button>
-                                            <Folder className="w-4 h-4" style={{ color: project.color }} />
-                                            <span className="flex-1 truncate">{project.title}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {projTasks.length}
-                                            </span>
-                                        </div>
-                                        <div className="px-2 pb-2 pl-8">
-                                            {nextAction ? (
-                                                <span className="text-xs text-muted-foreground truncate block">
-                                                    ↳ {nextAction.title}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleProjectFocus(project.id);
+                                                    }}
+                                                    className={cn(
+                                                        "text-sm transition-colors",
+                                                        project.isFocused ? "text-amber-500" : "text-muted-foreground hover:text-amber-500",
+                                                        !project.isFocused && focusedCount >= 5 && "opacity-30 cursor-not-allowed"
+                                                    )}
+                                                    title={project.isFocused ? "Remove from focus" : focusedCount >= 5 ? "Max 5 focused projects" : "Add to focus"}
+                                                >
+                                                    {project.isFocused ? '⭐' : '☆'}
+                                                </button>
+                                                <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                                <span className="flex-1 truncate">{project.title}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {projTasks.length}
                                                 </span>
-                                            ) : projTasks.length > 0 ? (
-                                                <span className="text-xs text-amber-600 dark:text-amber-400">
-                                                    ⚠️ {t('projects.noNextAction')}
-                                                </span>
-                                            ) : null}
+                                            </div>
+                                            <div className="px-2 pb-2 pl-8">
+                                                {nextAction ? (
+                                                    <span className="text-xs text-muted-foreground truncate block">
+                                                        ↳ {nextAction.title}
+                                                    </span>
+                                                ) : projTasks.length > 0 ? (
+                                                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                                                        ⚠️ {t('projects.noNextAction')}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ))}
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
 
                     {groupedDeferredProjects.length > 0 && (
                         <div className="pt-2 border-t border-border">
@@ -340,33 +444,53 @@ export function ProjectsView() {
                             </button>
                             {showDeferredProjects && (
                                 <div className="space-y-3">
-                                    {groupedDeferredProjects.map(([area, areaProjects]) => (
-                                        <div key={`deferred-${area}`} className="space-y-1">
-                                            <div className="px-2 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                {area}
-                                            </div>
-                                            {areaProjects.map(project => (
-                                                <div
-                                                    key={project.id}
-                                                    className={cn(
-                                                        "rounded-lg cursor-pointer transition-colors text-sm border",
-                                                        selectedProjectId === project.id
-                                                            ? "bg-accent text-accent-foreground border-accent"
-                                                            : "border-transparent hover:bg-muted/50"
-                                                    )}
-                                                    onClick={() => setSelectedProjectId(project.id)}
+                                    {groupedDeferredProjects.map(([areaId, areaProjects]) => {
+                                        const area = areaById.get(areaId);
+                                        const areaLabel = area ? area.name : t('projects.noArea');
+                                        const isCollapsed = collapsedAreas[areaId] ?? false;
+
+                                        return (
+                                            <div key={`deferred-${areaId}`} className="space-y-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleAreaCollapse(areaId)}
+                                                    className="w-full flex items-center justify-between px-2 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
                                                 >
-                                                    <div className="flex items-center gap-2 p-2">
-                                                        <Folder className="w-4 h-4" style={{ color: project.color }} />
-                                                        <span className="flex-1 truncate">{project.title}</span>
-                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">
-                                                            {t(`status.${project.status}`) || project.status}
-                                                        </span>
+                                                    <span className="flex items-center gap-2">
+                                                        {area?.color && (
+                                                            <span
+                                                                className="w-2 h-2 rounded-full border border-border/50"
+                                                                style={{ backgroundColor: area.color }}
+                                                            />
+                                                        )}
+                                                        {area?.icon && <span className="text-[10px]">{area.icon}</span>}
+                                                        {areaLabel}
+                                                    </span>
+                                                    {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                </button>
+                                                {!isCollapsed && areaProjects.map(project => (
+                                                    <div
+                                                        key={project.id}
+                                                        className={cn(
+                                                            "rounded-lg cursor-pointer transition-colors text-sm border",
+                                                            selectedProjectId === project.id
+                                                                ? "bg-accent text-accent-foreground border-accent"
+                                                                : "border-transparent hover:bg-muted/50"
+                                                        )}
+                                                        onClick={() => setSelectedProjectId(project.id)}
+                                                    >
+                                                        <div className="flex items-center gap-2 p-2">
+                                                            <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                                            <span className="flex-1 truncate">{project.title}</span>
+                                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">
+                                                                {t(`status.${project.status}`) || project.status}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
+                                                ))}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -405,6 +529,18 @@ export function ProjectsView() {
                                     />
                                     <div className="flex flex-col min-w-0">
                                         <h2 className="text-2xl font-bold truncate">{selectedProject.title}</h2>
+                                        {selectedProject.tagIds && selectedProject.tagIds.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 pt-1">
+                                                {selectedProject.tagIds.map((tag) => (
+                                                    <span
+                                                        key={tag}
+                                                        className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                                                    >
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                         {projectProgress && projectProgress.total > 0 && (
                                             <div className="text-xs text-muted-foreground">
                                                 {t('status.done')}: {projectProgress.doneCount} / {projectProgress.remainingCount} {t('process.remaining')}
@@ -596,27 +732,76 @@ export function ProjectsView() {
 			                            )}
 			                        </div>
 
-			                        <div className="mb-6 bg-card border border-border rounded-lg p-3 space-y-2">
-			                            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-			                                {t('projects.areaLabel')}
-			                            </label>
-			                            <input
-			                                key={`${selectedProject.id}-area`}
-			                                type="text"
-			                                value={areaDraft}
-			                                onChange={(e) => setAreaDraft(e.target.value)}
-			                                onBlur={() => updateProject(selectedProject.id, { areaTitle: areaDraft.trim() || undefined })}
-			                                onKeyDown={(e) => {
-			                                    if (e.key === 'Enter') {
-			                                        e.preventDefault();
-			                                        updateProject(selectedProject.id, { areaTitle: areaDraft.trim() || undefined });
-			                                        e.currentTarget.blur();
-			                                    }
-			                                }}
-			                                placeholder={t('projects.areaPlaceholder')}
-			                                className="w-full text-sm bg-muted/50 border border-border rounded px-2 py-1"
-			                            />
-			                        </div>
+                        <div className="mb-6 bg-card border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                    {t('projects.areaLabel')}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (selectedProject) {
+                                                setPendingAreaAssignProjectId(selectedProject.id);
+                                            }
+                                            setShowQuickAreaPrompt(true);
+                                        }}
+                                        className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        + New
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAreaManager(true)}
+                                        className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        Manage Areas
+                                    </button>
+                                </div>
+                            </div>
+                            <select
+                                key={`${selectedProject.id}-area`}
+                                value={selectedProject.areaId && areaById.has(selectedProject.areaId) ? selectedProject.areaId : NO_AREA}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    updateProject(selectedProject.id, { areaId: value === NO_AREA ? undefined : value });
+                                }}
+                                className="w-full text-sm bg-muted/50 border border-border rounded px-2 py-1"
+                            >
+                                <option value={NO_AREA}>{t('projects.noArea')}</option>
+                                {sortedAreas.map((area) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-6 bg-card border border-border rounded-lg p-3 space-y-2">
+                            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                {t('taskEdit.tagsLabel')}
+                            </label>
+                            <input
+                                key={`${selectedProject.id}-tags`}
+                                type="text"
+                                value={tagDraft}
+                                onChange={(e) => setTagDraft(e.target.value)}
+                                onBlur={() => {
+                                    const tags = parseTagInput(tagDraft);
+                                    updateProject(selectedProject.id, { tagIds: tags });
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const tags = parseTagInput(tagDraft);
+                                        updateProject(selectedProject.id, { tagIds: tags });
+                                        e.currentTarget.blur();
+                                    }
+                                }}
+                                placeholder="#feature, #client"
+                                className="w-full text-sm bg-muted/50 border border-border rounded px-2 py-1"
+                            />
+                        </div>
 
 			                        <div className="mb-6 bg-card border border-border rounded-lg p-3 space-y-2">
 			                            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
@@ -689,6 +874,123 @@ export function ProjectsView() {
                 )}
             </div>
         </div>
+        {showAreaManager && (
+            <div
+                className="fixed inset-0 bg-black/50 flex items-start justify-center pt-[15vh] z-50"
+                role="dialog"
+                aria-modal="true"
+                onClick={() => setShowAreaManager(false)}
+            >
+                <div
+                    className="w-full max-w-lg bg-popover text-popover-foreground rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="px-4 py-3 border-b flex items-center justify-between">
+                        <h3 className="font-semibold">Manage Areas</h3>
+                        <button
+                            type="button"
+                            onClick={() => setShowAreaManager(false)}
+                            className="text-muted-foreground hover:text-foreground"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <div className="p-4 space-y-4">
+                        <div className="space-y-2">
+                            {sortedAreas.length === 0 && (
+                                <div className="text-sm text-muted-foreground">
+                                    {t('projects.noArea')}
+                                </div>
+                            )}
+                            {sortedAreas.map((area) => (
+                                <div key={area.id} className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={area.color || '#94a3b8'}
+                                        onChange={(e) => updateArea(area.id, { color: e.target.value })}
+                                        className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                                        title={t('projects.color')}
+                                    />
+                                    <input
+                                        key={`${area.id}-${area.updatedAt}`}
+                                        defaultValue={area.name}
+                                        onBlur={(e) => {
+                                            const name = e.target.value.trim();
+                                            if (name && name !== area.name) {
+                                                updateArea(area.id, { name });
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                const name = e.currentTarget.value.trim();
+                                                if (name && name !== area.name) {
+                                                    updateArea(area.id, { name });
+                                                }
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
+                                        className="flex-1 bg-muted/50 border border-border rounded px-2 py-1 text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            const confirmed = isTauriRuntime()
+                                                ? await import('@tauri-apps/plugin-dialog').then(({ confirm }) =>
+                                                    confirm(t('projects.deleteConfirm'), {
+                                                        title: 'Area',
+                                                        kind: 'warning',
+                                                    }),
+                                                )
+                                                : window.confirm(t('projects.deleteConfirm'));
+                                            if (confirmed) {
+                                                deleteArea(area.id);
+                                            }
+                                        }}
+                                        className="text-destructive hover:bg-destructive/10 h-8 w-8 rounded-md transition-colors flex items-center justify-center"
+                                        title={t('common.delete')}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="border-t border-border/50 pt-3 space-y-2">
+                            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                New Area
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="color"
+                                    value={newAreaColor}
+                                    onChange={(e) => setNewAreaColor(e.target.value)}
+                                    className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                                />
+                                <input
+                                    type="text"
+                                    value={newAreaName}
+                                    onChange={(e) => setNewAreaName(e.target.value)}
+                                    placeholder="Area name"
+                                    className="flex-1 bg-muted/50 border border-border rounded px-2 py-1 text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const name = newAreaName.trim();
+                                        if (!name) return;
+                                        addArea(name, { color: newAreaColor });
+                                        setNewAreaName('');
+                                    }}
+                                    className="px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                    {t('projects.create')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
         <PromptModal
             isOpen={showLinkPrompt}
             title={t('attachments.addLink')}
@@ -713,6 +1015,34 @@ export function ProjectsView() {
                 };
                 updateProject(selectedProject.id, { attachments: [...(selectedProject.attachments || []), attachment] });
                 setShowLinkPrompt(false);
+            }}
+        />
+        <PromptModal
+            isOpen={showQuickAreaPrompt}
+            title={t('projects.areaLabel')}
+            description={t('projects.areaPlaceholder')}
+            placeholder={t('projects.areaPlaceholder')}
+            defaultValue=""
+            confirmLabel={t('projects.create')}
+            cancelLabel={t('common.cancel')}
+            onCancel={() => {
+                setShowQuickAreaPrompt(false);
+                setPendingAreaAssignProjectId(null);
+            }}
+            onConfirm={async (value) => {
+                const name = value.trim();
+                if (!name) return;
+                await addArea(name, { color: newAreaColor });
+                const state = useTaskStore.getState();
+                const matching = [...state.areas]
+                    .filter((area) => area.name.trim().toLowerCase() === name.toLowerCase())
+                    .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+                const created = matching[0];
+                if (created && pendingAreaAssignProjectId) {
+                    updateProject(pendingAreaAssignProjectId, { areaId: created.id });
+                }
+                setShowQuickAreaPrompt(false);
+                setPendingAreaAssignProjectId(null);
             }}
         />
         </>

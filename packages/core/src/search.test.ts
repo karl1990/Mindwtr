@@ -78,6 +78,7 @@ describe('search', () => {
                 title: 'Work Stuff',
                 color: '#000000',
                 status: 'active',
+                tagIds: [],
                 createdAt: nowIso,
                 updatedAt: nowIso,
             },

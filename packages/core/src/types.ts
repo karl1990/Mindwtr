@@ -12,9 +12,13 @@ export type RecurrenceRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export type RecurrenceStrategy = 'strict' | 'fluid';
 
+export type RecurrenceWeekday = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
+
 export interface Recurrence {
     rule: RecurrenceRule;
     strategy?: RecurrenceStrategy; // Defaults to 'strict'
+    byDay?: RecurrenceWeekday[]; // Explicit weekdays for weekly recurrences
+    rrule?: string; // Optional RFC 5545 fragment (e.g. FREQ=WEEKLY;BYDAY=MO,WE)
 }
 
 export type TaskEditorFieldId =
@@ -37,6 +41,7 @@ export interface Project {
     title: string;
     status: 'active' | 'someday' | 'waiting' | 'archived';
     color: string;
+    tagIds: string[]; // Array of Tag IDs
     isSequential?: boolean; // If true, only first incomplete task shows in Next Actions
     isFocused?: boolean; // If true, this project is a priority focus (max 5 allowed)
     supportNotes?: string;

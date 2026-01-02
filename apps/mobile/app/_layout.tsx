@@ -1,12 +1,13 @@
 import '../polyfills';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Alert, AppState, AppStateStatus } from 'react-native';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider } from '../contexts/language-context';
@@ -29,7 +30,9 @@ try {
 }
 
 function RootLayoutContent() {
+  const router = useRouter();
   const { isDark } = useTheme();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const [storageWarningShown, setStorageWarningShown] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
@@ -85,6 +88,23 @@ function RootLayoutContent() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    const sharedText =
+      typeof shareIntent?.text === 'string'
+        ? shareIntent.text
+        : typeof shareIntent?.webUrl === 'string'
+          ? shareIntent.webUrl
+          : '';
+    if (sharedText.trim()) {
+      router.replace({
+        pathname: '/capture',
+        params: { text: encodeURIComponent(sharedText.trim()) },
+      });
+    }
+    resetShareIntent();
+  }, [hasShareIntent, resetShareIntent, router, shareIntent?.text, shareIntent?.webUrl]);
 
   // Sync on foreground/background transitions
   useEffect(() => {
@@ -255,11 +275,13 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <LanguageProvider>
-          <RootLayoutContent />
-        </LanguageProvider>
-      </ThemeProvider>
+      <ShareIntentProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <RootLayoutContent />
+          </LanguageProvider>
+        </ThemeProvider>
+      </ShareIntentProvider>
     </ErrorBoundary>
   );
 }

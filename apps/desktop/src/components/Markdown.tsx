@@ -11,6 +11,23 @@ function isSafeLink(href: string): boolean {
     }
 }
 
+function isLocalLink(href: string): boolean {
+    if (href.startsWith('file://')) return true;
+    if (href.startsWith('/')) return true;
+    if (/^[a-zA-Z]:[\\/]/.test(href)) return true;
+    if (href.startsWith('~/')) return true;
+    return false;
+}
+
+async function openLinkTarget(href: string) {
+    try {
+        const mod = await import('@tauri-apps/plugin-shell');
+        await mod.open(href);
+    } catch (error) {
+        console.error('[Markdown] Failed to open link:', error);
+    }
+}
+
 function renderInline(text: string): React.ReactNode[] {
     const nodes: React.ReactNode[] = [];
     const tokenRe = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
@@ -41,15 +58,22 @@ function renderInline(text: string): React.ReactNode[] {
         } else if (italicA || italicB) {
             nodes.push(<em key={`italic-${match.index}`}>{italicA || italicB}</em>);
         } else if (linkText && linkHref) {
-            if (isSafeLink(linkHref)) {
+            if (isSafeLink(linkHref) || isLocalLink(linkHref)) {
+                const local = isLocalLink(linkHref);
                 nodes.push(
                     <a
                         key={`link-${match.index}`}
                         href={linkHref}
-                        target="_blank"
-                        rel="noreferrer"
+                        target={local ? undefined : '_blank'}
+                        rel={local ? undefined : 'noreferrer'}
                         className="text-primary underline underline-offset-2 hover:opacity-90"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (local) {
+                                e.preventDefault();
+                                void openLinkTarget(linkHref);
+                            }
+                        }}
                     >
                         {linkText}
                     </a>
@@ -146,4 +170,3 @@ export function Markdown({ markdown, className }: { markdown: string; className?
 
     return <div className={cn('space-y-2 whitespace-pre-wrap break-words', className)}>{blocks}</div>;
 }
-

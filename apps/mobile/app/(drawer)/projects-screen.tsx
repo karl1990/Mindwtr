@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, SectionList, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, SectionList, StyleSheet, TouchableOpacity, Modal, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Attachment, generateUUID, Project, useTaskStore } from '@mindwtr/core';
+import { Attachment, generateUUID, Project, PRESET_TAGS, useTaskStore } from '@mindwtr/core';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
@@ -15,7 +15,7 @@ import { MarkdownText } from '../../components/markdown-text';
 import { ListSectionHeader, defaultListContentStyle } from '@/components/list-layout';
 
 export default function ProjectsScreen() {
-  const { projects, tasks, addProject, updateProject, deleteProject, toggleProjectFocus } = useTaskStore();
+  const { projects, tasks, areas, addProject, updateProject, deleteProject, toggleProjectFocus, addArea, deleteArea } = useTaskStore();
   const { t } = useLanguage();
   const tc = useThemeColors();
   const statusPalette: Record<Project['status'], { text: string; bg: string; border: string }> = {
@@ -25,7 +25,7 @@ export default function ProjectsScreen() {
     archived: { text: tc.secondaryText, bg: tc.filterBg, border: tc.border },
   };
   const [newProjectTitle, setNewProjectTitle] = useState('');
-  const [newProjectArea, setNewProjectArea] = useState('');
+  const [newProjectAreaId, setNewProjectAreaId] = useState<string | undefined>(undefined);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [showNotesPreview, setShowNotesPreview] = useState(false);
@@ -33,6 +33,15 @@ export default function ProjectsScreen() {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [linkModalVisible, setLinkModalVisible] = useState(false);
   const [linkInput, setLinkInput] = useState('');
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showAreaManager, setShowAreaManager] = useState(false);
+  const [newAreaName, setNewAreaName] = useState('');
+  const [newAreaColor, setNewAreaColor] = useState('#3b82f6');
+  const ALL_TAGS = '__all__';
+  const NO_TAGS = '__none__';
+  const [selectedTagFilter, setSelectedTagFilter] = useState(ALL_TAGS);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
 
   const formatReviewDate = (dateStr?: string) => {
     if (!dateStr) return t('common.notSet');
@@ -46,6 +55,59 @@ export default function ProjectsScreen() {
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
   const [selectedColor, setSelectedColor] = useState(colors[0]);
 
+  const sortedAreas = useMemo(() => [...areas].sort((a, b) => a.order - b.order), [areas]);
+  const areaById = useMemo(() => new Map(sortedAreas.map((area) => [area.id, area])), [sortedAreas]);
+  const areaUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    projects.forEach((project) => {
+      if (project.deletedAt) return;
+      if (!project.areaId) return;
+      counts.set(project.areaId, (counts.get(project.areaId) || 0) + 1);
+    });
+    return counts;
+  }, [projects]);
+
+  const projectTagOptions = useMemo(() => {
+    const taskTags = tasks.flatMap((item) => item.tags || []);
+    const projectTags = projects.flatMap((item) => item.tagIds || []);
+    return Array.from(new Set([...PRESET_TAGS, ...taskTags, ...projectTags])).filter(Boolean);
+  }, [tasks, projects]);
+
+  const tagFilterOptions = useMemo(() => {
+    const tags = new Set<string>();
+    let hasNoTags = false;
+    projects.forEach((project) => {
+      if (project.deletedAt) return;
+      const list = project.tagIds || [];
+      if (list.length === 0) {
+        hasNoTags = true;
+        return;
+      }
+      list.forEach((tag) => tags.add(tag));
+    });
+    return {
+      list: Array.from(tags).sort(),
+      hasNoTags,
+    };
+  }, [projects]);
+
+  const normalizeTag = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  };
+
+  const toggleProjectTag = (tag: string) => {
+    if (!selectedProject) return;
+    const normalized = normalizeTag(tag);
+    if (!normalized) return;
+    const current = selectedProject.tagIds || [];
+    const exists = current.includes(normalized);
+    const next = exists ? current.filter((t) => t !== normalized) : [...current, normalized];
+    updateProject(selectedProject.id, { tagIds: next });
+    setSelectedProject({ ...selectedProject, tagIds: next });
+  };
+
   const groupedProjects = useMemo(() => {
     const visible = projects.filter(p => !p.deletedAt);
     const sorted = [...visible].sort((a, b) => {
@@ -53,27 +115,39 @@ export default function ProjectsScreen() {
       if (!a.isFocused && b.isFocused) return 1;
       return a.title.localeCompare(b.title);
     });
+    const filteredByTag = sorted.filter((project) => {
+      const tags = project.tagIds || [];
+      if (selectedTagFilter === ALL_TAGS) return true;
+      if (selectedTagFilter === NO_TAGS) return tags.length === 0;
+      return tags.includes(selectedTagFilter);
+    });
 
-    const noAreaLabel = t('common.none');
     const groups = new Map<string, Project[]>();
-    for (const project of sorted) {
-      const area = project.areaTitle?.trim() || noAreaLabel;
-      if (!groups.has(area)) groups.set(area, []);
-      groups.get(area)!.push(project);
+    for (const project of filteredByTag) {
+      const areaId = project.areaId && areaById.has(project.areaId) ? project.areaId : 'no-area';
+      if (!groups.has(areaId)) groups.set(areaId, []);
+      groups.get(areaId)!.push(project);
     }
 
-    return Array.from(groups.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([title, data]) => ({ title, data }));
-  }, [projects, t]);
+    const sections = sortedAreas
+      .filter((area) => (groups.get(area.id) || []).length > 0)
+      .map((area) => ({ title: area.name, data: groups.get(area.id) || [] }));
+
+    const noAreaProjects = groups.get('no-area') || [];
+    if (noAreaProjects.length > 0) {
+      sections.push({ title: t('projects.noArea'), data: noAreaProjects });
+    }
+
+    return sections;
+  }, [projects, t, sortedAreas, areaById, selectedTagFilter, ALL_TAGS, NO_TAGS]);
 
   const handleAddProject = () => {
     if (newProjectTitle.trim()) {
       addProject(newProjectTitle, selectedColor, {
-        areaTitle: newProjectArea.trim() || undefined,
+        areaId: newProjectAreaId || undefined,
       });
       setNewProjectTitle('');
-      setNewProjectArea('');
+      setNewProjectAreaId(undefined);
     }
   };
 
@@ -83,12 +157,15 @@ export default function ProjectsScreen() {
     if (!original) return;
 
     const nextTitle = project.title.trim();
-    const nextArea = project.areaTitle?.trim() || undefined;
-    const prevArea = original.areaTitle?.trim() || undefined;
+    const nextArea = project.areaId || undefined;
+    const prevArea = original.areaId || undefined;
 
     const updates: Partial<Project> = {};
     if (nextTitle && nextTitle !== original.title) updates.title = nextTitle;
-    if (nextArea !== prevArea) updates.areaTitle = nextArea;
+    if (nextArea !== prevArea) updates.areaId = nextArea;
+    if ((project.tagIds || []).join('|') !== (original.tagIds || []).join('|')) {
+      updates.tagIds = project.tagIds || [];
+    }
 
     if (Object.keys(updates).length > 0) {
       updateProject(project.id, updates);
@@ -204,15 +281,98 @@ export default function ProjectsScreen() {
           onSubmitEditing={handleAddProject}
           returnKeyType="done"
         />
-        <TextInput
-          style={[styles.input, { borderColor: tc.border, backgroundColor: tc.inputBg, color: tc.text, marginTop: 8 }]}
-          placeholder={t('projects.areaPlaceholder')}
-          placeholderTextColor={tc.secondaryText}
-          value={newProjectArea}
-          onChangeText={setNewProjectArea}
-          onSubmitEditing={handleAddProject}
-          returnKeyType="done"
-        />
+        <View style={styles.areaChipRow}>
+          <TouchableOpacity
+            style={[
+              styles.areaChip,
+              { borderColor: tc.border, backgroundColor: !newProjectAreaId ? tc.filterBg : tc.cardBg },
+            ]}
+            onPress={() => setNewProjectAreaId(undefined)}
+          >
+            <Text style={[styles.areaChipText, { color: tc.text }]}>{t('projects.noArea')}</Text>
+          </TouchableOpacity>
+          {sortedAreas.map((area) => (
+            <TouchableOpacity
+              key={area.id}
+              style={[
+                styles.areaChip,
+                {
+                  borderColor: tc.border,
+                  backgroundColor: newProjectAreaId === area.id ? tc.filterBg : tc.cardBg,
+                },
+              ]}
+              onPress={() => setNewProjectAreaId(area.id)}
+              onLongPress={() => {
+                const inUse = (areaUsage.get(area.id) || 0) > 0;
+                if (inUse) {
+                  Alert.alert(t('common.notice') || 'Notice', t('projects.areaInUse') || 'Area has projects.');
+                  return;
+                }
+                Alert.alert(
+                  t('projects.areaLabel'),
+                  t('projects.deleteConfirm'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                      text: t('common.delete'),
+                      style: 'destructive',
+                      onPress: () => deleteArea(area.id),
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={[styles.areaChipText, { color: tc.text }]}>{area.name}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[styles.areaChip, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+            onPress={() => {
+              setNewAreaName('');
+              setNewAreaColor(colors[0]);
+              setShowAreaManager(true);
+            }}
+          >
+            <Text style={[styles.areaChipText, { color: tc.secondaryText }]}>+ {t('projects.areaLabel')}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.tagFilterRow}>
+          <Text style={[styles.tagFilterLabel, { color: tc.secondaryText }]}>{t('projects.tagFilter')}</Text>
+          <View style={styles.tagFilterChips}>
+            <TouchableOpacity
+              style={[
+                styles.tagFilterChip,
+                { borderColor: tc.border, backgroundColor: selectedTagFilter === ALL_TAGS ? tc.filterBg : tc.cardBg },
+              ]}
+              onPress={() => setSelectedTagFilter(ALL_TAGS)}
+            >
+              <Text style={[styles.tagFilterText, { color: tc.text }]}>{t('projects.allTags')}</Text>
+            </TouchableOpacity>
+            {tagFilterOptions.list.map((tag) => (
+              <TouchableOpacity
+                key={tag}
+                style={[
+                  styles.tagFilterChip,
+                  { borderColor: tc.border, backgroundColor: selectedTagFilter === tag ? tc.filterBg : tc.cardBg },
+                ]}
+                onPress={() => setSelectedTagFilter(tag)}
+              >
+                <Text style={[styles.tagFilterText, { color: tc.text }]}>{tag}</Text>
+              </TouchableOpacity>
+            ))}
+            {tagFilterOptions.hasNoTags && (
+              <TouchableOpacity
+                style={[
+                  styles.tagFilterChip,
+                  { borderColor: tc.border, backgroundColor: selectedTagFilter === NO_TAGS ? tc.filterBg : tc.cardBg },
+                ]}
+                onPress={() => setSelectedTagFilter(NO_TAGS)}
+              >
+                <Text style={[styles.tagFilterText, { color: tc.text }]}>{t('projects.noTags')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
         <View style={styles.colorPicker}>
           {colors.map((color) => (
             <TouchableOpacity
@@ -285,7 +445,16 @@ export default function ProjectsScreen() {
               >
                 <View style={[styles.projectColor, { backgroundColor: item.color }]} />
                 <View style={styles.projectContent}>
-                  <Text style={[styles.projectTitle, { color: tc.text }]}>{item.title}</Text>
+                  <View style={styles.projectTitleRow}>
+                    <Text style={[styles.projectTitle, { color: tc.text }]}>{item.title}</Text>
+                    {item.tagIds?.length ? (
+                      <View style={styles.projectTagDots}>
+                        {item.tagIds.slice(0, 4).map((tag) => (
+                          <View key={tag} style={[styles.projectTagDot, { backgroundColor: tc.secondaryText }]} />
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
                   {nextAction ? (
                     <Text style={[styles.projectMeta, { color: tc.secondaryText }]} numberOfLines={1}>
                       ↳ {nextAction.title}
@@ -340,13 +509,15 @@ export default function ProjectsScreen() {
           persistSelectedProjectEdits(selectedProject);
           setSelectedProject(null);
           setNotesExpanded(false);
-          setShowNotesPreview(false);
-          setShowReviewPicker(false);
-          setShowStatusMenu(false);
-          setLinkModalVisible(false);
-          setLinkInput('');
-        }}
-      >
+                    setShowNotesPreview(false);
+                    setShowReviewPicker(false);
+                    setShowStatusMenu(false);
+                    setLinkModalVisible(false);
+                    setLinkInput('');
+                    setShowAreaPicker(false);
+                    setShowTagPicker(false);
+                  }}
+                >
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaView style={{ flex: 1, backgroundColor: tc.bg }}>
             {selectedProject && (
@@ -483,6 +654,36 @@ export default function ProjectsScreen() {
                   </View>
                 </View>
 
+                <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                  <Text style={[styles.reviewLabel, { color: tc.text }]}>
+                    {t('projects.areaLabel')}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.reviewButton, { backgroundColor: tc.inputBg, borderColor: tc.border }]}
+                    onPress={() => setShowAreaPicker(true)}
+                  >
+                    <Text style={{ color: tc.text }}>
+                      {selectedProject.areaId && areaById.has(selectedProject.areaId)
+                        ? areaById.get(selectedProject.areaId)?.name
+                        : t('projects.noArea')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                  <Text style={[styles.reviewLabel, { color: tc.text }]}>
+                    {t('taskEdit.tagsLabel')}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.reviewButton, { backgroundColor: tc.inputBg, borderColor: tc.border }]}
+                    onPress={() => setShowTagPicker(true)}
+                  >
+                    <Text style={{ color: tc.text }}>
+                      {selectedProject.tagIds?.length ? selectedProject.tagIds.join(', ') : t('common.none')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Project Notes Section */}
                 <View style={[styles.notesContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                   <View style={styles.notesHeaderRow}>
@@ -574,32 +775,6 @@ export default function ProjectsScreen() {
                         ))}
                     </View>
                   )}
-                </View>
-
-                {/* Project Area */}
-                <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
-                  <Text style={[styles.reviewLabel, { color: tc.text }]}>
-                    {t('projects.areaLabel')}
-                  </Text>
-                  <TextInput
-                    style={[styles.reviewButton, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
-                    placeholder={t('projects.areaPlaceholder')}
-                    placeholderTextColor={tc.secondaryText}
-                    value={selectedProject.areaTitle || ''}
-                    onChangeText={(text) => setSelectedProject({ ...selectedProject, areaTitle: text })}
-                    onSubmitEditing={(e) => {
-                      const value = e.nativeEvent.text.trim();
-                      updateProject(selectedProject.id, { areaTitle: value || undefined });
-                      setSelectedProject({ ...selectedProject, areaTitle: value || undefined });
-                    }}
-                    onEndEditing={(e) => {
-                      const value = e.nativeEvent.text.trim();
-                      updateProject(selectedProject.id, { areaTitle: value || undefined });
-                      setSelectedProject({ ...selectedProject, areaTitle: value || undefined });
-                    }}
-                    returnKeyType="done"
-                    blurOnSubmit
-                  />
                 </View>
 
                 {/* Project Review Date (Tickler) */}
@@ -697,6 +872,191 @@ export default function ProjectsScreen() {
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={showAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaPicker(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowAreaPicker(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
+            <TouchableOpacity
+              style={[styles.pickerRow, { borderColor: tc.border }]}
+              onPress={() => {
+                setShowAreaPicker(false);
+                setNewAreaName('');
+                setNewAreaColor(colors[0]);
+                setShowAreaManager(true);
+              }}
+            >
+              <Text style={[styles.pickerRowText, { color: tc.secondaryText }]}>+ {t('projects.areaLabel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pickerRow, { borderColor: tc.border }]}
+              onPress={() => {
+                if (!selectedProject) return;
+                updateProject(selectedProject.id, { areaId: undefined });
+                setSelectedProject({ ...selectedProject, areaId: undefined });
+                setShowAreaPicker(false);
+              }}
+            >
+              <Text style={[styles.pickerRowText, { color: tc.text }]}>{t('projects.noArea')}</Text>
+            </TouchableOpacity>
+            {sortedAreas.map((area) => (
+              <TouchableOpacity
+                key={area.id}
+                style={[styles.pickerRow, { borderColor: tc.border }]}
+                onPress={() => {
+                  if (!selectedProject) return;
+                  updateProject(selectedProject.id, { areaId: area.id });
+                  setSelectedProject({ ...selectedProject, areaId: area.id });
+                  setShowAreaPicker(false);
+                }}
+              >
+                <View style={[styles.areaDot, { backgroundColor: area.color || tc.tint }]} />
+                <Text style={[styles.pickerRowText, { color: tc.text }]}>{area.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={showAreaManager}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaManager(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowAreaManager(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
+            {sortedAreas.length === 0 ? (
+              <Text style={[styles.helperText, { color: tc.secondaryText }]}>{t('projects.noArea')}</Text>
+            ) : (
+              <View style={styles.areaManagerList}>
+                {sortedAreas.map((area) => {
+                  const inUse = (areaUsage.get(area.id) || 0) > 0;
+                  return (
+                    <View key={area.id} style={[styles.areaManagerRow, { borderColor: tc.border }]}>
+                      <View style={styles.areaManagerInfo}>
+                        <View style={[styles.areaDot, { backgroundColor: area.color || tc.tint }]} />
+                        <Text style={[styles.areaManagerText, { color: tc.text }]}>{area.name}</Text>
+                      </View>
+                      <TouchableOpacity
+                        disabled={inUse}
+                        onPress={() => {
+                          if (inUse) {
+                            Alert.alert(t('common.notice') || 'Notice', t('projects.areaInUse') || 'Area has projects.');
+                            return;
+                          }
+                          deleteArea(area.id);
+                        }}
+                        style={[styles.areaDeleteButton, inUse && styles.areaDeleteButtonDisabled]}
+                      >
+                        <Text style={[styles.areaDeleteText, { color: inUse ? tc.secondaryText : '#EF4444' }]}>
+                          {t('common.delete')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+            <TextInput
+              value={newAreaName}
+              onChangeText={setNewAreaName}
+              placeholder={t('projects.areaLabel')}
+              placeholderTextColor={tc.secondaryText}
+              style={[styles.linkModalInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
+            />
+            <View style={styles.colorPicker}>
+              {colors.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: color },
+                    newAreaColor === color && styles.colorOptionSelected,
+                  ]}
+                  onPress={() => setNewAreaColor(color)}
+                />
+              ))}
+            </View>
+            <View style={styles.linkModalButtons}>
+              <TouchableOpacity
+                onPress={() => setShowAreaManager(false)}
+                style={styles.linkModalButton}
+              >
+                <Text style={[styles.linkModalButtonText, { color: tc.secondaryText }]}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const name = newAreaName.trim();
+                  if (!name) return;
+                  addArea(name, { color: newAreaColor });
+                  setShowAreaManager(false);
+                  setNewAreaName('');
+                }}
+                disabled={!newAreaName.trim()}
+                style={[styles.linkModalButton, !newAreaName.trim() && styles.linkModalButtonDisabled]}
+              >
+                <Text style={[styles.linkModalButtonText, { color: tc.tint }]}>{t('common.save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={showTagPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTagPicker(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowTagPicker(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('taskEdit.tagsLabel')}</Text>
+            <View style={[styles.tagInputRow, { borderColor: tc.border, backgroundColor: tc.inputBg }]}>
+              <TextInput
+                value={tagDraft}
+                onChangeText={setTagDraft}
+                placeholder="#tag"
+                placeholderTextColor={tc.secondaryText}
+                style={[styles.tagInput, { color: tc.text }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  const nextTag = normalizeTag(tagDraft);
+                  if (!nextTag) return;
+                  toggleProjectTag(nextTag);
+                  setTagDraft('');
+                }}
+                style={[styles.tagAddButton, { borderColor: tc.border }]}
+              >
+                <Text style={[styles.tagAddButtonText, { color: tc.tint }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tagOptions}>
+              {projectTagOptions.map((tag) => {
+                const active = Boolean(selectedProject?.tagIds?.includes(tag));
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    onPress={() => toggleProjectTag(tag)}
+                    style={[
+                      styles.tagOption,
+                      { borderColor: tc.border, backgroundColor: active ? tc.filterBg : tc.cardBg },
+                    ]}
+                  >
+                    <Text style={[styles.tagOptionText, { color: tc.text }]}>{tag}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View >
   );
 }
@@ -711,6 +1071,43 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
+  },
+  areaChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagFilterRow: {
+    gap: 8,
+  },
+  tagFilterLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagFilterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  tagFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  areaChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  areaChipText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,
@@ -769,6 +1166,22 @@ const styles = StyleSheet.create({
   },
   projectContent: {
     flex: 1,
+  },
+  projectTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  projectTagDots: {
+    flexDirection: 'row',
+    gap: 4,
+    marginLeft: 6,
+  },
+  projectTagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    opacity: 0.7,
   },
   projectTitle: {
     fontSize: 16,
@@ -1047,6 +1460,97 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 12,
     marginTop: 14,
+  },
+  areaManagerList: {
+    marginBottom: 12,
+  },
+  areaManagerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  areaManagerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  areaManagerText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  areaDeleteButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  areaDeleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  areaDeleteText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pickerCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 280,
+    maxWidth: 360,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  pickerRowText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  areaDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+  },
+  tagInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    marginTop: 10,
+  },
+  tagInput: {
+    flex: 1,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  tagAddButton: {
+    borderLeftWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  tagAddButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  tagOptions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagOption: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  tagOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   linkModalButton: {
     paddingHorizontal: 10,

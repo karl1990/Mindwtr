@@ -9,8 +9,11 @@ import {
     TaskPriority,
     TimeEstimate,
     TaskEditorFieldId,
+    type Recurrence,
     type RecurrenceRule,
     type RecurrenceStrategy,
+    buildRRuleString,
+    parseRRuleString,
     generateUUID,
     getTaskAgeLabel,
     getTaskStaleness,
@@ -34,6 +37,7 @@ import { Markdown } from './Markdown';
 import { isTauriRuntime } from '../lib/runtime';
 import { normalizeAttachmentInput } from '../lib/attachment-utils';
 import { buildAIConfig, buildCopilotConfig, loadAIKey } from '../lib/ai-config';
+import { WeekdaySelector } from './Task/TaskForm/WeekdaySelector';
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'status',
@@ -73,6 +77,14 @@ function getRecurrenceStrategyValue(recurrence: Task['recurrence']): RecurrenceS
     return 'strict';
 }
 
+function getRecurrenceRRuleValue(recurrence: Task['recurrence']): string {
+    if (!recurrence || typeof recurrence === 'string') return '';
+    const rec = recurrence as Recurrence;
+    if (rec.rrule) return rec.rrule;
+    if (rec.byDay && rec.byDay.length > 0) return buildRRuleString(rec.rule, rec.byDay);
+    return rec.rule ? buildRRuleString(rec.rule) : '';
+}
+
 interface TaskItemProps {
     task: Task;
     project?: Project;
@@ -106,6 +118,7 @@ export const TaskItem = memo(function TaskItem({
     const [editLocation, setEditLocation] = useState(task.location || '');
     const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule | ''>(getRecurrenceRuleValue(task.recurrence));
     const [editRecurrenceStrategy, setEditRecurrenceStrategy] = useState<RecurrenceStrategy>(getRecurrenceStrategyValue(task.recurrence));
+    const [editRecurrenceRRule, setEditRecurrenceRRule] = useState<string>(getRecurrenceRRuleValue(task.recurrence));
     const [editTimeEstimate, setEditTimeEstimate] = useState<TimeEstimate | ''>(task.timeEstimate || '');
     const [editPriority, setEditPriority] = useState<TaskPriority | ''>(task.priority || '');
     const [editReviewAt, setEditReviewAt] = useState(toDateTimeLocalValue(task.reviewAt));
@@ -428,7 +441,19 @@ export const TaskItem = memo(function TaskItem({
                         <select
                             value={editRecurrence}
                             aria-label="Recurrence"
-                            onChange={(e) => setEditRecurrence(e.target.value as RecurrenceRule | '')}
+                            onChange={(e) => {
+                                const value = e.target.value as RecurrenceRule | '';
+                                setEditRecurrence(value);
+                                if (value === 'weekly') {
+                                    const parsed = parseRRuleString(editRecurrenceRRule);
+                                    if (!editRecurrenceRRule || parsed.rule !== 'weekly') {
+                                        setEditRecurrenceRRule(buildRRuleString('weekly'));
+                                    }
+                                }
+                                if (!value) {
+                                    setEditRecurrenceRRule('');
+                                }
+                            }}
                             className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
                         >
                             <option value="">{t('recurrence.none')}</option>
@@ -468,6 +493,16 @@ export const TaskItem = memo(function TaskItem({
                                         {t('recurrence.strategyFluid')}
                                     </button>
                                 </div>
+                            </div>
+                        )}
+                        {editRecurrence === 'weekly' && (
+                            <div className="pt-1">
+                                <span className="text-[10px] text-muted-foreground">Repeat on</span>
+                                <WeekdaySelector
+                                    value={editRecurrenceRRule || buildRRuleString('weekly')}
+                                    onChange={(rrule) => setEditRecurrenceRRule(rrule)}
+                                    className="pt-1"
+                                />
                             </div>
                         )}
                     </div>
@@ -769,6 +804,7 @@ export const TaskItem = memo(function TaskItem({
         setEditLocation(task.location || '');
         setEditRecurrence(getRecurrenceRuleValue(task.recurrence));
         setEditRecurrenceStrategy(getRecurrenceStrategyValue(task.recurrence));
+        setEditRecurrenceRRule(getRecurrenceRRuleValue(task.recurrence));
         setEditTimeEstimate(task.timeEstimate || '');
         setEditPriority(task.priority || '');
         setEditReviewAt(toDateTimeLocalValue(task.reviewAt));
@@ -955,9 +991,16 @@ export const TaskItem = memo(function TaskItem({
         e.preventDefault();
         if (editTitle.trim()) {
             const filteredBlockedBy = editBlockedByTaskIds.filter((id) => availableBlockerIds.has(id));
-            const recurrenceValue = editRecurrence
+            const recurrenceValue: Recurrence | undefined = editRecurrence
                 ? { rule: editRecurrence, strategy: editRecurrenceStrategy }
                 : undefined;
+            if (recurrenceValue && editRecurrence === 'weekly' && editRecurrenceRRule) {
+                const parsed = parseRRuleString(editRecurrenceRRule);
+                if (parsed.byDay && parsed.byDay.length > 0) {
+                    recurrenceValue.byDay = parsed.byDay;
+                }
+                recurrenceValue.rrule = editRecurrenceRRule;
+            }
             updateTask(task.id, {
                 title: editTitle,
                 dueDate: editDueDate || undefined,

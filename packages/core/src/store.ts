@@ -129,6 +129,10 @@ interface TaskStore {
     /** Reorder areas by id list */
     reorderAreas: (orderedIds: string[]) => Promise<void>;
 
+    // Tag Actions
+    /** Delete a tag from tasks and projects */
+    deleteTag: (tagId: string) => Promise<void>;
+
     // Settings Actions
     /** Update application settings */
     updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
@@ -140,6 +144,13 @@ interface TaskStore {
 let pendingData: AppData | null = null;
 let pendingOnError: ((msg: string) => void) | null = null;
 let saveInFlight: Promise<void> | null = null;
+
+const normalizeTagId = (value: string): string => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    const withPrefix = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    return withPrefix.toLowerCase();
+};
 
 /**
  * Save data with write coalescing.
@@ -240,7 +251,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                     };
                 });
             }
-            const allProjects = rawProjects.map((project) => {
+            let allProjects = rawProjects.map((project) => {
                 const status = project.status;
                 const normalizedStatus =
                     status === 'active' || status === 'someday' || status === 'waiting' || status === 'archived'
@@ -248,9 +259,51 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                         : status === 'completed'
                             ? 'archived'
                             : 'active';
-                return normalizedStatus === status ? project : { ...project, status: normalizedStatus };
+                const tagIds = Array.isArray((project as Project).tagIds) ? (project as Project).tagIds : [];
+                const normalizedProject =
+                    normalizedStatus === status
+                        ? { ...project, tagIds }
+                        : { ...project, status: normalizedStatus, tagIds };
+                return normalizedProject;
             });
-            const allAreas = rawAreas
+            let didAreaMigration = false;
+            let allAreas = rawAreas
+                .map((area, index) => ({
+                    ...area,
+                    order: Number.isFinite(area.order) ? area.order : index,
+                }))
+                .sort((a, b) => a.order - b.order);
+            const areaByName = new Map<string, string>();
+            allAreas.forEach((area) => {
+                if (area?.name) {
+                    areaByName.set(area.name.trim().toLowerCase(), area.id);
+                }
+            });
+            const ensureAreaForTitle = (title: string) => {
+                const trimmed = title.trim();
+                if (!trimmed) return undefined;
+                const key = trimmed.toLowerCase();
+                const existing = areaByName.get(key);
+                if (existing) return existing;
+                const now = new Date().toISOString();
+                const id = uuidv4();
+                const order = allAreas.reduce((max, area) => Math.max(max, Number.isFinite(area.order) ? area.order : -1), -1) + 1;
+                allAreas = [...allAreas, { id, name: trimmed, order, createdAt: now, updatedAt: now }];
+                areaByName.set(key, id);
+                didAreaMigration = true;
+                return id;
+            };
+            const areaIdExists = (areaId?: string) => Boolean(areaId && allAreas.some((area) => area.id === areaId));
+            allProjects = allProjects.map((project) => {
+                if (areaIdExists(project.areaId)) return project;
+                const areaTitle = typeof project.areaTitle === 'string' ? project.areaTitle : '';
+                if (!areaTitle) return project;
+                const derivedId = ensureAreaForTitle(areaTitle);
+                if (!derivedId) return project;
+                didAreaMigration = true;
+                return { ...project, areaId: derivedId };
+            });
+            allAreas = allAreas
                 .map((area, index) => ({
                     ...area,
                     order: Number.isFinite(area.order) ? area.order : index,
@@ -271,7 +324,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                 lastDataChangeAt: didAutoArchive ? Date.now() : get().lastDataChangeAt,
             });
 
-            if (didAutoArchive) {
+            if (didAutoArchive || didAreaMigration) {
                 debouncedSave(
                     { tasks: allTasks, projects: allProjects, areas: allAreas, settings: rawSettings as AppData['settings'] },
                     (msg) => set({ error: msg })
@@ -519,6 +572,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             ...initialProps,
+            tagIds: initialProps?.tagIds ?? [],
         };
         const newAllProjects = [...get()._allProjects, newProject];
         const newVisibleProjects = [...get().projects, newProject];
@@ -755,6 +809,43 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         set({ areas: newAllAreas, _allAreas: newAllAreas, lastDataChangeAt: Date.now() });
         debouncedSave(
             { tasks: get()._allTasks, projects: get()._allProjects, areas: newAllAreas, settings: get().settings },
+            (msg) => set({ error: msg })
+        );
+    },
+
+    deleteTag: async (tagId: string) => {
+        const normalizedTarget = normalizeTagId(tagId);
+        if (!normalizedTarget) return;
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
+
+        const newAllTasks = get()._allTasks.map((task) => {
+            if (!task.tags || task.tags.length === 0) return task;
+            const filtered = task.tags.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
+            if (filtered.length === task.tags.length) return task;
+            return { ...task, tags: filtered, updatedAt: now };
+        });
+
+        const newAllProjects = get()._allProjects.map((project) => {
+            if (!project.tagIds || project.tagIds.length === 0) return project;
+            const filtered = project.tagIds.filter((tag) => normalizeTagId(tag) !== normalizedTarget);
+            if (filtered.length === project.tagIds.length) return project;
+            return { ...project, tagIds: filtered, updatedAt: now };
+        });
+
+        const newVisibleTasks = newAllTasks.filter((t) => !t.deletedAt && t.status !== 'archived');
+        const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
+
+        set({
+            tasks: newVisibleTasks,
+            projects: newVisibleProjects,
+            _allTasks: newAllTasks,
+            _allProjects: newAllProjects,
+            lastDataChangeAt: changeAt,
+        });
+
+        debouncedSave(
+            { tasks: newAllTasks, projects: newAllProjects, areas: get()._allAreas, settings: get().settings },
             (msg) => set({ error: msg })
         );
     },

@@ -74,6 +74,15 @@
           "useLegacyPackaging": true
         }
       ],
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "text/*"
+          ],
+          "disableIOS": true
+        }
+      ],
       "expo-build-properties"
     ],
     "experiments": {

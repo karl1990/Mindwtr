@@ -15,6 +15,9 @@ import {
     PRESET_TAGS,
     RecurrenceRule,
     type RecurrenceStrategy,
+    type RecurrenceWeekday,
+    buildRRuleString,
+    parseRRuleString,
     RECURRENCE_RULES,
 } from '@mindwtr/core';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -76,6 +79,34 @@ const buildRecurrenceValue = (rule: RecurrenceRule | '', strategy: RecurrenceStr
     return { rule, strategy };
 };
 
+const WEEKDAY_ORDER: RecurrenceWeekday[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const WEEKDAY_BUTTONS: { key: RecurrenceWeekday; label: string }[] = [
+    { key: 'SU', label: 'S' },
+    { key: 'MO', label: 'M' },
+    { key: 'TU', label: 'T' },
+    { key: 'WE', label: 'W' },
+    { key: 'TH', label: 'T' },
+    { key: 'FR', label: 'F' },
+    { key: 'SA', label: 'S' },
+];
+
+const getRecurrenceByDayValue = (recurrence: Task['recurrence']): RecurrenceWeekday[] => {
+    if (!recurrence || typeof recurrence === 'string') return [];
+    if (recurrence.byDay?.length) return recurrence.byDay;
+    if (recurrence.rrule) {
+        const parsed = parseRRuleString(recurrence.rrule);
+        return parsed.byDay || [];
+    }
+    return [];
+};
+
+const getRecurrenceRRuleValue = (recurrence: Task['recurrence']): string => {
+    if (!recurrence || typeof recurrence === 'string') return '';
+    if (recurrence.rrule) return recurrence.rrule;
+    if (recurrence.byDay?.length) return buildRRuleString(recurrence.rule, recurrence.byDay);
+    return buildRRuleString(recurrence.rule);
+};
+
 
 export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, defaultTab }: TaskEditModalProps) {
     const { tasks, projects, settings, duplicateTask, resetTaskChecklist } = useTaskStore();
@@ -90,6 +121,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const [showMoreOptions, setShowMoreOptions] = useState(false);
     const [linkModalVisible, setLinkModalVisible] = useState(false);
     const [linkInput, setLinkInput] = useState('');
+    const [customWeekdays, setCustomWeekdays] = useState<RecurrenceWeekday[]>([]);
     const [isAIWorking, setIsAIWorking] = useState(false);
     const [aiModal, setAiModal] = useState<{ title: string; message?: string; actions: AIResponseAction[] } | null>(null);
     const aiEnabled = settings.ai?.enabled === true;
@@ -161,7 +193,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         if (task) {
             const recurrenceRule = getRecurrenceRuleValue(task.recurrence);
             const recurrenceStrategy = getRecurrenceStrategyValue(task.recurrence);
-            setEditedTask({ ...task, recurrence: buildRecurrenceValue(recurrenceRule, recurrenceStrategy) });
+            const byDay = getRecurrenceByDayValue(task.recurrence);
+            const rrule = getRecurrenceRRuleValue(task.recurrence);
+            setCustomWeekdays(byDay);
+            setEditedTask({
+                ...task,
+                recurrence: recurrenceRule
+                    ? { rule: recurrenceRule, strategy: recurrenceStrategy, ...(rrule ? { rrule } : {}), ...(byDay.length ? { byDay } : {}) }
+                    : undefined,
+            });
             setShowMoreOptions(false);
             setShowDescriptionPreview(false);
             setEditTab(resolveInitialTab(defaultTab, task));
@@ -175,6 +215,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             setShowMoreOptions(false);
             setShowDescriptionPreview(false);
             setEditTab(resolveInitialTab(defaultTab, null));
+            setCustomWeekdays([]);
         }
     }, [task, defaultTab, visible]);
 
@@ -270,7 +311,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         const updates: Partial<Task> = { ...editedTask };
         const recurrenceRule = getRecurrenceRuleValue(editedTask.recurrence);
         const recurrenceStrategy = getRecurrenceStrategyValue(editedTask.recurrence);
-        updates.recurrence = buildRecurrenceValue(recurrenceRule, recurrenceStrategy);
+        if (recurrenceRule === 'weekly' && customWeekdays.length > 0) {
+            const rrule = buildRRuleString('weekly', customWeekdays);
+            updates.recurrence = { rule: 'weekly', strategy: recurrenceStrategy, byDay: customWeekdays, rrule };
+        } else {
+            updates.recurrence = buildRecurrenceValue(recurrenceRule, recurrenceStrategy);
+        }
         if (editedTask.blockedByTaskIds) {
             const filtered = editedTask.blockedByTaskIds.filter((id) => availableBlockerIds.has(id));
             updates.blockedByTaskIds = filtered.length > 0 ? filtered : undefined;
@@ -1101,10 +1147,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                     style={getStatusChipStyle(
                                         recurrenceRuleValue === opt.value || (!opt.value && !recurrenceRuleValue)
                                     )}
-                                    onPress={() => setEditedTask(prev => ({
-                                        ...prev,
-                                        recurrence: buildRecurrenceValue(opt.value || '', recurrenceStrategyValue),
-                                    }))}
+                                    onPress={() => {
+                                        if (opt.value !== 'weekly') {
+                                            setCustomWeekdays([]);
+                                        }
+                                        setEditedTask(prev => ({
+                                            ...prev,
+                                            recurrence: buildRecurrenceValue(opt.value as RecurrenceRule | '', recurrenceStrategyValue),
+                                        }));
+                                    }}
                                 >
                                     <Text style={getStatusTextStyle(
                                         recurrenceRuleValue === opt.value || (!opt.value && !recurrenceRuleValue)
@@ -1114,6 +1165,42 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                 </TouchableOpacity>
                             ))}
                         </View>
+                        {recurrenceRuleValue === 'weekly' && (
+                            <View style={[styles.weekdayRow, { marginTop: 10 }]}>
+                                {WEEKDAY_BUTTONS.map((day) => {
+                                    const active = customWeekdays.includes(day.key);
+                                    return (
+                                        <TouchableOpacity
+                                            key={day.key}
+                                            style={[
+                                                styles.weekdayButton,
+                                                {
+                                                    borderColor: tc.border,
+                                                    backgroundColor: active ? tc.filterBg : tc.cardBg,
+                                                },
+                                            ]}
+                                            onPress={() => {
+                                                const next = active
+                                                    ? customWeekdays.filter((d) => d !== day.key)
+                                                    : [...customWeekdays, day.key];
+                                                setCustomWeekdays(next);
+                                                setEditedTask(prev => ({
+                                                    ...prev,
+                                                    recurrence: {
+                                                        rule: 'weekly',
+                                                        strategy: recurrenceStrategyValue,
+                                                        byDay: next,
+                                                        rrule: buildRRuleString('weekly', next),
+                                                    },
+                                                }));
+                                            }}
+                                        >
+                                            <Text style={[styles.weekdayButtonText, { color: tc.text }]}>{day.label}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
                         {!!recurrenceRuleValue && (
                             <View style={[styles.statusContainer, { marginTop: 8 }]}>
                                 {(['strict', 'fluid'] as RecurrenceStrategy[]).map((strategy) => (
@@ -1122,7 +1209,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                         style={getStatusChipStyle(recurrenceStrategyValue === strategy)}
                                         onPress={() => setEditedTask(prev => ({
                                             ...prev,
-                                            recurrence: buildRecurrenceValue(recurrenceRuleValue, strategy),
+                                            recurrence:
+                                                recurrenceRuleValue === 'weekly' && customWeekdays.length > 0
+                                                    ? {
+                                                        rule: 'weekly',
+                                                        strategy,
+                                                        byDay: customWeekdays,
+                                                        rrule: buildRRuleString('weekly', customWeekdays),
+                                                    }
+                                                    : buildRecurrenceValue(recurrenceRuleValue, strategy),
                                         }))}
                                     >
                                         <Text style={getStatusTextStyle(recurrenceStrategyValue === strategy)}>
@@ -1863,6 +1958,19 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     statusContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    weekdayRow: { flexDirection: 'row', gap: 8 },
+    weekdayButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    weekdayButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
     statusChip: {
         paddingHorizontal: 12,
         paddingVertical: 6,

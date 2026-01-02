@@ -23,6 +23,7 @@ describe('quick-add', () => {
                 title: 'MyProject',
                 status: 'active',
                 color: '#000000',
+                tagIds: [],
                 createdAt: now.toISOString(),
                 updatedAt: now.toISOString(),
             },
