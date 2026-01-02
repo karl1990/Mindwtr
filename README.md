@@ -60,9 +60,12 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
 - 🔗 **Task Dependencies** - Block tasks until prerequisites complete
 - 📎 **Attachments** - Files and links on tasks
 - ✏️ **Markdown Notes** - Rich text descriptions with preview
+- 🗂️ **Project States** - Active, Waiting, Someday, Archived
+- ♾️ **Fluid Recurrence** - Strict dates or “X days after completion”
 - ♻️ **Reusable Lists** - Duplicate tasks or reset checklists
 - ✅ **Checklist Mode** - Fast list-style checking for checklist tasks
 - 🧭 **Copilot Suggestions** - Optional context/tag/time hints while typing
+- 🧘 **Focus / Zen Modes** - Reduce clutter and highlight top priorities
 - 🔔 **Notifications** - Due date reminders with snooze
 - 📊 **Daily Digest** - Morning briefing + evening review
 - 📅 **Weekly Review** - Customizable weekly reminder
