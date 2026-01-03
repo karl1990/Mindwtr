@@ -3,26 +3,6 @@ import { render } from '@testing-library/react';
 import App from './App';
 import { LanguageProvider } from './contexts/language-context';
 
-vi.mock('@mindwtr/core', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('@mindwtr/core')>();
-    const store = {
-        fetchData: vi.fn(),
-        settings: {},
-        updateSettings: vi.fn(),
-    };
-    const useTaskStore = () => store;
-    (useTaskStore as any).subscribe = vi.fn(() => () => {});
-    return {
-        ...actual,
-        useTaskStore,
-        flushPendingSave: vi.fn().mockResolvedValue(undefined),
-    };
-});
-
-vi.mock('./contexts/keybinding-context', () => ({
-    KeybindingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 const renderWithProviders = (ui: React.ReactElement) => {
     return render(
         <LanguageProvider>
