@@ -919,6 +919,14 @@ export function SettingsView() {
                     es: 'días',
                     hi: 'दिन',
                     ar: 'أيام',
+                    de: translateText('days', 'de'),
+                    ru: translateText('days', 'ru'),
+                    ja: translateText('days', 'ja'),
+                    fr: translateText('days', 'fr'),
+                    pt: translateText('days', 'pt'),
+                    ko: translateText('days', 'ko'),
+                    it: translateText('days', 'it'),
+                    tr: translateText('days', 'tr'),
                 };
                 const label = dayLabelMap[language] ?? 'days';
                 return `${days} ${label}`;

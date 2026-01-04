@@ -24,6 +24,7 @@ const MAPPING = {
   'checkmark.circle.fill': '✅',
   'circle': '⚪',
   'arrow.up.circle.fill': '⬆️',
+  'trash.fill': '🗑️',
 } as const;
 
 /**
