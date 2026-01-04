@@ -256,7 +256,7 @@ fn parse_json_array(raw: Option<String>) -> Value {
     }
 }
 
-fn migrate_json_to_sqlite(conn: &Connection, data: &Value) -> Result<(), String> {
+fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM tasks", []).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM projects", []).map_err(|e| e.to_string())?;
@@ -828,12 +828,12 @@ fn get_data(app: tauri::AppHandle) -> Result<Value, String> {
     ensure_data_file(&app)?;
     let data_path = get_data_path(&app);
     let backup_path = data_path.with_extension("json.bak");
-    let conn = open_sqlite(&app)?;
+    let mut conn = open_sqlite(&app)?;
 
     if !sqlite_has_any_data(&conn)? && data_path.exists() {
         if let Ok(value) = read_json_with_retries(&data_path, 2) {
             let _ = fs::copy(&data_path, &backup_path);
-            migrate_json_to_sqlite(&conn, &value)?;
+            migrate_json_to_sqlite(&mut conn, &value)?;
         }
     }
 
@@ -858,8 +858,8 @@ fn get_data(app: tauri::AppHandle) -> Result<Value, String> {
 #[tauri::command]
 fn save_data(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
     ensure_data_file(&app)?;
-    let conn = open_sqlite(&app)?;
-    migrate_json_to_sqlite(&conn, &data)?;
+    let mut conn = open_sqlite(&app)?;
+    migrate_json_to_sqlite(&mut conn, &data)?;
 
     // Keep JSON backup updated for safety/rollbacks
     let data_path = get_data_path(&app);

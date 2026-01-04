@@ -74,19 +74,27 @@ const createSqliteClient = async (): Promise<SqliteClient> => {
     const SQLite = await import('expo-sqlite');
     const openDatabaseAsync = (SQLite as any).openDatabaseAsync as ((name: string) => Promise<any>) | undefined;
     if (openDatabaseAsync) {
-        const db = await openDatabaseAsync(SQLITE_DB_NAME);
-        return {
-            run: async (sql: string, params: unknown[] = []) => {
-                await db.runAsync(sql, params);
-            },
-            all: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
-                db.getAllAsync(sql, params) as Promise<T[]>,
-            get: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
-                (await db.getFirstAsync(sql, params)) as T | undefined,
-            exec: async (sql: string) => {
-                await db.execAsync(sql);
-            },
-        };
+        try {
+            const db = await openDatabaseAsync(SQLITE_DB_NAME);
+            if (db?.runAsync && db?.getAllAsync && db?.getFirstAsync && db?.execAsync) {
+                return {
+                    run: async (sql: string, params: unknown[] = []) => {
+                        await db.runAsync(sql, params);
+                    },
+                    all: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
+                        db.getAllAsync(sql, params) as Promise<T[]>,
+                    get: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
+                        (await db.getFirstAsync(sql, params)) as T | undefined,
+                    exec: async (sql: string) => {
+                        await db.execAsync(sql);
+                    },
+                };
+            }
+        } catch (error) {
+            if (__DEV__) {
+                console.warn('[Storage] Async SQLite open failed, falling back to legacy API', error);
+            }
+        }
     }
 
     const legacyDb = (SQLite as any).openDatabase(SQLITE_DB_NAME);
@@ -122,10 +130,29 @@ const getLegacyJson = async (AsyncStorage: any): Promise<string | null> => {
 
 const initSqliteState = async (): Promise<SqliteState> => {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    const client = await createSqliteClient();
-    const adapter = new SqliteAdapter(client);
-    await adapter.ensureSchema();
-    const hasData = await sqliteHasAnyData(client);
+    let client = await createSqliteClient();
+    let adapter = new SqliteAdapter(client);
+    try {
+        await adapter.ensureSchema();
+    } catch (error) {
+        if (__DEV__) {
+            console.warn('[Storage] SQLite schema init failed, retrying with legacy API', error);
+        }
+        const SQLite = await import('expo-sqlite');
+        const legacyDb = (SQLite as any).openDatabase(SQLITE_DB_NAME);
+        client = createLegacyClient(legacyDb);
+        adapter = new SqliteAdapter(client);
+        await adapter.ensureSchema();
+    }
+    let hasData = false;
+    try {
+        hasData = await sqliteHasAnyData(client);
+    } catch (error) {
+        if (__DEV__) {
+            console.warn('[Storage] SQLite availability check failed', error);
+        }
+        hasData = false;
+    }
     if (!hasData) {
         const jsonValue = await getLegacyJson(AsyncStorage);
         if (jsonValue != null) {
@@ -144,7 +171,10 @@ const initSqliteState = async (): Promise<SqliteState> => {
 
 const getSqliteState = async (): Promise<SqliteState> => {
     if (!sqliteStatePromise) {
-        sqliteStatePromise = initSqliteState();
+        sqliteStatePromise = initSqliteState().catch((error) => {
+            sqliteStatePromise = null;
+            throw error;
+        });
     }
     return sqliteStatePromise;
 };
@@ -210,7 +240,20 @@ const createStorage = (): StorageAdapter => {
                 });
                 return data;
             } catch (e) {
-                console.error('Failed to load stored data', e);
+                console.warn('[Storage] SQLite load failed, falling back to JSON backup', e);
+                const jsonValue = await getLegacyJson(AsyncStorage);
+                if (jsonValue != null) {
+                    try {
+                        const data = JSON.parse(jsonValue) as AppData;
+                        data.areas = Array.isArray(data.areas) ? data.areas : [];
+                        updateAndroidWidgetFromData(data).catch((error) => {
+                            console.warn('[Widgets] Failed to update Android widget from backup', error);
+                        });
+                        return data;
+                    } catch (parseError) {
+                        console.error('Failed to parse stored data - may be corrupted', parseError);
+                    }
+                }
                 throw new Error('Data appears corrupted. Please restore from backup.');
             }
         },
@@ -218,6 +261,10 @@ const createStorage = (): StorageAdapter => {
             try {
                 const { adapter } = await getSqliteState();
                 await adapter.saveData(data);
+            } catch (error) {
+                console.warn('[Storage] SQLite save failed, keeping JSON backup', error);
+            }
+            try {
                 const jsonValue = JSON.stringify(data);
                 await AsyncStorage.setItem(DATA_KEY, jsonValue);
                 await updateAndroidWidgetFromData(data);
