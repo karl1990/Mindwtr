@@ -14,6 +14,7 @@ import {
     PRESET_CONTEXTS,
     PRESET_TAGS,
     RecurrenceRule,
+    type AIProviderId,
     type RecurrenceStrategy,
     type RecurrenceWeekday,
     buildRRuleString,
@@ -128,7 +129,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const [isAIWorking, setIsAIWorking] = useState(false);
     const [aiModal, setAiModal] = useState<{ title: string; message?: string; actions: AIResponseAction[] } | null>(null);
     const aiEnabled = settings.ai?.enabled === true;
-    const aiProvider = (settings.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
     const [aiKey, setAiKey] = useState('');
     const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; timeEstimate?: TimeEstimate; tags?: string[] } | null>(null);
     const [copilotApplied, setCopilotApplied] = useState(false);
@@ -842,7 +843,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             Alert.alert(t('ai.disabledTitle'), t('ai.disabledBody'));
             return null;
         }
-        const provider = (settings.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+        const provider = (settings.ai?.provider ?? 'openai') as AIProviderId;
         const apiKey = await loadAIKey(provider);
         if (!apiKey) {
             Alert.alert(t('ai.missingKeyTitle'), t('ai.missingKeyBody'));

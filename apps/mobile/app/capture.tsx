@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { createAIProvider, PRESET_CONTEXTS, PRESET_TAGS, parseQuickAdd, type Task, type TimeEstimate, useTaskStore } from '@mindwtr/core';
+import { createAIProvider, PRESET_CONTEXTS, PRESET_TAGS, parseQuickAdd, type Task, type TimeEstimate, type AIProviderId, useTaskStore } from '@mindwtr/core';
 import { useTheme } from '../contexts/theme-context';
 import { useLanguage } from '../contexts/language-context';
 import { Colors } from '@/constants/theme';
@@ -37,7 +37,7 @@ export default function CaptureScreen() {
   }, [params.text]);
 
   const aiEnabled = settings.ai?.enabled === true;
-  const aiProvider = (settings.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+  const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
   const timeEstimatesEnabled = settings.features?.timeEstimates === true;
 
   useEffect(() => {

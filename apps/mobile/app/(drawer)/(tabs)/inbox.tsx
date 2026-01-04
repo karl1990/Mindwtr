@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput, Platform, Alert } from 'react-native';
 
-import { useTaskStore, PRESET_CONTEXTS, createAIProvider, safeFormatDate, safeParseDate, type Task } from '@mindwtr/core';
+import { useTaskStore, PRESET_CONTEXTS, createAIProvider, safeFormatDate, safeParseDate, type Task, type AIProviderId } from '@mindwtr/core';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TaskList } from '../../../components/task-list';
 import { AIResponseModal, type AIResponseAction } from '../../../components/ai-response-modal';
@@ -234,7 +234,7 @@ export default function InboxScreen() {
       Alert.alert(t('ai.disabledTitle'), t('ai.disabledBody'));
       return null;
     }
-    const provider = (settings.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const provider = (settings.ai?.provider ?? 'openai') as AIProviderId;
     const apiKey = await loadAIKey(provider);
     if (!apiKey) {
       Alert.alert(t('ai.missingKeyTitle'), t('ai.missingKeyBody'));

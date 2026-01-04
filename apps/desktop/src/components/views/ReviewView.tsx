@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { createAIProvider, getStaleItems, isDueForReview, safeFormatDate, safeParseDate, sortTasksBy, type ReviewSuggestion, useTaskStore, type Project, type Task, type TaskStatus, type TaskSortBy } from '@mindwtr/core';
+import { createAIProvider, getStaleItems, isDueForReview, safeFormatDate, safeParseDate, sortTasksBy, type ReviewSuggestion, useTaskStore, type Project, type Task, type TaskStatus, type TaskSortBy, type AIProviderId } from '@mindwtr/core';
 import { Archive, ArrowRight, Calendar, Check, CheckSquare, Layers, RefreshCw, Sparkles, X, type LucideIcon } from 'lucide-react';
 
 import { TaskItem } from '../TaskItem';
@@ -27,7 +27,7 @@ function WeeklyReviewGuideModal({ onClose }: { onClose: () => void }) {
     const [aiRan, setAiRan] = useState(false);
 
     const aiEnabled = settings?.ai?.enabled === true;
-    const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const staleItems = useMemo(() => getStaleItems(tasks, projects), [tasks, projects]);
     const staleItemTitleMap = useMemo(() => {
         return staleItems.reduce((acc, item) => {

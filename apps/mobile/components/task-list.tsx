@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, RefreshControl, ScrollView, Modal, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { useTaskStore, Task, TaskStatus, sortTasksBy, parseQuickAdd, safeParseDate, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider } from '@mindwtr/core';
+import { useTaskStore, Task, TaskStatus, sortTasksBy, parseQuickAdd, safeParseDate, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 
 
@@ -78,7 +78,7 @@ export function TaskList({
 
   const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
   const aiEnabled = settings?.ai?.enabled === true;
-  const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+  const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
   const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
 
   // Memoize filtered and sorted tasks for performance

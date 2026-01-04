@@ -1,5 +1,5 @@
 import type { AIProviderConfig, AIProviderId, AppData } from '@mindwtr/core';
-import { DEFAULT_GEMINI_THINKING_BUDGET, DEFAULT_REASONING_EFFORT, getDefaultAIConfig, getDefaultCopilotModel } from '@mindwtr/core';
+import { DEFAULT_GEMINI_THINKING_BUDGET, DEFAULT_ANTHROPIC_THINKING_BUDGET, DEFAULT_REASONING_EFFORT, getDefaultAIConfig, getDefaultCopilotModel } from '@mindwtr/core';
 
 const AI_KEY_PREFIX = 'mindwtr-ai-key';
 
@@ -42,5 +42,6 @@ export function buildCopilotConfig(settings: AppData['settings'], apiKey: string
         model: settings.ai?.copilotModel ?? getDefaultCopilotModel(provider),
         reasoningEffort: DEFAULT_REASONING_EFFORT,
         ...(provider === 'gemini' ? { thinkingBudget: DEFAULT_GEMINI_THINKING_BUDGET } : {}),
+        ...(provider === 'anthropic' ? { thinkingBudget: DEFAULT_ANTHROPIC_THINKING_BUDGET } : {}),
     };
 }

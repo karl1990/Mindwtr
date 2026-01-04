@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { createAIProvider, getStaleItems, isDueForReview, type ReviewSuggestion, useTaskStore } from '@mindwtr/core';
+import { createAIProvider, getStaleItems, isDueForReview, type ReviewSuggestion, type AIProviderId, useTaskStore } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useTheme } from '../contexts/theme-context';
 import { useLanguage } from '../contexts/language-context';
@@ -186,7 +186,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     };
 
     const aiEnabled = settings?.ai?.enabled === true;
-    const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const staleItems = getStaleItems(tasks, projects);
     const staleItemTitleMap = staleItems.reduce((acc, item) => {
         acc[item.id] = item.title;

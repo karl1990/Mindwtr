@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, Play, X, Trash2, Moon, User, CheckCircle, Filter } from 'lucide-react';
-import { useTaskStore, TaskStatus, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider } from '@mindwtr/core';
+import { useTaskStore, TaskStatus, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { TaskInput } from '../Task/TaskInput';
@@ -45,7 +45,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [copilotContext, setCopilotContext] = useState<string | null>(null);
     const [copilotTags, setCopilotTags] = useState<string[]>([]);
     const aiEnabled = settings?.ai?.enabled === true;
-    const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const activePriorities = useMemo(

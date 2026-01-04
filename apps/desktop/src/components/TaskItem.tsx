@@ -23,6 +23,7 @@ import {
     PRESET_CONTEXTS,
     PRESET_TAGS,
     type ClarifyResponse,
+    type AIProviderId,
 } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { PromptModal } from './PromptModal';
@@ -143,7 +144,7 @@ export const TaskItem = memo(function TaskItem({
     const [isAIWorking, setIsAIWorking] = useState(false);
     const copilotAbortRef = useRef<AbortController | null>(null);
     const aiEnabled = settings?.ai?.enabled === true;
-    const aiProvider = (settings?.ai?.provider ?? 'openai') as 'openai' | 'gemini';
+    const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const isHighlighted = highlightTaskId === task.id;

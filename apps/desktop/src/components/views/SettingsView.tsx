@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
     DEFAULT_GEMINI_THINKING_BUDGET,
+    DEFAULT_ANTHROPIC_THINKING_BUDGET,
     DEFAULT_REASONING_EFFORT,
     generateUUID,
     getDefaultAIConfig,
@@ -100,9 +101,11 @@ export function SettingsView() {
         : 7;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const aiEnabled = settings?.ai?.enabled === true;
-    const aiModel = settings?.ai?.model ?? getDefaultAIConfig(aiProvider).model;
+    const aiDefaults = getDefaultAIConfig(aiProvider);
+    const aiModel = settings?.ai?.model ?? aiDefaults.model;
     const aiReasoningEffort = (settings?.ai?.reasoningEffort ?? DEFAULT_REASONING_EFFORT) as AIReasoningEffort;
-    const aiThinkingBudget = settings?.ai?.thinkingBudget ?? DEFAULT_GEMINI_THINKING_BUDGET;
+    const aiThinkingBudget = settings?.ai?.thinkingBudget ?? aiDefaults.thinkingBudget ?? DEFAULT_GEMINI_THINKING_BUDGET;
+    const anthropicThinkingEnabled = aiProvider === 'anthropic' && aiThinkingBudget > 0;
     const aiModelOptions = getModelOptions(aiProvider);
     const aiCopilotModel = settings?.ai?.copilotModel ?? getDefaultCopilotModel(aiProvider);
     const aiCopilotOptions = getCopilotModelOptions(aiProvider);
@@ -443,6 +446,7 @@ export function SettingsView() {
             aiProvider: 'Provider',
             aiProviderOpenAI: 'OpenAI',
             aiProviderGemini: 'Gemini',
+            aiProviderAnthropic: 'Anthropic (Claude)',
             aiModel: 'Model',
             aiApiKey: 'API key',
             aiApiKeyHint: 'Stored locally on this device. Never synced.',
@@ -454,7 +458,9 @@ export function SettingsView() {
             aiCopilotModel: 'Copilot model',
             aiCopilotHint: 'Used for fast autocomplete suggestions.',
             aiThinkingBudget: 'Thinking budget',
-            aiThinkingHint: 'Gemini only. 0 disables extended thinking.',
+            aiThinkingHint: 'Claude/Gemini only. 0 disables extended thinking.',
+            aiThinkingEnable: 'Enable thinking',
+            aiThinkingEnableDesc: 'Use extended reasoning for complex tasks.',
             aiThinkingOff: 'Off',
             aiThinkingLow: 'Low',
             aiThinkingMedium: 'Medium',
@@ -586,6 +592,7 @@ export function SettingsView() {
             aiProvider: '服务商',
             aiProviderOpenAI: 'OpenAI',
             aiProviderGemini: 'Gemini',
+            aiProviderAnthropic: 'Anthropic（Claude）',
             aiModel: '模型',
             aiApiKey: 'API 密钥',
             aiApiKeyHint: '仅保存在本机，不会同步。',
@@ -597,7 +604,9 @@ export function SettingsView() {
             aiCopilotModel: '助手模型',
             aiCopilotHint: '用于快速补全建议。',
             aiThinkingBudget: '思考预算',
-            aiThinkingHint: '仅用于 Gemini。0 代表关闭深度思考。',
+            aiThinkingHint: '仅用于 Claude/Gemini。0 代表关闭深度思考。',
+            aiThinkingEnable: '启用思考',
+            aiThinkingEnableDesc: '为复杂任务启用扩展推理。',
             aiThinkingOff: '关闭',
             aiThinkingLow: '低',
             aiThinkingMedium: '中',
@@ -708,6 +717,11 @@ export function SettingsView() {
     };
 
     const t = labelsByLanguage[language] ?? labels.en;
+    const anthropicThinkingOptions = [
+        { value: DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024, label: t.aiThinkingLow },
+        { value: 2048, label: t.aiThinkingMedium },
+        { value: 4096, label: t.aiThinkingHigh },
+    ];
 
     const linuxFlavor = useMemo(() => {
         if (!linuxDistro) return null;
@@ -1198,11 +1212,13 @@ export function SettingsView() {
                                         provider: e.target.value as AIProviderId,
                                         model: getDefaultAIConfig(e.target.value as AIProviderId).model,
                                         copilotModel: getDefaultCopilotModel(e.target.value as AIProviderId),
+                                        thinkingBudget: getDefaultAIConfig(e.target.value as AIProviderId).thinkingBudget,
                                     })}
                                     className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
                                 >
                                     <option value="openai">{t.aiProviderOpenAI}</option>
                                     <option value="gemini">{t.aiProviderGemini}</option>
+                                    <option value="anthropic">{t.aiProviderAnthropic}</option>
                                 </select>
                             </div>
 
@@ -1254,6 +1270,57 @@ export function SettingsView() {
                                         <option value="medium">{t.aiEffortMedium}</option>
                                         <option value="high">{t.aiEffortHigh}</option>
                                     </select>
+                                </div>
+                            )}
+
+                            {aiProvider === 'anthropic' && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-sm font-medium">{t.aiThinkingEnable}</div>
+                                            <div className="text-xs text-muted-foreground">{t.aiThinkingEnableDesc}</div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={anthropicThinkingEnabled}
+                                            onClick={() => updateAISettings({
+                                                thinkingBudget: anthropicThinkingEnabled
+                                                    ? 0
+                                                    : (DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024),
+                                            })}
+                                            className={cn(
+                                                "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
+                                                anthropicThinkingEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border"
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                                                    anthropicThinkingEnabled ? "translate-x-4" : "translate-x-1"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    {anthropicThinkingEnabled && (
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div>
+                                                <div className="text-sm font-medium">{t.aiThinkingBudget}</div>
+                                                <div className="text-xs text-muted-foreground">{t.aiThinkingHint}</div>
+                                            </div>
+                                            <select
+                                                value={String(aiThinkingBudget)}
+                                                onChange={(e) => updateAISettings({ thinkingBudget: Number(e.target.value) })}
+                                                className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                            >
+                                                {anthropicThinkingOptions.map((option) => (
+                                                    <option key={option.value} value={String(option.value)}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

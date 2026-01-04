@@ -151,7 +151,7 @@ export interface AppData {
         weeklyReviewTime?: string; // HH:mm
         ai?: {
             enabled?: boolean;
-            provider?: 'gemini' | 'openai';
+            provider?: 'gemini' | 'openai' | 'anthropic';
             apiKey?: string;
             model?: string;
             reasoningEffort?: 'low' | 'medium' | 'high';

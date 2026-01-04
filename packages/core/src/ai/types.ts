@@ -1,6 +1,6 @@
 import type { TimeEstimate } from '../types';
 
-export type AIProviderId = 'gemini' | 'openai';
+export type AIProviderId = 'gemini' | 'openai' | 'anthropic';
 
 export type AIReasoningEffort = 'low' | 'medium' | 'high';
 

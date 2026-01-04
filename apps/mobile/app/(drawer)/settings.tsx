@@ -31,6 +31,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
     DEFAULT_REASONING_EFFORT,
+    DEFAULT_ANTHROPIC_THINKING_BUDGET,
     DEFAULT_GEMINI_THINKING_BUDGET,
     generateUUID,
     getDefaultAIConfig,
@@ -141,10 +142,11 @@ export default function SettingsPage() {
     const aiEnabled = settings.ai?.enabled === true;
     const aiModel = settings.ai?.model ?? getDefaultAIConfig(aiProvider).model;
     const aiReasoningEffort = (settings.ai?.reasoningEffort ?? DEFAULT_REASONING_EFFORT) as AIReasoningEffort;
-    const aiThinkingBudget = settings.ai?.thinkingBudget ?? DEFAULT_GEMINI_THINKING_BUDGET;
+    const aiThinkingBudget = settings.ai?.thinkingBudget ?? getDefaultAIConfig(aiProvider).thinkingBudget ?? 0;
     const aiModelOptions = getModelOptions(aiProvider);
     const aiCopilotModel = settings.ai?.copilotModel ?? getDefaultCopilotModel(aiProvider);
     const aiCopilotOptions = getCopilotModelOptions(aiProvider);
+    const anthropicThinkingEnabled = aiProvider === 'anthropic' && aiThinkingBudget > 0;
     const defaultTimeEstimatePresets: TimeEstimate[] = ['10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
     const timeEstimateOptions: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
     const timeEstimatePresets: TimeEstimate[] = (settings.gtd?.timeEstimatePresets?.length
@@ -830,7 +832,11 @@ export default function SettingsPage() {
                                 <View style={styles.settingInfo}>
                                     <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiProvider')}</Text>
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                        {aiProvider === 'openai' ? t('settings.aiProviderOpenAI') : t('settings.aiProviderGemini')}
+                                        {aiProvider === 'openai'
+                                            ? t('settings.aiProviderOpenAI')
+                                            : aiProvider === 'gemini'
+                                                ? t('settings.aiProviderGemini')
+                                                : t('settings.aiProviderAnthropic')}
                                     </Text>
                                 </View>
                             </View>
@@ -841,11 +847,16 @@ export default function SettingsPage() {
                                             styles.backendOption,
                                             { borderColor: tc.border, backgroundColor: aiProvider === 'openai' ? tc.filterBg : 'transparent' },
                                         ]}
-                                        onPress={() => updateAISettings({
-                                            provider: 'openai',
-                                            model: getDefaultAIConfig('openai').model,
-                                            copilotModel: getDefaultCopilotModel('openai'),
-                                        })}
+                                        onPress={() => {
+                                            const defaults = getDefaultAIConfig('openai');
+                                            updateAISettings({
+                                                provider: 'openai',
+                                                model: defaults.model,
+                                                copilotModel: getDefaultCopilotModel('openai'),
+                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+                                                thinkingBudget: defaults.thinkingBudget ?? 0,
+                                            });
+                                        }}
                                     >
                                         <Text style={[styles.backendOptionText, { color: aiProvider === 'openai' ? tc.tint : tc.secondaryText }]}>
                                             {t('settings.aiProviderOpenAI')}
@@ -856,14 +867,39 @@ export default function SettingsPage() {
                                             styles.backendOption,
                                             { borderColor: tc.border, backgroundColor: aiProvider === 'gemini' ? tc.filterBg : 'transparent' },
                                         ]}
-                                        onPress={() => updateAISettings({
-                                            provider: 'gemini',
-                                            model: getDefaultAIConfig('gemini').model,
-                                            copilotModel: getDefaultCopilotModel('gemini'),
-                                        })}
+                                        onPress={() => {
+                                            const defaults = getDefaultAIConfig('gemini');
+                                            updateAISettings({
+                                                provider: 'gemini',
+                                                model: defaults.model,
+                                                copilotModel: getDefaultCopilotModel('gemini'),
+                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+                                                thinkingBudget: defaults.thinkingBudget ?? DEFAULT_GEMINI_THINKING_BUDGET,
+                                            });
+                                        }}
                                     >
                                         <Text style={[styles.backendOptionText, { color: aiProvider === 'gemini' ? tc.tint : tc.secondaryText }]}>
                                             {t('settings.aiProviderGemini')}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.backendOption,
+                                            { borderColor: tc.border, backgroundColor: aiProvider === 'anthropic' ? tc.filterBg : 'transparent' },
+                                        ]}
+                                        onPress={() => {
+                                            const defaults = getDefaultAIConfig('anthropic');
+                                            updateAISettings({
+                                                provider: 'anthropic',
+                                                model: defaults.model,
+                                                copilotModel: getDefaultCopilotModel('anthropic'),
+                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+                                                thinkingBudget: defaults.thinkingBudget ?? DEFAULT_ANTHROPIC_THINKING_BUDGET,
+                                            });
+                                        }}
+                                    >
+                                        <Text style={[styles.backendOptionText, { color: aiProvider === 'anthropic' ? tc.tint : tc.secondaryText }]}>
+                                            {t('settings.aiProviderAnthropic')}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -974,6 +1010,64 @@ export default function SettingsPage() {
                                         ))}
                                     </View>
                                 </View>
+                            </>
+                        )}
+
+                        {aiProvider === 'anthropic' && (
+                            <>
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiThinkingEnable')}</Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {t('settings.aiThinkingEnableDesc')}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={anthropicThinkingEnabled}
+                                        onValueChange={(value) =>
+                                            updateAISettings({
+                                                thinkingBudget: value
+                                                    ? (DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024)
+                                                    : 0,
+                                            })
+                                        }
+                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                    />
+                                </View>
+                                {anthropicThinkingEnabled && (
+                                    <>
+                                        <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                            <View style={styles.settingInfo}>
+                                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiThinkingBudget')}</Text>
+                                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                    {t('settings.aiThinkingHint')}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                                            <View style={styles.backendToggle}>
+                                                {[
+                                                    { value: DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024, label: t('settings.aiThinkingLow') },
+                                                    { value: 2048, label: t('settings.aiThinkingMedium') },
+                                                    { value: 4096, label: t('settings.aiThinkingHigh') },
+                                                ].map((option) => (
+                                                    <TouchableOpacity
+                                                        key={option.value}
+                                                        style={[
+                                                            styles.backendOption,
+                                                            { borderColor: tc.border, backgroundColor: aiThinkingBudget === option.value ? tc.filterBg : 'transparent' },
+                                                        ]}
+                                                        onPress={() => updateAISettings({ thinkingBudget: option.value })}
+                                                    >
+                                                        <Text style={[styles.backendOptionText, { color: aiThinkingBudget === option.value ? tc.tint : tc.secondaryText }]}>
+                                                            {option.label}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    </>
+                                )}
                             </>
                         )}
 
