@@ -126,10 +126,12 @@ export function SettingsView() {
     const [syncPath, setSyncPath] = useState<string>('');
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
-    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav'>('file');
+    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud'>('file');
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
+    const [cloudUrl, setCloudUrl] = useState('');
+    const [cloudToken, setCloudToken] = useState('');
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
     const [newCalendarName, setNewCalendarName] = useState('');
     const [newCalendarUrl, setNewCalendarUrl] = useState('');
@@ -181,6 +183,12 @@ export function SettingsView() {
                 setWebdavUrl(cfg.url);
                 setWebdavUsername(cfg.username);
                 setWebdavPassword(cfg.password);
+            })
+            .catch(console.error);
+        SyncService.getCloudConfig()
+            .then((cfg) => {
+                setCloudUrl(cfg.url);
+                setCloudToken(cfg.token);
             })
             .catch(console.error);
     }, []);
@@ -272,7 +280,7 @@ export function SettingsView() {
         }
     };
 
-    const handleSetSyncBackend = async (backend: 'file' | 'webdav') => {
+    const handleSetSyncBackend = async (backend: 'file' | 'webdav' | 'cloud') => {
         setSyncBackend(backend);
         await SyncService.setSyncBackend(backend);
         showSaved();
@@ -287,6 +295,14 @@ export function SettingsView() {
         showSaved();
     };
 
+    const handleSaveCloud = async () => {
+        await SyncService.setCloudConfig({
+            url: cloudUrl.trim(),
+            token: cloudToken.trim(),
+        });
+        showSaved();
+    };
+
     const handleSync = async () => {
         try {
             setIsSyncing(true);
@@ -295,6 +311,10 @@ export function SettingsView() {
             if (syncBackend === 'webdav') {
                 if (!webdavUrl.trim()) return;
                 await handleSaveWebDav();
+            }
+            if (syncBackend === 'cloud') {
+                if (!cloudUrl.trim()) return;
+                await handleSaveCloud();
             }
             if (syncBackend === 'file') {
                 const path = syncPath.trim();
@@ -494,6 +514,7 @@ export function SettingsView() {
             syncBackend: 'Sync backend',
             syncBackendFile: 'File',
             syncBackendWebdav: 'WebDAV',
+            syncBackendCloud: 'Self-Hosted',
             calendar: 'Calendar',
             calendarDesc: 'View external calendars via ICS subscription URLs.',
             externalCalendars: 'External calendars',
@@ -512,6 +533,10 @@ export function SettingsView() {
             webdavPassword: 'Password',
             webdavSave: 'Save WebDAV',
             webdavHint: 'Use a full URL to your sync JSON file (e.g., https://example.com/remote.php/dav/files/user/data.json).',
+            cloudUrl: 'Self-hosted URL',
+            cloudToken: 'Access token',
+            cloudSave: 'Save Self-Hosted',
+            cloudHint: 'Use your self-hosted endpoint URL.',
             lastSync: 'Last sync',
             lastSyncNever: 'Never',
             lastSyncSuccess: 'Sync completed',
@@ -641,6 +666,7 @@ export function SettingsView() {
             syncBackend: '同步后端',
             syncBackendFile: '文件',
             syncBackendWebdav: 'WebDAV',
+            syncBackendCloud: '自托管',
             calendar: '日历',
             calendarDesc: '通过 ICS 订阅地址查看外部日历（只读）。',
             externalCalendars: '外部日历',
@@ -659,6 +685,10 @@ export function SettingsView() {
             webdavPassword: '密码',
             webdavSave: '保存 WebDAV',
             webdavHint: '请输入同步 JSON 文件的完整 URL（例如 https://example.com/remote.php/dav/files/user/data.json）。',
+            cloudUrl: '自托管地址',
+            cloudToken: '访问令牌',
+            cloudSave: '保存自托管配置',
+            cloudHint: '请输入自托管同步端点 URL。',
             lastSync: '上次同步',
             lastSyncNever: '从未同步',
             lastSyncSuccess: '同步完成',
@@ -1751,6 +1781,17 @@ export function SettingsView() {
                                     >
                                         {t.syncBackendWebdav}
                                     </button>
+                                    <button
+                                        onClick={() => handleSetSyncBackend('cloud')}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded-md text-sm font-medium transition-colors border",
+                                            syncBackend === 'cloud'
+                                                ? "bg-primary/10 text-primary border-primary ring-1 ring-primary"
+                                                : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground",
+                                        )}
+                                    >
+                                        {t.syncBackendCloud}
+                                    </button>
                                 </div>
                             </div>
 
@@ -1837,9 +1878,46 @@ export function SettingsView() {
                                 </div>
                             )}
 
+                            {syncBackend === 'cloud' && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm font-medium">{t.cloudUrl}</label>
+                                        <input
+                                            type="text"
+                                            value={cloudUrl}
+                                            onChange={(e) => setCloudUrl(e.target.value)}
+                                            placeholder="https://example.com/v1/data"
+                                            className="bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <p className="text-xs text-muted-foreground">{t.cloudHint}</p>
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm font-medium">{t.cloudToken}</label>
+                                        <input
+                                            type="password"
+                                            value={cloudToken}
+                                            onChange={(e) => setCloudToken(e.target.value)}
+                                            className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={handleSaveCloud}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
+                                        >
+                                            {t.cloudSave}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {(syncBackend === 'webdav'
                                 ? !!webdavUrl.trim()
-                                : !!syncPath.trim()) && (
+                                : syncBackend === 'cloud'
+                                    ? !!cloudUrl.trim()
+                                    : !!syncPath.trim()) && (
                                 <div className="pt-2 flex items-center gap-3">
                                     <button
                                         onClick={handleSync}

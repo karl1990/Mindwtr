@@ -57,6 +57,8 @@ import {
     WEBDAV_URL_KEY,
     WEBDAV_USERNAME_KEY,
     WEBDAV_PASSWORD_KEY,
+    CLOUD_URL_KEY,
+    CLOUD_TOKEN_KEY,
 } from '../../lib/sync-service';
 
 type SettingsScreen =
@@ -114,10 +116,12 @@ export default function SettingsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
     const [syncPath, setSyncPath] = useState<string | null>(null);
-    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav'>('file');
+    const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud'>('file');
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
+    const [cloudUrl, setCloudUrl] = useState('');
+    const [cloudToken, setCloudToken] = useState('');
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
     const [digestTimePicker, setDigestTimePicker] = useState<'morning' | 'evening' | null>(null);
     const [weeklyReviewTimePicker, setWeeklyReviewTimePicker] = useState(false);
@@ -239,6 +243,8 @@ export default function SettingsPage() {
             WEBDAV_URL_KEY,
             WEBDAV_USERNAME_KEY,
             WEBDAV_PASSWORD_KEY,
+            CLOUD_URL_KEY,
+            CLOUD_TOKEN_KEY,
         ]).then((entries) => {
             const entryMap = new Map(entries);
             const path = entryMap.get(SYNC_PATH_KEY);
@@ -246,12 +252,16 @@ export default function SettingsPage() {
             const url = entryMap.get(WEBDAV_URL_KEY);
             const username = entryMap.get(WEBDAV_USERNAME_KEY);
             const password = entryMap.get(WEBDAV_PASSWORD_KEY);
+            const cloudSyncUrl = entryMap.get(CLOUD_URL_KEY);
+            const cloudSyncToken = entryMap.get(CLOUD_TOKEN_KEY);
 
             if (path) setSyncPath(path);
-            setSyncBackend(backend === 'webdav' ? 'webdav' : 'file');
+            setSyncBackend(backend === 'webdav' || backend === 'cloud' ? backend : 'file');
             if (url) setWebdavUrl(url);
             if (username) setWebdavUsername(username);
             if (password) setWebdavPassword(password);
+            if (cloudSyncUrl) setCloudUrl(cloudSyncUrl);
+            if (cloudSyncToken) setCloudToken(cloudSyncToken);
         }).catch(console.error);
     }, []);
 
@@ -411,6 +421,19 @@ export default function SettingsPage() {
                     [WEBDAV_URL_KEY, webdavUrl.trim()],
                     [WEBDAV_USERNAME_KEY, webdavUsername],
                     [WEBDAV_PASSWORD_KEY, webdavPassword],
+                ]);
+            } else if (syncBackend === 'cloud') {
+                if (!cloudUrl.trim()) {
+                    Alert.alert(
+                        localize('Notice', '提示'),
+                        localize('Please set a self-hosted URL first', '请先设置自托管地址')
+                    );
+                    return;
+                }
+                await AsyncStorage.multiSet([
+                    [SYNC_BACKEND_KEY, 'cloud'],
+                    [CLOUD_URL_KEY, cloudUrl.trim()],
+                    [CLOUD_TOKEN_KEY, cloudToken],
                 ]);
             } else {
                 if (!syncPath) {
@@ -1702,7 +1725,9 @@ export default function SettingsPage() {
                                 <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                     {syncBackend === 'webdav'
                                         ? t('settings.syncBackendWebdav')
-                                        : t('settings.syncBackendFile')}
+                                        : syncBackend === 'cloud'
+                                            ? t('settings.syncBackendCloud')
+                                            : t('settings.syncBackendFile')}
                                 </Text>
                             </View>
                             <View style={styles.backendToggle}>
@@ -1732,6 +1757,20 @@ export default function SettingsPage() {
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'webdav' ? tc.tint : tc.secondaryText }]}>
                                         {t('settings.syncBackendWebdav')}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.backendOption,
+                                        { borderColor: tc.border, backgroundColor: syncBackend === 'cloud' ? tc.filterBg : 'transparent' },
+                                    ]}
+                                    onPress={() => {
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(console.error);
+                                        setSyncBackend('cloud');
+                                    }}
+                                >
+                                    <Text style={[styles.backendOptionText, { color: syncBackend === 'cloud' ? tc.tint : tc.secondaryText }]}>
+                                        {t('settings.syncBackendCloud')}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -1896,6 +1935,106 @@ export default function SettingsPage() {
                                         </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                             {language === 'zh' ? '读取并合并 WebDAV 数据' : translateText('Read and merge WebDAV data', language)}
+                                        </Text>
+                                    </View>
+                                    {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
+                                </TouchableOpacity>
+
+                                <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                            {localize('Last Sync', '上次同步')}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {settings.lastSyncAt
+                                                ? new Date(settings.lastSyncAt).toLocaleString()
+                                                : localize('Never', '从未同步')}
+                                            {settings.lastSyncStatus === 'error' && localize(' (failed)', '（失败）')}
+                                            {settings.lastSyncStatus === 'conflict' && localize(' (conflicts)', '（有冲突）')}
+                                        </Text>
+                                        {settings.lastSyncStats && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Conflicts', '冲突')}: {(settings.lastSyncStats.tasks.conflicts || 0) + (settings.lastSyncStats.projects.conflicts || 0)}
+                                            </Text>
+                                        )}
+                                        {settings.lastSyncStatus === 'error' && settings.lastSyncError && (
+                                            <Text style={[styles.settingDescription, { color: '#EF4444' }]}>
+                                                {settings.lastSyncError}
+                                            </Text>
+                                        )}
+                                    </View>
+                                </View>
+                            </View>
+                        </>
+                    )}
+
+                    {syncBackend === 'cloud' && (
+                        <>
+                            <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 16 }]}>
+                                {t('settings.syncBackendCloud')}
+                            </Text>
+                            <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
+                                <View style={styles.inputGroup}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudUrl')}</Text>
+                                    <TextInput
+                                        value={cloudUrl}
+                                        onChangeText={setCloudUrl}
+                                        placeholder="https://example.com/v1/data"
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
+                                    />
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {t('settings.cloudHint')}
+                                    </Text>
+                                </View>
+
+                                <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudToken')}</Text>
+                                    <TextInput
+                                        value={cloudToken}
+                                        onChangeText={setCloudToken}
+                                        placeholder="••••••••"
+                                        placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        secureTextEntry
+                                        style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
+                                    />
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={() => {
+                                        AsyncStorage.multiSet([
+                                            [SYNC_BACKEND_KEY, 'cloud'],
+                                            [CLOUD_URL_KEY, cloudUrl.trim()],
+                                            [CLOUD_TOKEN_KEY, cloudToken],
+                                        ]).then(() => {
+                                            Alert.alert(localize('Success', '成功'), t('settings.cloudSave'));
+                                        }).catch(console.error);
+                                    }}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: tc.tint }]}>{t('settings.cloudSave')}</Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {t('settings.cloudUrl')}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={handleSync}
+                                    disabled={isSyncing || !cloudUrl.trim()}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() ? tc.tint : tc.secondaryText }]}>
+                                            {localize('Sync', '同步')}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {language === 'zh' ? '读取并合并自托管数据' : translateText('Read and merge self-hosted data', language)}
                                         </Text>
                                     </View>
                                     {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
