@@ -57,7 +57,7 @@ export default function InboxScreen() {
     setProcessingStep('refine');
     setSkippedIds(new Set());
     setPendingStartDate(null);
-    setSelectedContexts([]);
+    setSelectedContexts(processingQueue[0]?.contexts ?? []);
     setNewContext('');
     setProjectSearch('');
     const firstTask = processingQueue[0];
@@ -83,10 +83,10 @@ export default function InboxScreen() {
       setCurrentIndex(currentIndex + 1);
       setProcessingStep('refine');
       setPendingStartDate(null);
-      setSelectedContexts([]);
+      const nextTask = processingQueue[currentIndex + 1];
+      setSelectedContexts(nextTask?.contexts ?? []);
       setNewContext('');
       setProjectSearch('');
-      const nextTask = processingQueue[currentIndex + 1];
       setProcessingTitle(nextTask?.title ?? '');
       setProcessingDescription(nextTask?.description ?? '');
     } else {
@@ -175,6 +175,7 @@ export default function InboxScreen() {
       setWaitingNote('');
       setProcessingStep('waiting-note');
     } else {
+      setSelectedContexts(currentTask.contexts ?? []);
       setProcessingStep('context');
     }
   };
