@@ -42,15 +42,15 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
 
     const navItems = [
         { id: 'inbox', labelKey: 'nav.inbox', icon: Inbox, count: inboxCount },
-        { id: 'agenda', labelKey: 'nav.agenda', icon: Target },
-        { id: 'board', labelKey: 'nav.board', icon: Layers },
-        { id: 'projects', labelKey: 'nav.projects', icon: Folder },
-        { id: 'contexts', labelKey: 'nav.contexts', icon: Tag, path: 'contexts' },
         { id: 'next', labelKey: 'nav.next', icon: Layers, count: nextCount },
-        { id: 'waiting', labelKey: 'nav.waiting', icon: PauseCircle },
+        { id: 'agenda', labelKey: 'nav.agenda', icon: Target },
+        { id: 'projects', labelKey: 'nav.projects', icon: Folder },
+        { id: 'board', labelKey: 'nav.board', icon: Layers },
         { id: 'someday', labelKey: 'nav.someday', icon: Archive },
+        { id: 'waiting', labelKey: 'nav.waiting', icon: PauseCircle },
         { id: 'calendar', labelKey: 'nav.calendar', icon: Calendar },
         { id: 'review', labelKey: 'nav.review', icon: CheckCircle2, path: 'review' },
+        { id: 'contexts', labelKey: 'nav.contexts', icon: Tag, path: 'contexts' },
         { id: 'tutorial', labelKey: 'nav.tutorial', icon: HelpCircle, path: 'tutorial' },
         // Settings moved to footer
         { id: 'done', labelKey: 'nav.done', icon: CheckSquare },
