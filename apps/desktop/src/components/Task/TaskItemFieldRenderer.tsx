@@ -22,87 +22,102 @@ export type MonthlyRecurrenceInfo = {
     interval: number;
 };
 
-type TaskItemFieldRendererProps = {
-    fieldId: TaskEditorFieldId;
+export type TaskItemFieldRendererData = {
     t: (key: string) => string;
     task: Task;
+    taskId: string;
     showDescriptionPreview: boolean;
-    onToggleDescriptionPreview: () => void;
     editDescription: string;
-    onEditDescription: (value: string) => void;
     attachmentError: string | null;
     visibleEditAttachments: Attachment[];
-    onAddFileAttachment: () => void;
-    onAddLinkAttachment: () => void;
-    onOpenAttachment: (attachment: Attachment) => void;
-    onRemoveAttachment: (id: string) => void;
     editStartTime: string;
-    onEditStartTime: (value: string) => void;
     editReviewAt: string;
-    onEditReviewAt: (value: string) => void;
-    onStatusChange: (event: ChangeEvent<HTMLSelectElement>) => void;
     editPriority: TaskPriority | '';
-    onEditPriority: (value: TaskPriority | '') => void;
     editRecurrence: RecurrenceRule | '';
-    onEditRecurrence: (value: RecurrenceRule | '') => void;
     editRecurrenceStrategy: RecurrenceStrategy;
-    onEditRecurrenceStrategy: (value: RecurrenceStrategy) => void;
     editRecurrenceRRule: string;
-    onEditRecurrenceRRule: (value: string) => void;
-    onOpenCustomRecurrence: () => void;
     monthlyRecurrence: MonthlyRecurrenceInfo;
     editTimeEstimate: TimeEstimate | '';
-    onEditTimeEstimate: (value: TimeEstimate | '') => void;
     editContexts: string;
-    onEditContexts: (value: string) => void;
     editTags: string;
-    onEditTags: (value: string) => void;
     popularTagOptions: string[];
-    taskId: string;
+};
+
+export type TaskItemFieldRendererHandlers = {
+    toggleDescriptionPreview: () => void;
+    setEditDescription: (value: string) => void;
+    addFileAttachment: () => void;
+    addLinkAttachment: () => void;
+    openAttachment: (attachment: Attachment) => void;
+    removeAttachment: (id: string) => void;
+    setEditStartTime: (value: string) => void;
+    setEditReviewAt: (value: string) => void;
+    handleStatusChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+    setEditPriority: (value: TaskPriority | '') => void;
+    setEditRecurrence: (value: RecurrenceRule | '') => void;
+    setEditRecurrenceStrategy: (value: RecurrenceStrategy) => void;
+    setEditRecurrenceRRule: (value: string) => void;
+    openCustomRecurrence: () => void;
+    setEditTimeEstimate: (value: TimeEstimate | '') => void;
+    setEditContexts: (value: string) => void;
+    setEditTags: (value: string) => void;
     updateTask: (taskId: string, updates: Partial<Task>) => void;
     resetTaskChecklist: (taskId: string) => void;
 };
 
+type TaskItemFieldRendererProps = {
+    fieldId: TaskEditorFieldId;
+    data: TaskItemFieldRendererData;
+    handlers: TaskItemFieldRendererHandlers;
+};
+
 export function TaskItemFieldRenderer({
     fieldId,
-    t,
-    task,
-    showDescriptionPreview,
-    onToggleDescriptionPreview,
-    editDescription,
-    onEditDescription,
-    attachmentError,
-    visibleEditAttachments,
-    onAddFileAttachment,
-    onAddLinkAttachment,
-    onOpenAttachment,
-    onRemoveAttachment,
-    editStartTime,
-    onEditStartTime,
-    editReviewAt,
-    onEditReviewAt,
-    onStatusChange,
-    editPriority,
-    onEditPriority,
-    editRecurrence,
-    onEditRecurrence,
-    editRecurrenceStrategy,
-    onEditRecurrenceStrategy,
-    editRecurrenceRRule,
-    onEditRecurrenceRRule,
-    onOpenCustomRecurrence,
-    monthlyRecurrence,
-    editTimeEstimate,
-    onEditTimeEstimate,
-    editContexts,
-    onEditContexts,
-    editTags,
-    onEditTags,
-    popularTagOptions,
-    taskId,
-    updateTask,
-    resetTaskChecklist,
+    data,
+    handlers,
 }: TaskItemFieldRendererProps) {
+    const {
+        t,
+        task,
+        taskId,
+        showDescriptionPreview,
+        editDescription,
+        attachmentError,
+        visibleEditAttachments,
+        editStartTime,
+        editReviewAt,
+        editPriority,
+        editRecurrence,
+        editRecurrenceStrategy,
+        editRecurrenceRRule,
+        monthlyRecurrence,
+        editTimeEstimate,
+        editContexts,
+        editTags,
+        popularTagOptions,
+    } = data;
+    const {
+        toggleDescriptionPreview,
+        setEditDescription,
+        addFileAttachment,
+        addLinkAttachment,
+        openAttachment,
+        removeAttachment,
+        setEditStartTime,
+        setEditReviewAt,
+        handleStatusChange,
+        setEditPriority,
+        setEditRecurrence,
+        setEditRecurrenceStrategy,
+        setEditRecurrenceRRule,
+        openCustomRecurrence,
+        setEditTimeEstimate,
+        setEditContexts,
+        setEditTags,
+        updateTask,
+        resetTaskChecklist,
+    } = handlers;
+
     switch (fieldId) {
         case 'description':
             return (
@@ -111,7 +126,7 @@ export function TaskItemFieldRenderer({
                         <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.descriptionLabel')}</label>
                         <button
                             type="button"
-                            onClick={onToggleDescriptionPreview}
+                            onClick={toggleDescriptionPreview}
                             className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground"
                         >
                             {showDescriptionPreview ? t('markdown.edit') : t('markdown.preview')}
@@ -121,38 +136,38 @@ export function TaskItemFieldRenderer({
                         <div className="text-xs bg-muted/30 border border-border rounded px-2 py-2">
                             <Markdown markdown={editDescription || ''} />
                         </div>
-                    ) : (
-                        <textarea
-                            aria-label="Task description"
-                            value={editDescription}
-                            onChange={(e) => onEditDescription(e.target.value)}
-                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 min-h-[60px] resize-y"
-                            placeholder={t('taskEdit.descriptionPlaceholder')}
-                        />
-                    )}
-                </div>
+                        ) : (
+                            <textarea
+                                aria-label="Task description"
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                className="text-xs bg-muted/50 border border-border rounded px-2 py-1 min-h-[60px] resize-y"
+                                placeholder={t('taskEdit.descriptionPlaceholder')}
+                            />
+                        )}
+                    </div>
             );
         case 'attachments':
             return (
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <label className="text-xs text-muted-foreground font-medium">{t('attachments.title')}</label>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={onAddFileAttachment}
-                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
-                            >
-                                <Paperclip className="w-3 h-3" />
-                                {t('attachments.addFile')}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onAddLinkAttachment}
-                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
-                            >
-                                <Link2 className="w-3 h-3" />
-                                {t('attachments.addLink')}
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs text-muted-foreground font-medium">{t('attachments.title')}</label>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={addFileAttachment}
+                                    className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                                >
+                                    <Paperclip className="w-3 h-3" />
+                                    {t('attachments.addFile')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={addLinkAttachment}
+                                    className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                                >
+                                    <Link2 className="w-3 h-3" />
+                                    {t('attachments.addLink')}
                             </button>
                         </div>
                     </div>
@@ -170,7 +185,7 @@ export function TaskItemFieldRenderer({
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            onOpenAttachment(attachment);
+                                            openAttachment(attachment);
                                         }}
                                         className="truncate text-primary hover:underline"
                                         title={attachment.title}
@@ -179,7 +194,7 @@ export function TaskItemFieldRenderer({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => onRemoveAttachment(attachment.id)}
+                                        onClick={() => removeAttachment(attachment.id)}
                                         className="text-muted-foreground hover:text-foreground"
                                     >
                                         {t('attachments.remove')}
@@ -198,7 +213,7 @@ export function TaskItemFieldRenderer({
                         type="datetime-local"
                         aria-label="Start time"
                         value={editStartTime}
-                        onChange={(e) => onEditStartTime(e.target.value)}
+                        onChange={(e) => setEditStartTime(e.target.value)}
                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
                     />
                 </div>
@@ -211,7 +226,7 @@ export function TaskItemFieldRenderer({
                         type="datetime-local"
                         aria-label="Review date"
                         value={editReviewAt}
-                        onChange={(e) => onEditReviewAt(e.target.value)}
+                        onChange={(e) => setEditReviewAt(e.target.value)}
                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
                     />
                 </div>
@@ -219,15 +234,15 @@ export function TaskItemFieldRenderer({
         case 'status':
             return (
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.statusLabel')}</label>
-                    <select
-                        value={task.status}
-                        aria-label="Status"
-                        onChange={onStatusChange}
-                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-                    >
-                        <option value="inbox">{t('status.inbox')}</option>
-                        <option value="next">{t('status.next')}</option>
+                        <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.statusLabel')}</label>
+                        <select
+                            value={task.status}
+                            aria-label="Status"
+                            onChange={handleStatusChange}
+                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+                        >
+                            <option value="inbox">{t('status.inbox')}</option>
+                            <option value="next">{t('status.next')}</option>
                         <option value="waiting">{t('status.waiting')}</option>
                         <option value="someday">{t('status.someday')}</option>
                         <option value="done">{t('status.done')}</option>
@@ -238,14 +253,14 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.priorityLabel')}</label>
-                    <select
-                        value={editPriority}
-                        aria-label={t('taskEdit.priorityLabel')}
-                        onChange={(e) => onEditPriority(e.target.value as TaskPriority | '')}
-                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-                    >
-                        <option value="">{t('common.none')}</option>
-                        <option value="low">{t('priority.low')}</option>
+                        <select
+                            value={editPriority}
+                            aria-label={t('taskEdit.priorityLabel')}
+                            onChange={(e) => setEditPriority(e.target.value as TaskPriority | '')}
+                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+                        >
+                            <option value="">{t('common.none')}</option>
+                            <option value="low">{t('priority.low')}</option>
                         <option value="medium">{t('priority.medium')}</option>
                         <option value="high">{t('priority.high')}</option>
                         <option value="urgent">{t('priority.urgent')}</option>
@@ -256,53 +271,53 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1 w-full">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.recurrenceLabel')}</label>
-                    <select
-                        value={editRecurrence}
-                        aria-label="Recurrence"
-                        onChange={(e) => {
-                            const value = e.target.value as RecurrenceRule | '';
-                            onEditRecurrence(value);
-                            if (value === 'weekly') {
-                                const parsed = parseRRuleString(editRecurrenceRRule);
-                                if (!editRecurrenceRRule || parsed.rule !== 'weekly') {
-                                    onEditRecurrenceRRule(buildRRuleString('weekly'));
+                        <select
+                            value={editRecurrence}
+                            aria-label="Recurrence"
+                            onChange={(e) => {
+                                const value = e.target.value as RecurrenceRule | '';
+                                setEditRecurrence(value);
+                                if (value === 'weekly') {
+                                    const parsed = parseRRuleString(editRecurrenceRRule);
+                                    if (!editRecurrenceRRule || parsed.rule !== 'weekly') {
+                                        setEditRecurrenceRRule(buildRRuleString('weekly'));
+                                    }
                                 }
-                            }
-                            if (value === 'monthly') {
-                                const parsed = parseRRuleString(editRecurrenceRRule);
-                                if (!editRecurrenceRRule || parsed.rule !== 'monthly') {
-                                    onEditRecurrenceRRule(buildRRuleString('monthly'));
+                                if (value === 'monthly') {
+                                    const parsed = parseRRuleString(editRecurrenceRRule);
+                                    if (!editRecurrenceRRule || parsed.rule !== 'monthly') {
+                                        setEditRecurrenceRRule(buildRRuleString('monthly'));
+                                    }
                                 }
-                            }
-                            if (!value) {
-                                onEditRecurrenceRRule('');
-                            }
-                        }}
-                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
-                    >
-                        <option value="">{t('recurrence.none')}</option>
+                                if (!value) {
+                                    setEditRecurrenceRRule('');
+                                }
+                            }}
+                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                        >
+                            <option value="">{t('recurrence.none')}</option>
                         <option value="daily">{t('recurrence.daily')}</option>
                         <option value="weekly">{t('recurrence.weekly')}</option>
                         <option value="monthly">{t('recurrence.monthly')}</option>
                         <option value="yearly">{t('recurrence.yearly')}</option>
                     </select>
-                    {editRecurrence && (
-                        <label className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
-                            <input
-                                type="checkbox"
-                                checked={editRecurrenceStrategy === 'fluid'}
-                                onChange={(e) => onEditRecurrenceStrategy(e.target.checked ? 'fluid' : 'strict')}
-                                className="accent-primary"
-                            />
-                            {t('recurrence.afterCompletion')}
-                        </label>
-                    )}
+                        {editRecurrence && (
+                            <label className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
+                                <input
+                                    type="checkbox"
+                                    checked={editRecurrenceStrategy === 'fluid'}
+                                    onChange={(e) => setEditRecurrenceStrategy(e.target.checked ? 'fluid' : 'strict')}
+                                    className="accent-primary"
+                                />
+                                {t('recurrence.afterCompletion')}
+                            </label>
+                        )}
                     {editRecurrence === 'weekly' && (
                         <div className="pt-1">
                             <span className="text-[10px] text-muted-foreground">Repeat on</span>
                             <WeekdaySelector
                                 value={editRecurrenceRRule || buildRRuleString('weekly')}
-                                onChange={(rrule) => onEditRecurrenceRRule(rrule)}
+                                onChange={(rrule) => setEditRecurrenceRRule(rrule)}
                                 className="pt-1"
                             />
                         </div>
@@ -313,7 +328,7 @@ export function TaskItemFieldRenderer({
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => onEditRecurrenceRRule(buildRRuleString('monthly'))}
+                                    onClick={() => setEditRecurrenceRRule(buildRRuleString('monthly'))}
                                     className={cn(
                                         'text-[10px] px-2 py-1 rounded border transition-colors',
                                         monthlyRecurrence.pattern === 'date'
@@ -325,7 +340,7 @@ export function TaskItemFieldRenderer({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={onOpenCustomRecurrence}
+                                    onClick={openCustomRecurrence}
                                     className={cn(
                                         'text-[10px] px-2 py-1 rounded border transition-colors',
                                         monthlyRecurrence.pattern === 'custom'
@@ -344,14 +359,14 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1 w-full">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.timeEstimateLabel')}</label>
-                    <select
-                        value={editTimeEstimate}
-                        aria-label="Time estimate"
-                        onChange={(e) => onEditTimeEstimate(e.target.value as TimeEstimate | '')}
-                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
-                    >
-                        <option value="">{t('common.none')}</option>
-                        <option value="5min">5m</option>
+                        <select
+                            value={editTimeEstimate}
+                            aria-label="Time estimate"
+                            onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
+                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                        >
+                            <option value="">{t('common.none')}</option>
+                            <option value="5min">5m</option>
                         <option value="10min">10m</option>
                         <option value="15min">15m</option>
                         <option value="30min">30m</option>
@@ -371,7 +386,7 @@ export function TaskItemFieldRenderer({
                         type="text"
                         aria-label="Contexts"
                         value={editContexts}
-                        onChange={(e) => onEditContexts(e.target.value)}
+                        onChange={(e) => setEditContexts(e.target.value)}
                         placeholder="@home, @work"
                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
                     />
@@ -390,7 +405,7 @@ export function TaskItemFieldRenderer({
                                         } else {
                                             newTags = [...currentTags, tag];
                                         }
-                                        onEditContexts(newTags.join(', '));
+                                        setEditContexts(newTags.join(', '));
                                     }}
                                     className={cn(
                                         "text-[10px] px-2 py-0.5 rounded-full border transition-colors",
@@ -414,7 +429,7 @@ export function TaskItemFieldRenderer({
                         type="text"
                         aria-label="Tags"
                         value={editTags}
-                        onChange={(e) => onEditTags(e.target.value)}
+                        onChange={(e) => setEditTags(e.target.value)}
                         placeholder="#urgent, #idea"
                         className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
                     />
@@ -433,7 +448,7 @@ export function TaskItemFieldRenderer({
                                         } else {
                                             newTags = [...currentTags, tag];
                                         }
-                                        onEditTags(newTags.join(', '));
+                                        setEditTags(newTags.join(', '));
                                     }}
                                     className={cn(
                                         "text-[10px] px-2 py-0.5 rounded-full border transition-colors",
