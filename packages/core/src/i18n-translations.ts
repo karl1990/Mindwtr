@@ -16,7 +16,7 @@ const en: Record<string, string> = {
         'nav.someday': 'Someday/Maybe',
         'nav.calendar': 'Calendar',
         'nav.review': 'Review',
-        'nav.agenda': 'Agenda',
+        'nav.agenda': 'Focus',
         'nav.tutorial': 'Tutorial',
         'nav.settings': 'Settings',
         'nav.done': 'Done',
@@ -50,7 +50,7 @@ const en: Record<string, string> = {
         'keybindings.focusContent': 'Focus main content',
         'keybindings.goInbox': 'Go to Inbox',
         'keybindings.goNext': 'Go to Next Actions',
-        'keybindings.goAgenda': 'Go to Agenda',
+        'keybindings.goAgenda': 'Go to Focus',
         'keybindings.goProjects': 'Go to Projects',
         'keybindings.goContexts': 'Go to Contexts',
         'keybindings.goReview': 'Go to Review',
@@ -688,7 +688,7 @@ const en: Record<string, string> = {
         'sort.created-desc': 'Created (newest)',
 
         // Agenda
-        'agenda.title': 'Agenda',
+        'agenda.title': 'Focus',
         'agenda.active': 'active items',
         'agenda.top3Only': 'Show Top 3 Only',
         'agenda.top3Title': "Today's Top 3",
