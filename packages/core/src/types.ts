@@ -114,6 +114,7 @@ export interface Task {
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted
     purgedAt?: string; // Permanently removed from trash, kept for sync tombstone
+    orderNum?: number; // Manual ordering within a project (for sequential projects)
 }
 
 export interface SavedSearch {

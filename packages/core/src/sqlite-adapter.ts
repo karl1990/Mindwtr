@@ -36,8 +36,17 @@ export class SqliteAdapter {
             await this.client.run(SQLITE_SCHEMA);
         }
         await this.ensureTaskPurgedAtColumn();
+        await this.ensureTaskOrderColumn();
         await this.ensureProjectOrderColumn();
         await this.ensureFtsPopulated();
+    }
+
+    private async ensureTaskOrderColumn() {
+        const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(tasks)');
+        const hasOrder = columns.some((col) => col.name === 'orderNum');
+        if (!hasOrder) {
+            await this.client.run('ALTER TABLE tasks ADD COLUMN orderNum INTEGER');
+        }
     }
 
     private async ensureTaskPurgedAtColumn() {
@@ -115,6 +124,7 @@ export class SqliteAdapter {
             attachments: fromJson<Task['attachments']>(row.attachments, undefined),
             location: row.location as string | undefined,
             projectId: row.projectId as string | undefined,
+            orderNum: row.orderNum === null || row.orderNum === undefined ? undefined : Number(row.orderNum),
             isFocusedToday: fromBool(row.isFocusedToday),
             timeEstimate: row.timeEstimate as Task['timeEstimate'] | undefined,
             reviewAt: row.reviewAt as string | undefined,
@@ -271,9 +281,9 @@ export class SqliteAdapter {
                 await this.client.run(
                     `INSERT INTO tasks (
                         id, title, status, priority, taskMode, startTime, dueDate, recurrence, pushCount,
-                        tags, contexts, checklist, description, attachments, location, projectId,
+                        tags, contexts, checklist, description, attachments, location, projectId, orderNum,
                         isFocusedToday, timeEstimate, reviewAt, completedAt, createdAt, updatedAt, deletedAt, purgedAt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         title=excluded.title,
                         status=excluded.status,
@@ -290,6 +300,7 @@ export class SqliteAdapter {
                         attachments=excluded.attachments,
                         location=excluded.location,
                         projectId=excluded.projectId,
+                        orderNum=excluded.orderNum,
                         isFocusedToday=excluded.isFocusedToday,
                         timeEstimate=excluded.timeEstimate,
                         reviewAt=excluded.reviewAt,
@@ -315,6 +326,7 @@ export class SqliteAdapter {
                         toJson(task.attachments),
                         task.location ?? null,
                         task.projectId ?? null,
+                        task.orderNum ?? null,
                         toBool(task.isFocusedToday),
                         task.timeEstimate ?? null,
                         task.reviewAt ?? null,

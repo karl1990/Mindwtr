@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   attachments TEXT,
   location TEXT,
   projectId TEXT,
+  orderNum INTEGER,
   isFocusedToday INTEGER,
   timeEstimate TEXT,
   reviewAt TEXT,
@@ -283,6 +284,7 @@ fn open_sqlite(app: &tauri::AppHandle) -> Result<Connection, String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     conn.execute_batch(SQLITE_SCHEMA).map_err(|e| e.to_string())?;
     ensure_tasks_purged_at_column(&conn)?;
+    ensure_tasks_order_column(&conn)?;
     ensure_fts_populated(&conn, false)?;
     Ok(conn)
 }
@@ -300,6 +302,23 @@ fn ensure_tasks_purged_at_column(conn: &Connection) -> Result<(), String> {
         }
     }
     conn.execute("ALTER TABLE tasks ADD COLUMN purgedAt TEXT", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_tasks_order_column(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(tasks)")
+        .map_err(|e| e.to_string())?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?;
+    for col in columns {
+        if col.map_err(|e| e.to_string())? == "orderNum" {
+            return Ok(());
+        }
+    }
+    conn.execute("ALTER TABLE tasks ADD COLUMN orderNum INTEGER", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -466,6 +485,9 @@ fn row_to_task_value(row: &rusqlite::Row<'_>) -> Result<Value, rusqlite::Error> 
     if let Ok(val) = row.get::<_, Option<String>>("projectId") {
         if let Some(v) = val { map.insert("projectId".to_string(), Value::String(v)); }
     }
+    if let Ok(val) = row.get::<_, Option<i64>>("orderNum") {
+        if let Some(v) = val { map.insert("orderNum".to_string(), Value::Number(v.into())); }
+    }
     if let Ok(val) = row.get::<_, i64>("isFocusedToday") {
         if val != 0 { map.insert("isFocusedToday".to_string(), Value::Bool(true)); }
     }
@@ -541,7 +563,7 @@ fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), Str
         let checklist_json = json_str(task.get("checklist"));
         let attachments_json = json_str(task.get("attachments"));
         tx.execute(
-            "INSERT INTO tasks (id, title, status, priority, taskMode, startTime, dueDate, recurrence, pushCount, tags, contexts, checklist, description, attachments, location, projectId, isFocusedToday, timeEstimate, reviewAt, completedAt, createdAt, updatedAt, deletedAt, purgedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+            "INSERT INTO tasks (id, title, status, priority, taskMode, startTime, dueDate, recurrence, pushCount, tags, contexts, checklist, description, attachments, location, projectId, orderNum, isFocusedToday, timeEstimate, reviewAt, completedAt, createdAt, updatedAt, deletedAt, purgedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
             params![
                 task.get("id").and_then(|v| v.as_str()).unwrap_or_default(),
                 task.get("title").and_then(|v| v.as_str()).unwrap_or_default(),
@@ -559,6 +581,7 @@ fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), Str
                 attachments_json,
                 task.get("location").and_then(|v| v.as_str()),
                 task.get("projectId").and_then(|v| v.as_str()),
+                task.get("orderNum").and_then(|v| v.as_i64()),
                 task.get("isFocusedToday").and_then(|v| v.as_bool()).unwrap_or(false) as i32,
                 task.get("timeEstimate").and_then(|v| v.as_str()),
                 task.get("reviewAt").and_then(|v| v.as_str()),

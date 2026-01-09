@@ -157,6 +157,8 @@ interface TaskStore {
     reorderAreas: (orderedIds: string[]) => Promise<void>;
     /** Reorder projects within a specific area by id list */
     reorderProjects: (orderedIds: string[], areaId?: string) => Promise<void>;
+    /** Reorder tasks within a project */
+    reorderProjectTasks: (projectId: string, orderedIds: string[]) => Promise<void>;
 
     // Tag Actions
     /** Delete a tag from tasks and projects */
@@ -183,6 +185,19 @@ const normalizeTagId = (value: string): string => {
     if (!trimmed) return '';
     const withPrefix = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
     return withPrefix.toLowerCase();
+};
+
+const getNextProjectOrder = (projectId: string | undefined, tasks: Task[]): number | undefined => {
+    if (!projectId) return undefined;
+    const projectTasks = tasks.filter((task) => task.projectId === projectId && !task.deletedAt);
+    if (projectTasks.length === 0) return 0;
+    const ordered = projectTasks
+        .map((task) => task.orderNum)
+        .filter((value): value is number => Number.isFinite(value));
+    if (ordered.length > 0) {
+        return Math.max(...ordered) + 1;
+    }
+    return projectTasks.length;
 };
 
 /**
@@ -468,6 +483,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
      */
     addTask: async (title: string, initialProps?: Partial<Task>) => {
         const changeAt = Date.now();
+        const hasOrderNum = Object.prototype.hasOwnProperty.call(initialProps ?? {}, 'orderNum');
+        const resolvedProjectId = initialProps?.projectId;
+        const resolvedOrderNum = !hasOrderNum && resolvedProjectId
+            ? getNextProjectOrder(resolvedProjectId, get()._allTasks)
+            : initialProps?.orderNum;
         const newTask: Task = {
             id: uuidv4(),
             title,
@@ -479,6 +499,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             ...initialProps,
+            orderNum: resolvedOrderNum,
         };
 
         const newAllTasks = [...get()._allTasks, newTask];
@@ -504,7 +525,29 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             return;
         }
 
-        const { updatedTask, nextRecurringTask } = applyTaskUpdates(oldTask, updates, now);
+        let adjustedUpdates = updates;
+        if (Object.prototype.hasOwnProperty.call(updates, 'projectId')) {
+            const nextProjectId = updates.projectId ?? undefined;
+            const projectChanged = (oldTask.projectId ?? undefined) !== nextProjectId;
+            if (projectChanged) {
+                const hasOrderNum = Object.prototype.hasOwnProperty.call(updates, 'orderNum');
+                if (nextProjectId) {
+                    if (!hasOrderNum) {
+                        adjustedUpdates = {
+                            ...adjustedUpdates,
+                            orderNum: getNextProjectOrder(nextProjectId, get()._allTasks),
+                        };
+                    }
+                } else {
+                    adjustedUpdates = {
+                        ...adjustedUpdates,
+                        orderNum: undefined,
+                    };
+                }
+            }
+        }
+
+        const { updatedTask, nextRecurringTask } = applyTaskUpdates(oldTask, adjustedUpdates, now);
 
         const newAllTasks = get()._allTasks.map((task) =>
             task.id === id ? updatedTask : task
@@ -658,6 +701,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             deletedAt: undefined,
             createdAt: now,
             updatedAt: now,
+            orderNum: sourceTask.projectId
+                ? getNextProjectOrder(sourceTask.projectId, get()._allTasks)
+                : undefined,
         };
 
         const newAllTasks = [...get()._allTasks, newTask];
@@ -1139,6 +1185,45 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         set({ projects: newVisibleProjects, _allProjects: newAllProjects, lastDataChangeAt: changeAt });
         debouncedSave(
             { tasks: get()._allTasks, projects: newAllProjects, areas: get()._allAreas, settings: get().settings },
+            (msg) => set({ error: msg })
+        );
+    },
+
+    reorderProjectTasks: async (projectId: string, orderedIds: string[]) => {
+        if (!projectId || orderedIds.length === 0) return;
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
+        const allTasks = get()._allTasks;
+        const isInProject = (task: Task) => task.projectId === projectId && !task.deletedAt;
+
+        const projectTasks = allTasks.filter(isInProject);
+        const orderedSet = new Set(orderedIds);
+        const remaining = projectTasks
+            .filter((task) => !orderedSet.has(task.id))
+            .sort((a, b) => {
+                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            });
+
+        const finalIds = [...orderedIds, ...remaining.map((task) => task.id)];
+        const orderById = new Map<string, number>();
+        finalIds.forEach((id, index) => {
+            orderById.set(id, index);
+        });
+
+        const newAllTasks = allTasks.map((task) => {
+            if (!isInProject(task)) return task;
+            const nextOrder = orderById.get(task.id);
+            if (!Number.isFinite(nextOrder)) return task;
+            return { ...task, orderNum: nextOrder as number, updatedAt: now };
+        });
+
+        const newVisibleTasks = newAllTasks.filter((task) => !task.deletedAt && task.status !== 'archived');
+        set({ tasks: newVisibleTasks, _allTasks: newAllTasks, lastDataChangeAt: changeAt });
+        debouncedSave(
+            { tasks: newAllTasks, projects: get()._allProjects, areas: get()._allAreas, settings: get().settings },
             (msg) => set({ error: msg })
         );
     },

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   attachments TEXT,
   location TEXT,
   projectId TEXT,
+  orderNum INTEGER,
   isFocusedToday INTEGER,
   timeEstimate TEXT,
   reviewAt TEXT,

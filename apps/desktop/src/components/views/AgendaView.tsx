@@ -125,16 +125,30 @@ export function AgendaView() {
         const sequentialProjectIds = new Set(
             projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id)
         );
-        const earliestByProject = new Map<string, Task>();
+        const tasksByProject = new Map<string, Task[]>();
         for (const task of filteredActiveTasks) {
             if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
             if (!sequentialProjectIds.has(task.projectId)) continue;
-            const existing = earliestByProject.get(task.projectId);
-            if (!existing || new Date(task.createdAt).getTime() < new Date(existing.createdAt).getTime()) {
-                earliestByProject.set(task.projectId, task);
-            }
+            const list = tasksByProject.get(task.projectId) ?? [];
+            list.push(task);
+            tasksByProject.set(task.projectId, list);
         }
-        const sequentialFirstTasks = new Set(Array.from(earliestByProject.values()).map((task) => task.id));
+        const sequentialFirstTasks = new Set<string>();
+        tasksByProject.forEach((tasksForProject) => {
+            const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
+            let firstTask: Task | null = null;
+            let bestKey = Number.POSITIVE_INFINITY;
+            tasksForProject.forEach((task) => {
+                const key = hasOrder
+                    ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+                    : new Date(task.createdAt).getTime();
+                if (!firstTask || key < bestKey) {
+                    firstTask = task;
+                    bestKey = key;
+                }
+            });
+            if (firstTask) sequentialFirstTasks.add(firstTask.id);
+        });
 
         const overdue = filteredActiveTasks.filter(t => {
             if (!t.dueDate) return false;

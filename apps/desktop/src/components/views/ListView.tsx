@@ -214,22 +214,38 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }, {} as Record<string, Task>);
     }, [tasks]);
 
-    // For sequential projects, get only the first (oldest) task to show in Next view
+    // For sequential projects, get only the first task to show in Next view
     const sequentialProjectFirstTasks = useMemo(() => {
         const sequentialIds = new Set(projects.filter(p => p.isSequential).map((p) => p.id));
         if (sequentialIds.size === 0) return new Set<string>();
-        const earliestByProject = new Map<string, Task>();
+        const tasksByProject = new Map<string, Task[]>();
 
         for (const task of baseTasks) {
             if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
             if (!sequentialIds.has(task.projectId)) continue;
-            const existing = earliestByProject.get(task.projectId);
-            if (!existing || new Date(task.createdAt).getTime() < new Date(existing.createdAt).getTime()) {
-                earliestByProject.set(task.projectId, task);
-            }
+            const list = tasksByProject.get(task.projectId) ?? [];
+            list.push(task);
+            tasksByProject.set(task.projectId, list);
         }
 
-        return new Set(Array.from(earliestByProject.values()).map((task) => task.id));
+        const firstTaskIds: string[] = [];
+        tasksByProject.forEach((tasksForProject) => {
+            const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
+            let firstTask: Task | null = null;
+            let bestKey = Number.POSITIVE_INFINITY;
+            tasksForProject.forEach((task) => {
+                const key = hasOrder
+                    ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+                    : new Date(task.createdAt).getTime();
+                if (!firstTask || key < bestKey) {
+                    firstTask = task;
+                    bestKey = key;
+                }
+            });
+            if (firstTask) firstTaskIds.push(firstTask.id);
+        });
+
+        return new Set(firstTaskIds);
     }, [baseTasks, projects]);
 
     useEffect(() => {
