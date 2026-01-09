@@ -3,8 +3,8 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 
 import { useTaskStore, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, safeFormatDate, safeParseDate, getChecklistProgress, type TaskStatus } from '@mindwtr/core';
 
-import { useLanguage } from '../../../contexts/language-context';
-import { useTheme } from '../../../contexts/theme-context';
+import { useLanguage } from '../../contexts/language-context';
+import { useTheme } from '../../contexts/theme-context';
 
 import { useThemeColors, ThemeColors } from '@/hooks/use-theme-colors';
 
