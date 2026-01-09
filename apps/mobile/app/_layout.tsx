@@ -45,30 +45,36 @@ function RootLayoutContent() {
   const widgetRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryLoadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncInFlight = useRef<Promise<void> | null>(null);
-  const syncQueued = useRef(false);
+  const syncRequestVersion = useRef(0);
+  const syncCompletedVersion = useRef(0);
   const isActive = useRef(true);
   const loadAttempts = useRef(0);
 
-  const queueSync = (minIntervalMs = 5_000) => {
+  const runSync = (minIntervalMs = 5_000) => {
     if (!isActive.current) return;
     if (syncInFlight.current) {
-      syncQueued.current = true;
       return;
     }
     const now = Date.now();
     if (now - lastAutoSyncAt.current < minIntervalMs) return;
     lastAutoSyncAt.current = now;
+    const targetVersion = syncRequestVersion.current;
 
     syncInFlight.current = (async () => {
       await flushPendingSave().catch(console.error);
       await performMobileSync().catch(console.error);
     })().finally(() => {
       syncInFlight.current = null;
-      if (syncQueued.current && isActive.current) {
-        syncQueued.current = false;
-        queueSync(0);
+      syncCompletedVersion.current = targetVersion;
+      if (syncRequestVersion.current > syncCompletedVersion.current && isActive.current) {
+        runSync(0);
       }
     });
+  };
+
+  const requestSync = (minIntervalMs = 5_000) => {
+    syncRequestVersion.current += 1;
+    runSync(minIntervalMs);
   };
 
   // Auto-sync on data changes with debounce
@@ -82,7 +88,7 @@ function RootLayoutContent() {
       }
       syncDebounceTimer.current = setTimeout(() => {
         if (!isActive.current) return;
-        queueSync(5_000);
+        requestSync(5_000);
       }, 5000);
     });
 
@@ -119,7 +125,7 @@ function RootLayoutContent() {
         // Coming back to foreground - sync to get latest data
         const now = Date.now();
         if (now - lastAutoSyncAt.current > 30_000) {
-          queueSync(0);
+          requestSync(0);
         }
         updateAndroidWidgetFromStore().catch(console.error);
         if (widgetRefreshTimer.current) {
@@ -136,7 +142,7 @@ function RootLayoutContent() {
           clearTimeout(syncDebounceTimer.current);
           syncDebounceTimer.current = null;
         }
-        queueSync(0);
+        requestSync(0);
       }
       appState.current = nextAppState;
     };
