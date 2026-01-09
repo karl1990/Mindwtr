@@ -21,7 +21,6 @@ import {
     type AIProviderId,
     type AIReasoningEffort,
     safeFormatDate,
-    translateText,
     type ExternalCalendarSubscription,
     useTaskStore,
 } from '@mindwtr/core';
@@ -83,7 +82,7 @@ const maskCalendarUrl = (url: string): string => {
 export function SettingsView() {
     const [page, setPage] = useState<SettingsPage>('main');
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
-    const { language, setLanguage } = useLanguage();
+    const { language, setLanguage, t: translate } = useLanguage();
     const { style: keybindingStyle, setStyle: setKeybindingStyle, openHelp } = useKeybindings();
     const { settings, updateSettings } = useTaskStore();
     const isTauri = isTauriRuntime();
@@ -490,7 +489,7 @@ export function SettingsView() {
 
     };
 
-    const labels = {
+    const labelFallback = {
         en: {
             title: 'Settings',
             general: 'General',
@@ -797,31 +796,39 @@ export function SettingsView() {
         },
     } as const;
 
-    type Labels = Record<keyof typeof labels.en, string>;
-    const translateLabels = (lang: Language): Labels => {
-        const entries = Object.entries(labels.en).map(([key, value]) => [
-            key,
-            translateText(value, lang),
-        ]);
-        return Object.fromEntries(entries) as Labels;
+    type Labels = Record<keyof typeof labelFallback.en, string>;
+    const labelKeyOverrides: Partial<Record<keyof Labels, string>> = {
+        back: 'common.back',
+        keybindings: 'keybindings.helpTitle',
+        keybindingsDesc: 'settings.keybindingsDesc',
+        keybindingVim: 'keybindings.style.vim',
+        keybindingEmacs: 'keybindings.style.emacs',
+        viewShortcuts: 'keybindings.openHelp',
+        taskEditorLayoutReset: 'settings.resetToDefault',
+        taskEditorFieldStatus: 'taskEdit.statusLabel',
+        taskEditorFieldProject: 'taskEdit.projectLabel',
+        taskEditorFieldPriority: 'taskEdit.priorityLabel',
+        taskEditorFieldContexts: 'taskEdit.contextsLabel',
+        taskEditorFieldDescription: 'taskEdit.descriptionLabel',
+        taskEditorFieldTags: 'taskEdit.tagsLabel',
+        taskEditorFieldTimeEstimate: 'taskEdit.timeEstimateLabel',
+        taskEditorFieldRecurrence: 'taskEdit.recurrenceLabel',
+        taskEditorFieldStartTime: 'taskEdit.startDateLabel',
+        taskEditorFieldDueDate: 'taskEdit.dueDateLabel',
+        taskEditorFieldReviewAt: 'taskEdit.reviewDateLabel',
+        taskEditorFieldAttachments: 'attachments.title',
+        taskEditorFieldChecklist: 'taskEdit.checklist',
     };
-    const labelsByLanguage: Record<Language, Labels> = {
-        en: labels.en,
-        zh: labels.zh,
-        es: translateLabels('es'),
-        hi: translateLabels('hi'),
-        ar: translateLabels('ar'),
-        de: translateLabels('de'),
-        ru: translateLabels('ru'),
-        ja: translateLabels('ja'),
-        fr: translateLabels('fr'),
-        pt: translateLabels('pt'),
-        ko: translateLabels('ko'),
-        it: translateLabels('it'),
-        tr: translateLabels('tr'),
-    };
-
-    const t = labelsByLanguage[language] ?? labels.en;
+    const labelsFallback = language === 'zh' ? labelFallback.zh : labelFallback.en;
+    const t = useMemo(() => {
+        const result = {} as Labels;
+        (Object.keys(labelFallback.en) as Array<keyof Labels>).forEach((key) => {
+            const i18nKey = labelKeyOverrides[key] ?? `settings.${key}`;
+            const translated = translate(i18nKey);
+            result[key] = translated !== i18nKey ? translated : labelsFallback[key];
+        });
+        return result;
+    }, [labelsFallback, translate]);
     const anthropicThinkingOptions = [
         { value: DEFAULT_ANTHROPIC_THINKING_BUDGET || 1024, label: t.aiThinkingLow },
         { value: 2048, label: t.aiThinkingMedium },
