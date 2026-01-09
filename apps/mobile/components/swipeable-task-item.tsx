@@ -95,16 +95,31 @@ export function SwipeableTaskItem({
     const [localChecklist, setLocalChecklist] = useState(task.checklist || []);
     const checklistUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingChecklist = useRef<Task['checklist'] | null>(null);
+    const checklistTaskIdRef = useRef(task.id);
+    const checklistVersionRef = useRef(0);
 
     useEffect(() => {
         setLocalChecklist(task.checklist || []);
     }, [task.checklist]);
 
     useEffect(() => {
+        if (checklistTaskIdRef.current !== task.id) {
+            checklistTaskIdRef.current = task.id;
+            pendingChecklist.current = null;
+            checklistVersionRef.current += 1;
+            if (checklistUpdateTimer.current) {
+                clearTimeout(checklistUpdateTimer.current);
+                checklistUpdateTimer.current = null;
+            }
+        }
+    }, [task.id]);
+
+    useEffect(() => {
         return () => {
             if (checklistUpdateTimer.current) {
                 clearTimeout(checklistUpdateTimer.current);
             }
+            checklistVersionRef.current += 1;
         };
     }, []);
 
@@ -358,10 +373,14 @@ export function SwipeableTaskItem({
                                             );
                                             setLocalChecklist(newList);
                                             pendingChecklist.current = newList;
+                                            const scheduledVersion = checklistVersionRef.current + 1;
+                                            checklistVersionRef.current = scheduledVersion;
                                             if (checklistUpdateTimer.current) {
                                                 clearTimeout(checklistUpdateTimer.current);
                                             }
                                             checklistUpdateTimer.current = setTimeout(() => {
+                                                if (checklistVersionRef.current !== scheduledVersion) return;
+                                                if (checklistTaskIdRef.current !== taskId) return;
                                                 const pending = pendingChecklist.current;
                                                 if (!pending) return;
                                                 const latestTask = useTaskStore.getState().tasks.find((t) => t.id === taskId) || task;
