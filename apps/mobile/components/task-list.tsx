@@ -402,6 +402,7 @@ export function TaskList({
   }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode, t]);
 
   const sortOptions: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
+  const hideStatusBadgeForList = statusFilter === 'next' || statusFilter === 'waiting';
 
   const renderTask = useCallback(({ item }: { item: Task }) => (
     <SwipeableTaskItem
@@ -418,7 +419,7 @@ export function TaskList({
       onLongPressAction={enableReorder && !reorderMode ? onEnterReorderMode : undefined}
       disableSwipe={reorderMode}
       showDragHandle={reorderMode}
-      hideStatusBadge={reorderMode}
+      hideStatusBadge={reorderMode || hideStatusBadgeForList}
     />
   ), [
     deleteTask,
@@ -431,6 +432,7 @@ export function TaskList({
     selectionMode,
     enableReorder,
     reorderMode,
+    hideStatusBadgeForList,
     themeColors,
     toggleMultiSelect,
     updateTask,
@@ -628,7 +630,7 @@ export function TaskList({
               </Text>
             </View>
           )}
-          {showQuickAddHelp && (
+          {showQuickAddHelp && !projectId && (
             <Text style={[styles.quickAddHelp, { color: themeColors.secondaryText }]}>
               {t('quickAdd.help')}
             </Text>
@@ -996,7 +998,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 16,
+    padding: 12,
   },
   taskItem: {
     flexDirection: 'row',

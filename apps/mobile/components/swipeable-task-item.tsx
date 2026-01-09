@@ -2,7 +2,7 @@ import { View, Text, Pressable, StyleSheet, Modal, Alert } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useTaskStore, Task, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getStatusColor, hasTimeComponent, safeFormatDate, safeParseDueDate, TaskStatus, Project } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ThemeColors } from '../hooks/use-theme-colors';
 
 export interface SwipeableTaskItemProps {
@@ -161,11 +161,66 @@ export function SwipeableTaskItem({
         return safeFormatDate(due, hasTime ? 'Pp' : 'P');
     })();
     const isStagnant = (task.pushCount ?? 0) > 3;
+    const staleness = getTaskStaleness(task.createdAt);
+    const showAge = task.status !== 'done' && (staleness === 'stale' || staleness === 'very-stale');
 
-    const showMetaChips =
-        (task.tags?.length ?? 0) > 0 ||
-        (!hideContexts && (task.contexts?.length ?? 0) > 0) ||
-        Boolean(timeEstimateLabel);
+    const metaParts: ReactNode[] = [];
+    const addMetaPart = (node: ReactNode, key: string) => {
+        if (metaParts.length > 0) {
+            metaParts.push(
+                <Text key={`sep-${key}`} style={[styles.metaSeparator, { color: tc.secondaryText }]}>
+                    ·
+                </Text>
+            );
+        }
+        metaParts.push(node);
+    };
+
+    if (project) {
+        addMetaPart(
+            <View key="project" style={styles.inlineMetaItem}>
+                <View style={[styles.projectDot, { backgroundColor: projectColor || tc.tint }]} />
+                <Text style={[styles.metaText, { color: tc.secondaryText }]} numberOfLines={1}>
+                    {project.title}
+                </Text>
+            </View>,
+            'project'
+        );
+    }
+
+    if (!hideContexts && task.contexts?.length) {
+        const ctx = task.contexts[0];
+        const more = task.contexts.length - 1;
+        addMetaPart(
+            <View key="context" style={styles.inlineMetaItem}>
+                <Text style={[styles.metaText, styles.contextText]} numberOfLines={1}>
+                    {ctx}
+                </Text>
+                {more > 0 && (
+                    <Text style={[styles.metaText, { color: tc.secondaryText }]}>+{more}</Text>
+                )}
+            </View>,
+            'context'
+        );
+    }
+
+    if (dueLabel) {
+        addMetaPart(
+            <Text key="due" style={[styles.metaText, styles.dueText]}>
+                {dueLabel}
+            </Text>,
+            'due'
+        );
+    }
+
+    if (timeEstimateLabel) {
+        addMetaPart(
+            <Text key="estimate" style={[styles.metaText, { color: tc.secondaryText }]}>
+                {timeEstimateLabel}
+            </Text>,
+            'estimate'
+        );
+    }
 
     const renderLeftActions = () => (
         <Pressable
@@ -294,73 +349,9 @@ export function SwipeableTaskItem({
                                 {task.description}
                             </Text>
                         )}
-                        {project && (
-                            <View style={[styles.projectBadge, { backgroundColor: (projectColor || tc.tint) + '20', borderColor: projectColor || tc.tint }]}>
-                                <Text style={[styles.projectBadgeText, { color: projectColor || tc.tint }]} numberOfLines={1}>
-                                    📁 {project.title}
-                                </Text>
-                            </View>
-                        )}
-                        {dueLabel && (
-                            <Text style={[styles.taskDueDate, isStagnant && styles.taskDueDateStale]}>
-                                {t('taskEdit.dueDateLabel')}: {dueLabel}
-                                {isStagnant && (
-                                    <Text style={styles.staleIndicator}> ⏳ {task.pushCount}</Text>
-                                )}
-                            </Text>
-                        )}
-                        {(task.startTime || task.reviewAt) && (
-                            <View style={styles.metaRow}>
-                                {task.startTime && (
-                                    <Text style={[
-                                        styles.metaPill,
-                                        { backgroundColor: tc.filterBg, borderColor: tc.border, color: tc.text }
-                                    ]}>
-                                        ⏱ {safeFormatDate(task.startTime, 'P')}
-                                    </Text>
-                                )}
-                                {task.reviewAt && (
-                                    <Text style={[
-                                        styles.metaPill,
-                                        { backgroundColor: tc.filterBg, borderColor: tc.border, color: tc.text }
-                                    ]}>
-                                        🔁 {safeFormatDate(task.reviewAt, 'P')}
-                                    </Text>
-                                )}
-                            </View>
-                        )}
-                        {showMetaChips && (
-                            <View style={styles.metaRow}>
-                                {(task.tags || []).slice(0, 6).map((tag, idx) => (
-                                    <Text
-                                        key={`${tag}-${idx}`}
-                                        style={[
-                                            styles.tagChip,
-                                            isDark ? styles.tagChipDark : styles.tagChipLight,
-                                        ]}
-                                    >
-                                        {tag}
-                                    </Text>
-                                ))}
-                                {!hideContexts && (task.contexts || []).slice(0, 6).map((ctx, idx) => (
-                                    <Text
-                                        key={`${ctx}-${idx}`}
-                                        style={[
-                                            styles.contextTag,
-                                            isDark ? styles.contextTagDark : styles.contextTagLight,
-                                        ]}
-                                    >
-                                        {ctx}
-                                    </Text>
-                                ))}
-                                {timeEstimateLabel && (
-                                    <Text style={[
-                                        styles.metaPill,
-                                        { backgroundColor: tc.filterBg, borderColor: tc.border, color: tc.text }
-                                    ]}>
-                                        ⏱ {timeEstimateLabel}
-                                    </Text>
-                                )}
+                        {metaParts.length > 0 && (
+                            <View style={styles.inlineMeta}>
+                                {metaParts}
                             </View>
                         )}
                         {checklistProgress && (
@@ -436,22 +427,10 @@ export function SwipeableTaskItem({
                             </View>
                         )}
                         {/* Task Age Indicator */}
-                        {task.status !== 'done' && getTaskAgeLabel(task.createdAt, language) && (
-                            <View style={[
-                                styles.ageBadge,
-                                getTaskStaleness(task.createdAt) === 'fresh' && styles.ageFresh,
-                                getTaskStaleness(task.createdAt) === 'aging' && styles.ageAging,
-                                getTaskStaleness(task.createdAt) === 'stale' && styles.ageStale,
-                                getTaskStaleness(task.createdAt) === 'very-stale' && styles.ageVeryStale,
-                            ]}>
-                                <Text style={[
-                                    styles.ageText,
-                                    getTaskStaleness(task.createdAt) === 'fresh' && styles.ageTextFresh,
-                                    getTaskStaleness(task.createdAt) === 'aging' && styles.ageTextAging,
-                                    getTaskStaleness(task.createdAt) === 'stale' && styles.ageTextStale,
-                                    getTaskStaleness(task.createdAt) === 'very-stale' && styles.ageTextVeryStale,
-                                ]}>⏱ {getTaskAgeLabel(task.createdAt, language)}</Text>
-                            </View>
+                        {showAge && getTaskAgeLabel(task.createdAt, language) && (
+                            <Text style={[styles.staleText, { color: tc.secondaryText }]}>
+                                ⏱ {getTaskAgeLabel(task.createdAt, language)}
+                            </Text>
                         )}
                     </View>
                     {showDragHandle && (
@@ -534,15 +513,15 @@ const styles = StyleSheet.create({
     taskItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 8,
         position: 'relative',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     selectionIndicator: {
         width: 22,
@@ -567,9 +546,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     taskTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
-        marginBottom: 4,
+        lineHeight: 20,
     },
     taskTitleFlex: {
         flex: 1,
@@ -588,26 +567,46 @@ const styles = StyleSheet.create({
         color: '#F59E0B',
     },
     taskDescription: {
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    taskDueDate: {
         fontSize: 12,
-        color: '#EF4444',
-        marginTop: 4,
+        marginTop: 2,
     },
-    taskDueDateStale: {
-        color: '#9CA3AF',
-    },
-    staleIndicator: {
-        fontSize: 11,
-        color: '#9CA3AF',
-    },
-    metaRow: {
+    inlineMeta: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 6,
-        marginTop: 8,
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+    },
+    inlineMetaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        maxWidth: '100%',
+    },
+    metaText: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    metaSeparator: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginHorizontal: 2,
+    },
+    contextText: {
+        color: '#3B82F6',
+    },
+    dueText: {
+        color: '#EF4444',
+        fontWeight: '600',
+    },
+    projectDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    staleText: {
+        fontSize: 11,
+        marginTop: 4,
     },
     metaPill: {
         borderWidth: 1,
@@ -862,19 +861,5 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '500',
         color: '#1D4ED8',
-    },
-    projectBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        marginTop: 4,
-        alignSelf: 'flex-start',
-        borderWidth: 1,
-    },
-    projectBadgeText: {
-        fontSize: 11,
-        fontWeight: '500',
     },
 });

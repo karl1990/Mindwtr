@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 110,
   },
   header: {
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   itemWrapper: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   emptyState: {
     paddingVertical: 40,
