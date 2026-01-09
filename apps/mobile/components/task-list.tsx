@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, RefreshControl, ScrollView, Modal, Pressable } from 'react-native';
+import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, RefreshControl, ScrollView, Modal, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTaskStore, Task, TaskStatus, sortTasksBy, parseQuickAdd, safeParseDate, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, type AIProviderId } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
@@ -339,13 +339,15 @@ export function TaskList({
     if (!hasSelection) return;
     await batchMoveTasks(selectedIdsArray, newStatus);
     exitSelectionMode();
-  }, [batchMoveTasks, selectedIdsArray, hasSelection, exitSelectionMode]);
+    Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+  }, [batchMoveTasks, selectedIdsArray, hasSelection, exitSelectionMode, t]);
 
   const handleBatchDelete = useCallback(async () => {
     if (!hasSelection) return;
     await batchDeleteTasks(selectedIdsArray);
     exitSelectionMode();
-  }, [batchDeleteTasks, selectedIdsArray, hasSelection, exitSelectionMode]);
+    Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+  }, [batchDeleteTasks, selectedIdsArray, hasSelection, exitSelectionMode, t]);
 
   const handleBatchAddTag = useCallback(async () => {
     const input = tagInput.trim();
@@ -360,7 +362,8 @@ export function TaskList({
     setTagInput('');
     setTagModalVisible(false);
     exitSelectionMode();
-  }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode]);
+    Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+  }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode, t]);
 
   const sortOptions: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
 
