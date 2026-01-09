@@ -155,6 +155,8 @@ interface TaskStore {
 // Save queue helper - coalesces writes while ensuring the latest snapshot is persisted quickly.
 let pendingData: AppData | null = null;
 let pendingOnError: ((msg: string) => void) | null = null;
+let pendingVersion = 0;
+let savedVersion = 0;
 let saveInFlight: Promise<void> | null = null;
 const MIGRATION_VERSION = 1;
 const AUTO_ARCHIVE_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -180,6 +182,7 @@ const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
         areas: [...(data.areas || [])],
     };
     if (onError) pendingOnError = onError;
+    pendingVersion += 1;
     void flushPendingSave();
 };
 
@@ -194,11 +197,13 @@ export const flushPendingSave = async (): Promise<void> => {
             continue;
         }
         if (!pendingData) return;
+        if (pendingVersion === savedVersion) return;
+        const targetVersion = pendingVersion;
         const dataToSave = pendingData;
         const onErrorCallback = pendingOnError;
-        pendingData = null;
-        pendingOnError = null;
-        saveInFlight = storage.saveData(dataToSave).catch((e) => {
+        saveInFlight = storage.saveData(dataToSave).then(() => {
+            savedVersion = targetVersion;
+        }).catch((e) => {
             console.error('Failed to flush pending save:', e);
             if (onErrorCallback) {
                 onErrorCallback('Failed to save data');
