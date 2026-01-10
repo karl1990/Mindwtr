@@ -7,6 +7,7 @@ import {
     TaskPriority,
     TimeEstimate,
     TaskEditorFieldId,
+    type AppData,
     type Recurrence,
     type RecurrenceRule,
     type RecurrenceStrategy,
@@ -149,10 +150,15 @@ export const TaskItem = memo(function TaskItem({
     const [copilotApplied, setCopilotApplied] = useState(false);
     const [copilotContext, setCopilotContext] = useState<string | undefined>(undefined);
     const [copilotEstimate, setCopilotEstimate] = useState<TimeEstimate | undefined>(undefined);
+    const copilotInputRef = useRef<string>('');
     const [isAIWorking, setIsAIWorking] = useState(false);
     const copilotAbortRef = useRef<AbortController | null>(null);
     const aiEnabled = settings?.ai?.enabled === true;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
+    const copilotModel = settings?.ai?.copilotModel;
+    const copilotSettings = useMemo(() => ({
+        ai: { provider: aiProvider, copilotModel },
+    }), [aiProvider, copilotModel]);
     const [aiKey, setAiKey] = useState('');
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
@@ -601,11 +607,23 @@ export const TaskItem = memo(function TaskItem({
             setCopilotSuggestion(null);
             return;
         }
+        const signature = JSON.stringify({
+            input,
+            contexts: editContexts,
+            provider: aiProvider,
+            model: copilotModel ?? '',
+            tags: tagOptions,
+            timeEstimatesEnabled,
+        });
+        if (signature === copilotInputRef.current) {
+            return;
+        }
+        copilotInputRef.current = signature;
         let cancelled = false;
         const handle = setTimeout(async () => {
             try {
                 const currentContexts = editContexts.split(',').map((c) => c.trim()).filter(Boolean);
-                const provider = createAIProvider(buildCopilotConfig(settings, aiKey));
+                const provider = createAIProvider(buildCopilotConfig(copilotSettings as AppData['settings'], aiKey));
                 if (copilotAbortRef.current) copilotAbortRef.current.abort();
                 const abortController = typeof AbortController === 'function' ? new AbortController() : null;
                 copilotAbortRef.current = abortController;
@@ -637,7 +655,7 @@ export const TaskItem = memo(function TaskItem({
                 copilotAbortRef.current = null;
             }
         };
-    }, [aiEnabled, aiKey, editTitle, editDescription, editContexts, settings, timeEstimatesEnabled]);
+    }, [aiEnabled, aiKey, editTitle, editDescription, editContexts, aiProvider, copilotModel, copilotSettings, timeEstimatesEnabled, tagOptions]);
 
     const logAIDebug = async (context: string, message: string) => {
         if (!isTauriRuntime()) return;
