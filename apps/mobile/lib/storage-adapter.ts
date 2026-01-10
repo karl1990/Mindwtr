@@ -168,8 +168,9 @@ const initSqliteState = async (): Promise<SqliteState> => {
             try {
                 const data = JSON.parse(jsonValue) as AppData;
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
-                await adapter.saveData(data);
+                // Ensure JSON backup is updated before SQLite migration so fallback stays consistent.
                 await AsyncStorage.setItem(DATA_KEY, JSON.stringify(data));
+                await adapter.saveData(data);
             } catch (error) {
                 console.warn('[Storage] Failed to migrate JSON data to SQLite', error);
             }
