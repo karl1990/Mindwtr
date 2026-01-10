@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView } from 'react-native';
-import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
+import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Area, Attachment, generateUUID, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore } from '@mindwtr/core';
@@ -314,24 +314,29 @@ export default function ProjectsScreen() {
   }, [selectedProject, tasks]);
 
   const renderReorderTask = ({ item, drag, isActive }: RenderItemParams<Task>) => (
-    <View style={{ opacity: isActive ? 0.7 : 1 }}>
-      <SwipeableTaskItem
-        task={item}
-        isDark={isDark}
-        tc={tc}
-        onPress={() => {}}
-        onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
-        onDelete={() => deleteTask(item.id)}
-        onDragStart={drag}
-        onDragHandlePress={() => {
-          setIsReorderingTasks(true);
-          drag();
-        }}
-        disableSwipe
-        showDragHandle
-        hideStatusBadge
-      />
-    </View>
+    <ScaleDecorator>
+      <TouchableOpacity
+        onLongPress={drag}
+        delayLongPress={150}
+        activeOpacity={1}
+        disabled={isActive}
+        style={{ opacity: isActive ? 0.7 : 1 }}
+      >
+        <View pointerEvents="none">
+          <SwipeableTaskItem
+            task={item}
+            isDark={isDark}
+            tc={tc}
+            onPress={() => {}}
+            onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
+            onDelete={() => deleteTask(item.id)}
+            disableSwipe
+            showDragHandle
+            hideStatusBadge
+          />
+        </View>
+      </TouchableOpacity>
+    </ScaleDecorator>
   );
 
   return (
