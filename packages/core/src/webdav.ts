@@ -28,8 +28,10 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function encodeBase64Utf8(value: string): string {
-    const btoaFn = (globalThis as any).btoa as ((input: string) => string) | undefined;
-    if (typeof btoaFn === 'function') {
+    const btoaFn = typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function'
+        ? globalThis.btoa.bind(globalThis)
+        : undefined;
+    if (btoaFn) {
         try {
             return btoaFn(unescape(encodeURIComponent(value)));
         } catch {
@@ -37,9 +39,9 @@ function encodeBase64Utf8(value: string): string {
         }
     }
 
-    const encoder = (globalThis as any).TextEncoder as typeof TextEncoder | undefined;
-    if (typeof encoder === 'function') {
-        return bytesToBase64(new encoder().encode(value));
+    const Encoder = typeof TextEncoder === 'function' ? TextEncoder : undefined;
+    if (Encoder) {
+        return bytesToBase64(new Encoder().encode(value));
     }
 
     try {
@@ -73,7 +75,9 @@ function buildHeaders(options: WebDavOptions): Record<string, string> {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function isAbortError(error: unknown): boolean {
-    return typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError';
+    if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+    const name = (error as { name?: unknown }).name;
+    return name === 'AbortError';
 }
 
 function isAllowedInsecureUrl(rawUrl: string): boolean {
@@ -84,7 +88,7 @@ function isAllowedInsecureUrl(rawUrl: string): boolean {
         const host = parsed.hostname;
         if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
         if (host === '10.0.2.2') {
-            const isDev = typeof globalThis !== 'undefined' && (globalThis as any).__DEV__ === true;
+            const isDev = typeof globalThis !== 'undefined' && (globalThis as { __DEV__?: boolean }).__DEV__ === true;
             return isDev;
         }
         return false;
@@ -153,7 +157,11 @@ export async function webdavGetJson<T>(
     }
 
     const text = await res.text();
-    return JSON.parse(text) as T;
+    try {
+        return JSON.parse(text) as T;
+    } catch (error) {
+        throw new Error(`WebDAV GET failed: invalid JSON (${(error as Error).message})`);
+    }
 }
 
 export async function webdavPutJson(

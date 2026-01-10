@@ -16,7 +16,9 @@ function buildHeaders(options: CloudOptions): Record<string, string> {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function isAbortError(error: unknown): boolean {
-    return typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError';
+    if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+    const name = (error as { name?: unknown }).name;
+    return name === 'AbortError';
 }
 
 function isAllowedInsecureUrl(rawUrl: string): boolean {
@@ -90,7 +92,11 @@ export async function cloudGetJson<T>(
     }
 
     const text = await res.text();
-    return JSON.parse(text) as T;
+    try {
+        return JSON.parse(text) as T;
+    } catch (error) {
+        throw new Error(`Cloud GET failed: invalid JSON (${(error as Error).message})`);
+    }
 }
 
 export async function cloudPutJson(
