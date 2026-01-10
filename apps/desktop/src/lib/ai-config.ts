@@ -83,7 +83,8 @@ export async function loadAIKey(provider: AIProviderId): Promise<string> {
             const { invoke } = await import('@tauri-apps/api/core');
             const value = await invoke<string | null>('get_ai_key', { provider });
             if (typeof value === 'string') return value;
-        } catch {
+        } catch (error) {
+            console.error('Failed to load AI key from secure storage:', error);
             return '';
         }
     }
@@ -96,8 +97,9 @@ export async function saveAIKey(provider: AIProviderId, value: string): Promise<
             const { invoke } = await import('@tauri-apps/api/core');
             await invoke('set_ai_key', { provider, value: value || null });
             return;
-        } catch {
-            // fall through to local storage
+        } catch (error) {
+            console.error('Failed to save AI key to secure storage:', error);
+            return;
         }
     }
     saveLocalKey(provider, value);

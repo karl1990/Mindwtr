@@ -176,7 +176,7 @@ export class SyncService {
             return normalizeSyncBackend(backend);
         } catch (error) {
             console.error('Failed to get sync backend:', error);
-            return SyncService.getSyncBackendLocal();
+            return 'file';
         }
     }
 
@@ -200,7 +200,7 @@ export class SyncService {
             return await tauriInvoke<WebDavConfig>('get_webdav_config');
         } catch (error) {
             console.error('Failed to get WebDAV config:', error);
-            return SyncService.getWebDavConfigLocal();
+            return { url: '', username: '', password: '' };
         }
     }
 
@@ -227,7 +227,7 @@ export class SyncService {
             return await tauriInvoke<CloudConfig>('get_cloud_config');
         } catch (error) {
             console.error('Failed to get Self-Hosted config:', error);
-            return SyncService.getCloudConfigLocal();
+            return { url: '', token: '' };
         }
     }
 
