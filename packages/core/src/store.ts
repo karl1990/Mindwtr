@@ -422,10 +422,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
                     }))
                     .sort((a, b) => a.order - b.order);
                 const areaIds = new Set(allAreas.map((area) => area.id));
-                const hasLegacyAreaTitle = rawProjects.some(
-                    (project) => typeof project.areaTitle === 'string' && project.areaTitle.trim() && !project.areaId
-                );
-                const hasMissingAreaId = rawProjects.some((project) => project.areaId && !areaIds.has(project.areaId));
+                let hasLegacyAreaTitle = false;
+                let hasMissingAreaId = false;
+                for (const project of rawProjects) {
+                    if (!hasLegacyAreaTitle && typeof project.areaTitle === 'string' && project.areaTitle.trim() && !project.areaId) {
+                        hasLegacyAreaTitle = true;
+                    }
+                    if (!hasMissingAreaId && project.areaId && !areaIds.has(project.areaId)) {
+                        hasMissingAreaId = true;
+                    }
+                    if (hasLegacyAreaTitle && hasMissingAreaId) break;
+                }
                 const nameSet = new Set<string>();
                 let hasDuplicateNames = false;
                 for (const area of allAreas) {

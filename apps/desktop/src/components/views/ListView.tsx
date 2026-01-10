@@ -141,13 +141,17 @@ export function ListView({ title, statusFilter }: ListViewProps) {
 
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const allContexts = useMemo(() => {
-        const taskContexts = tasks.flatMap(t => t.contexts || []);
-        return Array.from(new Set([...PRESET_CONTEXTS, ...taskContexts])).sort();
-    }, [tasks]);
-    const allTags = useMemo(() => {
-        const taskTags = tasks.flatMap(t => t.tags || []);
-        return Array.from(new Set([...PRESET_TAGS, ...taskTags])).sort();
+    const { allContexts, allTags } = useMemo(() => {
+        const contexts = new Set<string>(PRESET_CONTEXTS);
+        const tags = new Set<string>(PRESET_TAGS);
+        tasks.forEach((task) => {
+            task.contexts?.forEach((ctx) => contexts.add(ctx));
+            task.tags?.forEach((tag) => tags.add(tag));
+        });
+        return {
+            allContexts: Array.from(contexts).sort(),
+            allTags: Array.from(tags).sort(),
+        };
     }, [tasks]);
     const allTokens = useMemo(() => {
         return Array.from(new Set([...allContexts, ...allTags])).sort();
