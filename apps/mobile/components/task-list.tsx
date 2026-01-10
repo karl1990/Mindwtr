@@ -94,6 +94,27 @@ function TaskListComponent({
 
   // Dynamic colors based on theme
   const themeColors = useThemeColors();
+  const themeColorsMemo = useMemo(
+    () => themeColors,
+    [
+      themeColors.bg,
+      themeColors.cardBg,
+      themeColors.taskItemBg,
+      themeColors.text,
+      themeColors.secondaryText,
+      themeColors.icon,
+      themeColors.border,
+      themeColors.tint,
+      themeColors.onTint,
+      themeColors.tabIconDefault,
+      themeColors.tabIconSelected,
+      themeColors.inputBg,
+      themeColors.danger,
+      themeColors.success,
+      themeColors.warning,
+      themeColors.filterBg,
+    ],
+  );
 
   const tasksById = useMemo(() => {
     return tasks.reduce((acc, task) => {
@@ -408,14 +429,13 @@ function TaskListComponent({
 
   const sortOptions: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
   const hideStatusBadgeForList = statusFilter === 'next' || statusFilter === 'waiting';
-  const estimatedItemHeight = 84;
 
   const renderTask = useCallback(({ item }: { item: Task }) => (
     <ErrorBoundary>
       <SwipeableTaskItem
         task={item}
         isDark={isDark}
-        tc={themeColors}
+        tc={themeColorsMemo}
         onPress={() => handleEditTask(item)}
         selectionMode={enableBulkActions ? selectionMode : false}
         isMultiSelected={enableBulkActions && multiSelectedIds.has(item.id)}
@@ -435,20 +455,20 @@ function TaskListComponent({
     multiSelectedIds,
     selectionMode,
     hideStatusBadgeForList,
-    themeColors,
+    themeColorsMemo,
     toggleMultiSelect,
     updateTask,
   ]);
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={[styles.container, { backgroundColor: themeColorsMemo.bg }]}>
       {showHeader ? (
-        <View style={[styles.header, { borderBottomColor: themeColors.border, backgroundColor: themeColors.cardBg }]}>
+        <View style={[styles.header, { borderBottomColor: themeColorsMemo.border, backgroundColor: themeColorsMemo.cardBg }]}>
           <View style={styles.headerTopRow}>
-            <Text style={[styles.title, { color: themeColors.text }]} accessibilityRole="header" numberOfLines={1}>
+            <Text style={[styles.title, { color: themeColorsMemo.text }]} accessibilityRole="header" numberOfLines={1}>
               {title}
             </Text>
-            <Text style={[styles.count, { color: themeColors.secondaryText }]} accessibilityLabel={`${orderedTasks.length} tasks`}>
+            <Text style={[styles.count, { color: themeColorsMemo.secondaryText }]} accessibilityLabel={`${orderedTasks.length} tasks`}>
               {orderedTasks.length} {t('common.tasks')}
             </Text>
           </View>
@@ -456,7 +476,7 @@ function TaskListComponent({
             {showSort && (
               <TouchableOpacity
                 onPress={() => setSortModalVisible(true)}
-                style={[styles.sortButton, { borderColor: themeColors.border }]}
+                style={[styles.sortButton, { borderColor: themeColorsMemo.border }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('sort.label')}
               >
@@ -499,6 +519,8 @@ function TaskListComponent({
                 onPress={() => handleBatchMove(status)}
                 disabled={!hasSelection}
                 style={[styles.bulkMoveButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('bulk.moveTo')} ${t(`status.${status}`)}`}
               >
                 <Text style={[styles.bulkMoveText, { color: themeColors.text }]}>{t(`status.${status}`)}</Text>
               </TouchableOpacity>
@@ -509,6 +531,8 @@ function TaskListComponent({
               onPress={() => setTagModalVisible(true)}
               disabled={!hasSelection}
               style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('bulk.addTag')}
             >
               <Text style={[styles.bulkActionText, { color: themeColors.text }]}>{t('bulk.addTag')}</Text>
             </TouchableOpacity>
@@ -516,6 +540,8 @@ function TaskListComponent({
               onPress={handleBatchDelete}
               disabled={!hasSelection}
               style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('bulk.delete')}
             >
               <Text style={[styles.bulkActionText, { color: themeColors.text }]}>{t('bulk.delete')}</Text>
             </TouchableOpacity>
@@ -621,8 +647,8 @@ function TaskListComponent({
       {staticList ? (
         <View style={styles.staticList}>
           {orderedTasks.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: themeColors.secondaryText }]}>
+            <View style={[styles.emptyContainer, { backgroundColor: themeColors.cardBg, borderColor: themeColors.border }]}>
+              <Text style={[styles.emptyText, { color: themeColors.text }]}>
                 {emptyText || t('list.noTasks')}
               </Text>
             </View>
@@ -641,22 +667,18 @@ function TaskListComponent({
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
-          getItemLayout={(_, index) => ({
-            length: estimatedItemHeight,
-            offset: estimatedItemHeight * index,
-            index,
-          })}
+          getItemLayout={undefined}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={5}
           updateCellsBatchingPeriod={50}
-          removeClippedSubviews
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: themeColors.secondaryText }]}>
+            <View style={[styles.emptyContainer, { backgroundColor: themeColors.cardBg, borderColor: themeColors.border }]}>
+              <Text style={[styles.emptyText, { color: themeColors.text }]}>
                 {emptyText || t('list.noTasks')}
               </Text>
             </View>
@@ -1035,12 +1057,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyContainer: {
-    padding: 48,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
   },
   emptyText: {
-    color: '#999',
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   badgeContainer: {
     justifyContent: 'center',
