@@ -60,7 +60,7 @@ bun run --filter mindwtr-mcp-server dev -- --db "/path/to/mindwtr.db"
 Stop:
 - Press `Ctrl+C` in the terminal.
 
-### 3) Build and run the binary entry
+### 3) Build and run the binary entry (Node)
 
 ```bash
 # from repo root
@@ -120,7 +120,7 @@ Below are **generic** examples. Each client has its own config location and form
 }
 ```
 
-If your client doesn’t support Bun, use Node:
+If your client doesn’t support Bun, use Node. (Node requires building `better-sqlite3` native bindings.)
 
 ```json
 {

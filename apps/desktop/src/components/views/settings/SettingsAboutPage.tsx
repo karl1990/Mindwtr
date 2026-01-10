@@ -49,8 +49,8 @@ export function SettingsAboutPage({
     updateNotice,
 }: SettingsAboutPageProps) {
     const mcpCommand = dbPath
-        ? `mindwtr-mcp --db \"${dbPath}\"`
-        : 'mindwtr-mcp --db <path-to-mindwtr.db>';
+        ? `bun run mindwtr:mcp -- --db \"${dbPath}\"`
+        : 'bun run mindwtr:mcp -- --db <path-to-mindwtr.db>';
     const handleCopyMcpCommand = async () => {
         try {
             await navigator.clipboard.writeText(mcpCommand);

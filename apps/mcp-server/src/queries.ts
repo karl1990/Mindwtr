@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { DbClient } from './db.js';
 import { parseJson } from './db.js';
 
 export type TaskStatus = 'inbox' | 'next' | 'waiting' | 'someday' | 'done' | 'archived';
@@ -198,7 +198,7 @@ function mapTaskRow(row: any): TaskRow {
   };
 }
 
-export function listTasks(db: Database.Database, input: ListTasksInput): TaskRow[] {
+export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
   const where: string[] = [];
   const params: any[] = [];
 
@@ -227,7 +227,7 @@ export function listTasks(db: Database.Database, input: ListTasksInput): TaskRow
   return rows.map(mapTaskRow);
 }
 
-function getProjects(db: Database.Database): Project[] {
+function getProjects(db: DbClient): Project[] {
   const rows = db.prepare('SELECT id, title, status, areaId, areaTitle, color, orderNum, tagIds, isSequential, isFocused, supportNotes, attachments, reviewAt, createdAt, updatedAt, deletedAt FROM projects WHERE deletedAt IS NULL').all();
   return rows.map((row: any) => ({
     id: row.id,
@@ -249,7 +249,7 @@ function getProjects(db: Database.Database): Project[] {
   }));
 }
 
-export function addTask(db: Database.Database, input: AddTaskInput): TaskRow {
+export function addTask(db: DbClient, input: AddTaskInput): TaskRow {
   const now = new Date().toISOString();
   let title = (input.title || '').trim();
   let props: Partial<Task> = {};
@@ -335,7 +335,7 @@ export function addTask(db: Database.Database, input: AddTaskInput): TaskRow {
   return task as TaskRow;
 }
 
-export function completeTask(db: Database.Database, input: CompleteTaskInput): TaskRow {
+export function completeTask(db: DbClient, input: CompleteTaskInput): TaskRow {
   const now = new Date().toISOString();
   const update = db.prepare(`
     UPDATE tasks

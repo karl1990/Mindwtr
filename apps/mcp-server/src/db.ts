@@ -1,4 +1,3 @@
-import Database from 'better-sqlite3';
 import { resolveMindwtrDbPath } from './paths.js';
 
 export type DbOptions = {
@@ -6,21 +5,41 @@ export type DbOptions = {
   readonly?: boolean;
 };
 
-export function openMindwtrDb(options: DbOptions = {}) {
-  const path = resolveMindwtrDbPath(options.dbPath);
-  const db = new Database(path, {
-    readonly: options.readonly ?? false,
-    fileMustExist: true,
-  });
+export type DbClient = {
+  prepare: (sql: string) => {
+    all: (...args: any[]) => any[];
+    get: (...args: any[]) => any;
+    run: (...args: any[]) => { changes?: number };
+  };
+  pragma?: (sql: string) => void;
+  close: () => void;
+};
 
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  db.pragma('busy_timeout = 5000');
+export async function openMindwtrDb(options: DbOptions = {}) {
+  const path = resolveMindwtrDbPath(options.dbPath);
+  const isBun = typeof (globalThis as any).Bun !== 'undefined';
+
+  let db: DbClient;
+  if (isBun) {
+    const mod = await import('bun:sqlite');
+    db = new mod.Database(path, { readonly: options.readonly ?? false });
+  } else {
+    const mod = await import('better-sqlite3');
+    const Database = mod.default;
+    db = new Database(path, {
+      readonly: options.readonly ?? false,
+      fileMustExist: true,
+    });
+  }
+
+  db.pragma?.('journal_mode = WAL');
+  db.pragma?.('foreign_keys = ON');
+  db.pragma?.('busy_timeout = 5000');
 
   return { db, path };
 }
 
-export function closeDb(db: Database.Database) {
+export function closeDb(db: DbClient) {
   try {
     db.close();
   } catch {

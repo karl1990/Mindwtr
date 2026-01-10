@@ -63,8 +63,8 @@ const completeTaskSchema = z.object({
   id: z.string(),
 });
 
-const withDb = async <T>(fn: (db: ReturnType<typeof openMindwtrDb>['db']) => T): Promise<T> => {
-  const { db } = openMindwtrDb({ dbPath, readonly });
+const withDb = async <T>(fn: (db: Awaited<ReturnType<typeof openMindwtrDb>>['db']) => T): Promise<T> => {
+  const { db } = await openMindwtrDb({ dbPath, readonly });
   try {
     return fn(db);
   } finally {
