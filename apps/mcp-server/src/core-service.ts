@@ -125,6 +125,16 @@ const ensureCoreReady = async (options: DbOptions) => {
   coreReady = (async () => {
     const { core, adapter } = await loadCoreModules();
     const { client } = await createSqliteClient(coreDbPath!, coreReadonly);
+    // Preflight for older DBs missing orderNum column.
+    try {
+      const columns = await client.all<{ name?: string }>('PRAGMA table_info(tasks)');
+      const hasOrderNum = columns.some((col) => col.name === 'orderNum');
+      if (!hasOrderNum) {
+        await client.run('ALTER TABLE tasks ADD COLUMN orderNum INTEGER');
+      }
+    } catch {
+      // ignore preflight errors; sqlite adapter will attempt migrations
+    }
     const sqliteAdapter = new adapter.SqliteAdapter(client);
     await sqliteAdapter.ensureSchema();
     core.setStorageAdapter(sqliteAdapter);
