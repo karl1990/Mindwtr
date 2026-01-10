@@ -227,6 +227,15 @@ fn append_log_line(app: tauri::AppHandle, line: String) -> Result<String, String
         return Err(err.to_string());
     }
     let log_path = log_dir.join("mindwtr.log");
+    let rotated_path = log_dir.join("mindwtr.log.1");
+    let max_bytes: u64 = 5 * 1024 * 1024;
+
+    if let Ok(meta) = std::fs::metadata(&log_path) {
+        if meta.len() >= max_bytes {
+            let _ = std::fs::remove_file(&rotated_path);
+            let _ = std::fs::rename(&log_path, &rotated_path);
+        }
+    }
 
     let mut file = OpenOptions::new()
         .create(true)
