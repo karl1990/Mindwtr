@@ -269,7 +269,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 setEditedTaskState(normalizedTask);
                 baseTaskRef.current = normalizedTask;
                 isDirtyRef.current = false;
-                setShowMoreOptions(false);
                 setShowDescriptionPreview(false);
                 setEditTab(resolveInitialTab(defaultTab, normalizedTask));
                 setCopilotSuggestion(null);
