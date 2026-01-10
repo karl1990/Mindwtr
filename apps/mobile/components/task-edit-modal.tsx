@@ -52,6 +52,13 @@ interface TaskEditModalProps {
 }
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'done'];
+const COMPACT_STATUS_LABELS: Record<TaskStatus, string> = {
+    inbox: 'Inbox',
+    next: 'Next',
+    waiting: 'Wait',
+    someday: 'Later',
+    done: 'Done',
+};
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'status',
@@ -1086,15 +1093,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 return (
                     <View style={styles.formGroup}>
                         <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.statusLabel')}</Text>
-                        <View style={styles.statusContainer}>
+                        <View style={styles.statusContainerCompact}>
                             {STATUS_OPTIONS.map(status => (
                                 <TouchableOpacity
                                     key={status}
-                                    style={getStatusChipStyle(editedTask.status === status)}
+                                    style={[styles.statusChipCompact, ...getStatusChipStyle(editedTask.status === status)]}
                                     onPress={() => setEditedTask(prev => ({ ...prev, status }))}
                                 >
                                     <Text style={getStatusTextStyle(editedTask.status === status)}>
-                                        {t(`status.${status}`)}
+                                        {COMPACT_STATUS_LABELS[status] ?? t(`status.${status}`)}
                                     </Text>
                                 </TouchableOpacity>
                             ))}

@@ -88,6 +88,12 @@ export const styles = StyleSheet.create({
         fontWeight: '600',
     },
     statusContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    statusContainerCompact: {
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        justifyContent: 'space-between',
+        gap: 6,
+    },
     weekdayRow: { flexDirection: 'row', gap: 8 },
     weekdayButton: {
         width: 32,
@@ -115,6 +121,15 @@ export const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 16,
         borderWidth: 1,
+    },
+    statusChipCompact: {
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 14,
+        borderWidth: 1,
+        minWidth: 0,
+        flex: 1,
+        alignItems: 'center',
     },
     statusChipActive: { backgroundColor: '#007AFF' },
     statusText: { fontSize: 14, color: '#333' },
