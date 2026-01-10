@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { Plus, Filter, AlertTriangle, List } from 'lucide-react';
-import { useTaskStore, TaskStatus, Task, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
+import { useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate, createAIProvider, type AIProviderId } from '@mindwtr/core';
+import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -21,7 +22,7 @@ interface ListViewProps {
 
 const EMPTY_PRIORITIES: TaskPriority[] = [];
 const EMPTY_ESTIMATES: TimeEstimate[] = [];
-const VIRTUALIZATION_THRESHOLD = 40;
+const VIRTUALIZATION_THRESHOLD = 25;
 const VIRTUAL_ROW_ESTIMATE = 120;
 const VIRTUAL_OVERSCAN = 600;
 
@@ -245,20 +246,20 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }
 
         const firstTaskIds: string[] = [];
-        tasksByProject.forEach((tasksForProject) => {
+        tasksByProject.forEach((tasksForProject: Task[]) => {
             const hasOrder = tasksForProject.some((task) => Number.isFinite(task.orderNum));
-            let firstTask: Task | null = null;
+            let firstTaskId: string | null = null;
             let bestKey = Number.POSITIVE_INFINITY;
             tasksForProject.forEach((task) => {
                 const key = hasOrder
                     ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
                     : new Date(task.createdAt).getTime();
-                if (!firstTask || key < bestKey) {
-                    firstTask = task;
+                if (!firstTaskId || key < bestKey) {
+                    firstTaskId = task.id;
                     bestKey = key;
                 }
             });
-            if (firstTask) firstTaskIds.push(firstTask.id);
+            if (firstTaskId) firstTaskIds.push(firstTaskId);
         });
 
         return new Set(firstTaskIds);
