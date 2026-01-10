@@ -2,7 +2,7 @@ import { View, Text, Pressable, StyleSheet, Modal, Alert } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useTaskStore, Task, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, getStatusColor, hasTimeComponent, safeFormatDate, safeParseDueDate, TaskStatus, Project } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
-import { useRef, useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { ThemeColors } from '../hooks/use-theme-colors';
 
 export interface SwipeableTaskItemProps {
@@ -102,7 +102,28 @@ export function SwipeableTaskItem({
     const checklistUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingChecklist = useRef<Task['checklist'] | null>(null);
     const checklistTaskIdRef = useRef(task.id);
-    const checklistVersionRef = useRef(0);
+
+    const flushPendingChecklist = useCallback(() => {
+        const taskId = checklistTaskIdRef.current;
+        const pending = pendingChecklist.current;
+        if (!pending) return;
+        const latestTask = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+        if (!latestTask || latestTask.deletedAt) {
+            pendingChecklist.current = null;
+            return;
+        }
+        const isListMode = latestTask.taskMode === 'list';
+        const allComplete = pending.length > 0 && pending.every((entry) => entry.isCompleted);
+        const nextStatus = isListMode
+            ? allComplete
+                ? 'done'
+                : latestTask.status === 'done'
+                    ? 'next'
+                    : undefined
+            : undefined;
+        updateTask(taskId, { checklist: pending, ...(nextStatus ? { status: nextStatus } : {}) });
+        pendingChecklist.current = null;
+    }, [updateTask]);
 
     useEffect(() => {
         setLocalChecklist(task.checklist || []);
@@ -110,24 +131,24 @@ export function SwipeableTaskItem({
 
     useEffect(() => {
         if (checklistTaskIdRef.current !== task.id) {
+            flushPendingChecklist();
             checklistTaskIdRef.current = task.id;
             pendingChecklist.current = null;
-            checklistVersionRef.current += 1;
             if (checklistUpdateTimer.current) {
                 clearTimeout(checklistUpdateTimer.current);
                 checklistUpdateTimer.current = null;
             }
         }
-    }, [task.id]);
+    }, [task.id, flushPendingChecklist]);
 
     useEffect(() => {
         return () => {
             if (checklistUpdateTimer.current) {
                 clearTimeout(checklistUpdateTimer.current);
             }
-            checklistVersionRef.current += 1;
+            flushPendingChecklist();
         };
-    }, []);
+    }, [flushPendingChecklist]);
 
     const checklistProgress = useMemo(
         () => getChecklistProgress({ ...task, checklist: localChecklist }),
@@ -270,11 +291,20 @@ export function SwipeableTaskItem({
         if (onToggleSelect) onToggleSelect();
     };
 
+    const statusColors = getStatusColor(task.status);
     const content = (
         <Pressable
             style={[
                 styles.taskItem,
                 { backgroundColor: tc.taskItemBg },
+                !isDark && { borderWidth: StyleSheet.hairlineWidth, borderColor: tc.border },
+                !isDark && {
+                    shadowColor: '#0F172A',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 6,
+                    elevation: 2,
+                },
                 showFocusToggle && task.isFocusedToday && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
                 isHighlighted && !selectionMode && { borderWidth: 2, borderColor: tc.tint },
                 selectionMode && { borderWidth: 2, borderColor: isMultiSelected ? tc.tint : tc.border }
@@ -314,11 +344,19 @@ export function SwipeableTaskItem({
                                         event.stopPropagation();
                                         toggleFocus();
                                     }}
-                                    style={styles.focusButton}
+                                    style={[
+                                        styles.focusButton,
+                                        { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)' }
+                                    ]}
                                     accessibilityRole="button"
                                     accessibilityLabel={task.isFocusedToday ? t('agenda.removeFromFocus') : t('agenda.addToFocus')}
                                 >
-                                    <Text style={[styles.focusButtonText, task.isFocusedToday && styles.focusButtonActive]}>
+                                    <Text
+                                        style={[
+                                            styles.focusButtonText,
+                                            { color: task.isFocusedToday ? tc.warning : tc.secondaryText }
+                                        ]}
+                                    >
                                         {task.isFocusedToday ? '★' : '☆'}
                                     </Text>
                                 </Pressable>
@@ -366,29 +404,12 @@ export function SwipeableTaskItem({
                                             );
                                             setLocalChecklist(newList);
                                             pendingChecklist.current = newList;
-                                            const scheduledVersion = checklistVersionRef.current + 1;
-                                            checklistVersionRef.current = scheduledVersion;
                                             if (checklistUpdateTimer.current) {
                                                 clearTimeout(checklistUpdateTimer.current);
                                             }
                                             checklistUpdateTimer.current = setTimeout(() => {
-                                                if (checklistVersionRef.current !== scheduledVersion) return;
                                                 if (checklistTaskIdRef.current !== taskId) return;
-                                                const pending = pendingChecklist.current;
-                                                if (!pending) return;
-                                                const latestTask = useTaskStore.getState().tasks.find((t) => t.id === taskId);
-                                                if (!latestTask || latestTask.deletedAt) return;
-                                                const isListMode = latestTask.taskMode === 'list';
-                                                const allComplete = pending.length > 0 && pending.every((entry) => entry.isCompleted);
-                                                const nextStatus = isListMode
-                                                    ? allComplete
-                                                        ? 'done'
-                                                        : latestTask.status === 'done'
-                                                            ? 'next'
-                                                            : undefined
-                                                    : undefined;
-                                                updateTask(taskId, { checklist: pending, ...(nextStatus ? { status: nextStatus } : {}) });
-                                                pendingChecklist.current = null;
+                                                flushPendingChecklist();
                                                 checklistUpdateTimer.current = null;
                                             }, 200);
                                         }}
@@ -424,7 +445,7 @@ export function SwipeableTaskItem({
                             }}
                             style={[
                                 styles.statusBadge,
-                                { backgroundColor: getStatusColor(task.status).text }
+                                { backgroundColor: statusColors.bg, borderColor: statusColors.border }
                             ]}
                             accessibilityLabel={`Change status. Current status: ${task.status}`}
                             accessibilityHint="Double tap to open status menu"
@@ -432,7 +453,7 @@ export function SwipeableTaskItem({
                         >
                             <Text style={[
                                 styles.statusText,
-                                styles.textLight
+                                { color: statusColors.text }
                             ]}>
                                 {t(`status.${task.status}`)}
                             </Text>
@@ -544,14 +565,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
     },
     focusButtonText: {
         fontSize: 16,
-        color: '#94A3B8',
-    },
-    focusButtonActive: {
-        color: '#F59E0B',
+        fontWeight: '600',
     },
     taskDescription: {
         fontSize: 12,
@@ -697,17 +714,12 @@ const styles = StyleSheet.create({
         marginLeft: 12,
         minWidth: 60,
         alignItems: 'center',
+        borderWidth: 1,
     },
     statusText: {
         fontSize: 10,
         fontWeight: '600',
         textTransform: 'capitalize',
-    },
-    textLight: {
-        color: '#FFFFFF',
-    },
-    textDark: {
-        color: '#374151',
     },
     swipeActionLeft: {
         backgroundColor: '#10B981',
