@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
 import { hasTimeComponent, safeFormatDate, safeParseDate, type ClarifyResponse, type Project, type TaskEditorFieldId, type TimeEstimate } from '@mindwtr/core';
 import { ProjectSelector } from '../ui/ProjectSelector';
 import { TaskInput } from './TaskInput';
@@ -163,16 +164,20 @@ export function TaskItemEditor({
                         type="button"
                         onClick={handleAIClarify}
                         disabled={isAIWorking}
+                        aria-busy={isAIWorking}
                         className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground disabled:opacity-60"
                     >
+                        {isAIWorking && <Loader2 className="w-3 h-3 mr-1 inline-block animate-spin" />}
                         {t('taskEdit.aiClarify')}
                     </button>
                     <button
                         type="button"
                         onClick={handleAIBreakdown}
                         disabled={isAIWorking}
+                        aria-busy={isAIWorking}
                         className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground disabled:opacity-60"
                     >
+                        {isAIWorking && <Loader2 className="w-3 h-3 mr-1 inline-block animate-spin" />}
                         {t('taskEdit.aiBreakdown')}
                     </button>
                 </div>
