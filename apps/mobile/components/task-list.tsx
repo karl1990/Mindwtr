@@ -408,6 +408,7 @@ function TaskListComponent({
 
   const sortOptions: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
   const hideStatusBadgeForList = statusFilter === 'next' || statusFilter === 'waiting';
+  const estimatedItemHeight = 84;
 
   const renderTask = useCallback(({ item }: { item: Task }) => (
     <ErrorBoundary>
@@ -640,6 +641,11 @@ function TaskListComponent({
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          getItemLayout={(_, index) => ({
+            length: estimatedItemHeight,
+            offset: estimatedItemHeight * index,
+            index,
+          })}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={5}
