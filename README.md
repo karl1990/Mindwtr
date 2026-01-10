@@ -185,6 +185,10 @@ Sync via File (Dropbox, etc.) or WebDAV (Nextcloud, etc.) can be configured in S
 - 🔌 [Local API Server](https://github.com/dongdongbh/Mindwtr/wiki/Local-API)
 - 🌐 [Web / PWA](https://github.com/dongdongbh/Mindwtr/wiki/Web-App-PWA)
 
+## Roadmap
+
+- Build an MCP server for Mindwtr (LLM integration and automation).
+
 ## Development
 
 For developers, see the [Development Guide](docs/development.md).
