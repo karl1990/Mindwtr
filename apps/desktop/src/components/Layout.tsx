@@ -191,7 +191,14 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
             )}
 
             {/* Main Content */}
-            <main id="main-content" className="flex-1 overflow-auto" data-main-content tabIndex={-1}>
+            <main
+                id="main-content"
+                className="flex-1 overflow-auto"
+                data-main-content
+                tabIndex={-1}
+                role="main"
+                aria-label={t('accessibility.mainContent') || 'Main content'}
+            >
                 <div className={cn(
                     "mx-auto p-8 h-full",
                     isFocusMode ? "max-w-[800px]" : ['board', 'calendar'].includes(currentView) ? "max-w-full" : "max-w-4xl"
