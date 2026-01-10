@@ -241,39 +241,7 @@ const createStorage = (): StorageAdapter => {
 
     return {
         getData: async (): Promise<AppData> => {
-            if (preferJsonBackup) {
-                warnPreferJsonBackup();
-                const jsonValue = await getLegacyJson(AsyncStorage);
-                if (jsonValue != null) {
-                    try {
-                        const data = JSON.parse(jsonValue) as AppData;
-                        data.areas = Array.isArray(data.areas) ? data.areas : [];
-                        updateAndroidWidgetFromData(data).catch((error) => {
-                            console.warn('[Widgets] Failed to update Android widget from backup', error);
-                        });
-                        return data;
-                    } catch (parseError) {
-                        console.error('Failed to parse stored data - may be corrupted', parseError);
-                    }
-                }
-            }
-            try {
-                if (!shouldUseSqlite) {
-                    throw new Error('SQLite disabled in Expo Go');
-                }
-                const { adapter } = await getSqliteState();
-                const data = await adapter.getData();
-                data.areas = Array.isArray(data.areas) ? data.areas : [];
-                updateAndroidWidgetFromData(data).catch((error) => {
-                    console.warn('[Widgets] Failed to update Android widget from storage load', error);
-                });
-                return data;
-            } catch (e) {
-                if (__DEV__ && !shouldUseSqlite && String(e).includes('Expo Go')) {
-                    console.warn('[Storage] SQLite disabled in Expo Go, falling back to JSON backup');
-                } else {
-                    console.warn('[Storage] SQLite load failed, falling back to JSON backup', e);
-                }
+            const loadJsonBackup = async () => {
                 const jsonValue = await getLegacyJson(AsyncStorage);
                 if (jsonValue != null) {
                     try {
@@ -288,6 +256,35 @@ const createStorage = (): StorageAdapter => {
                     }
                 }
                 throw new Error('Data appears corrupted. Please restore from backup.');
+            };
+
+            if (preferJsonBackup && !shouldUseSqlite) {
+                warnPreferJsonBackup();
+                return loadJsonBackup();
+            }
+            if (preferJsonBackup) {
+                warnPreferJsonBackup();
+            }
+            try {
+                if (!shouldUseSqlite) {
+                    throw new Error('SQLite disabled in Expo Go');
+                }
+                const { adapter } = await getSqliteState();
+                const data = await adapter.getData();
+                data.areas = Array.isArray(data.areas) ? data.areas : [];
+                updateAndroidWidgetFromData(data).catch((error) => {
+                    console.warn('[Widgets] Failed to update Android widget from storage load', error);
+                });
+                preferJsonBackup = false;
+                didWarnPreferJsonBackup = false;
+                return data;
+            } catch (e) {
+                if (__DEV__ && !shouldUseSqlite && String(e).includes('Expo Go')) {
+                    console.warn('[Storage] SQLite disabled in Expo Go, falling back to JSON backup');
+                } else {
+                    console.warn('[Storage] SQLite load failed, falling back to JSON backup', e);
+                }
+                return loadJsonBackup();
             }
         },
         saveData: async (data: AppData): Promise<void> => {
