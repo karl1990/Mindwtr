@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { AppData, Attachment } from '@mindwtr/core';
-import { webdavGetFile, webdavMakeDirectory, webdavPutFile } from '@mindwtr/core';
+import { cloudGetFile, cloudPutFile, webdavGetFile, webdavMakeDirectory, webdavPutFile } from '@mindwtr/core';
 import {
   SYNC_BACKEND_KEY,
   SYNC_PATH_KEY,
+  CLOUD_URL_KEY,
+  CLOUD_TOKEN_KEY,
   WEBDAV_PASSWORD_KEY,
   WEBDAV_URL_KEY,
   WEBDAV_USERNAME_KEY,
@@ -92,6 +94,14 @@ export const getBaseSyncUrl = (fullUrl: string): string => {
   return trimmed;
 };
 
+export const getCloudBaseUrl = (fullUrl: string): string => {
+  const trimmed = fullUrl.replace(/\/+$/, '');
+  if (trimmed.toLowerCase().endsWith('/data')) {
+    return trimmed.slice(0, -'/data'.length);
+  }
+  return trimmed;
+};
+
 export const sanitizeAppDataForRemote = (data: AppData): AppData => {
   const sanitizeAttachments = (attachments?: Attachment[]): Attachment[] | undefined => {
     if (!attachments) return attachments;
@@ -119,6 +129,7 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
 };
 
 type WebDavConfig = { url: string; username: string; password: string };
+type CloudConfig = { url: string; token: string };
 
 const loadWebDavConfig = async (): Promise<WebDavConfig | null> => {
   const url = await AsyncStorage.getItem(WEBDAV_URL_KEY);
@@ -127,6 +138,15 @@ const loadWebDavConfig = async (): Promise<WebDavConfig | null> => {
     url,
     username: (await AsyncStorage.getItem(WEBDAV_USERNAME_KEY)) || '',
     password: (await AsyncStorage.getItem(WEBDAV_PASSWORD_KEY)) || '',
+  };
+};
+
+const loadCloudConfig = async (): Promise<CloudConfig | null> => {
+  const url = await AsyncStorage.getItem(CLOUD_URL_KEY);
+  if (!url) return null;
+  return {
+    url,
+    token: (await AsyncStorage.getItem(CLOUD_TOKEN_KEY)) || '',
   };
 };
 
@@ -309,6 +329,66 @@ export const syncWebdavAttachments = async (
   return didMutate;
 };
 
+export const syncCloudAttachments = async (
+  appData: AppData,
+  cloudConfig: CloudConfig,
+  baseSyncUrl: string
+): Promise<boolean> => {
+  await getAttachmentsDir();
+
+  const attachmentsById = new Map<string, Attachment>();
+  for (const task of appData.tasks) {
+    for (const attachment of task.attachments || []) {
+      attachmentsById.set(attachment.id, attachment);
+    }
+  }
+  for (const project of appData.projects) {
+    for (const attachment of project.attachments || []) {
+      attachmentsById.set(attachment.id, attachment);
+    }
+  }
+
+  let didMutate = false;
+  for (const attachment of attachmentsById.values()) {
+    if (attachment.kind !== 'file') continue;
+    if (attachment.deletedAt) continue;
+
+    const uri = attachment.uri || '';
+    const isHttp = /^https?:\/\//i.test(uri);
+    const isContent = uri.startsWith('content://');
+    const hasLocalPath = Boolean(uri) && !isHttp;
+    const existsLocally = hasLocalPath ? await fileExists(uri) : false;
+    const nextStatus: Attachment['localStatus'] = (existsLocally || isContent || isHttp) ? 'available' : 'missing';
+    if (attachment.localStatus !== nextStatus) {
+      attachment.localStatus = nextStatus;
+      didMutate = true;
+    }
+
+    if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
+      try {
+        const fileData = await readFileAsBytes(uri);
+        const buffer = fileData.byteOffset === 0 && fileData.byteLength === fileData.buffer.byteLength
+          ? fileData.buffer
+          : fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength);
+        const cloudKey = buildCloudKey(attachment);
+        await cloudPutFile(
+          `${baseSyncUrl}/${cloudKey}`,
+          buffer,
+          attachment.mimeType || DEFAULT_CONTENT_TYPE,
+          { token: cloudConfig.token }
+        );
+        attachment.cloudKey = cloudKey;
+        attachment.localStatus = 'available';
+        didMutate = true;
+      } catch (error) {
+        console.warn(`Failed to upload attachment ${attachment.title}`, error);
+      }
+    }
+  }
+
+  return didMutate;
+};
+
 export const syncFileAttachments = async (
   appData: AppData,
   syncPath: string
@@ -431,6 +511,32 @@ export const ensureAttachmentAvailable = async (attachment: Attachment): Promise
       if (resolved) return resolved;
     }
     return null;
+  }
+
+  if (backend === 'cloud' && attachment.cloudKey) {
+    const config = await loadCloudConfig();
+    if (!config?.url) return null;
+    const baseSyncUrl = getCloudBaseUrl(config.url);
+    const attachmentsDir = await getAttachmentsDir();
+    if (!attachmentsDir) return null;
+    const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.title)}`;
+    const targetUri = `${attachmentsDir}${filename}`;
+    const existing = await fileExists(targetUri);
+    if (existing) {
+      return { ...attachment, uri: targetUri, localStatus: 'available' };
+    }
+    try {
+      const data = await cloudGetFile(`${baseSyncUrl}/${attachment.cloudKey}`, {
+        token: config.token,
+      });
+      const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+      const base64 = bytesToBase64(bytes);
+      await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      return { ...attachment, uri: targetUri, localStatus: 'available' };
+    } catch (error) {
+      console.warn(`Failed to download attachment ${attachment.title}`, error);
+      return null;
+    }
   }
 
   if (attachment.cloudKey) {

@@ -124,3 +124,53 @@ export async function cloudPutJson(
         throw new Error(`Cloud PUT failed (${res.status}): ${res.statusText}`);
     }
 }
+
+export async function cloudPutFile(
+    url: string,
+    data: ArrayBuffer | Uint8Array | Blob,
+    contentType: string,
+    options: CloudOptions = {},
+): Promise<void> {
+    assertSecureUrl(url);
+    const fetcher = options.fetcher ?? fetch;
+    const headers = buildHeaders(options);
+    headers['Content-Type'] = contentType || 'application/octet-stream';
+
+    const res = await fetchWithTimeout(
+        url,
+        {
+            method: 'PUT',
+            headers,
+            body: data,
+        },
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        fetcher,
+    );
+
+    if (!res.ok) {
+        throw new Error(`Cloud File PUT failed (${res.status}): ${res.statusText}`);
+    }
+}
+
+export async function cloudGetFile(
+    url: string,
+    options: CloudOptions = {},
+): Promise<ArrayBuffer> {
+    assertSecureUrl(url);
+    const fetcher = options.fetcher ?? fetch;
+    const res = await fetchWithTimeout(
+        url,
+        {
+            method: 'GET',
+            headers: buildHeaders(options),
+        },
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        fetcher,
+    );
+
+    if (!res.ok) {
+        throw new Error(`Cloud File GET failed (${res.status}): ${res.statusText}`);
+    }
+
+    return await res.arrayBuffer();
+}
