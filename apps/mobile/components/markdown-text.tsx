@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, type TextStyle } from 'react-native';
 import * as Linking from 'expo-linking';
 
 import type { ThemeColors } from '@/hooks/use-theme-colors';
@@ -63,9 +63,9 @@ export function MarkdownText({
 }) {
   const source = (markdown || '').replace(/\r\n/g, '\n');
   const lines = source.split('\n');
-  const directionStyle = direction
+  const directionStyle: TextStyle | undefined = direction
     ? { writingDirection: direction, textAlign: direction === 'rtl' ? 'right' : 'left' }
-    : null;
+    : undefined;
 
   const blocks: React.ReactNode[] = [];
   let i = 0;

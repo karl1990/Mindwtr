@@ -238,6 +238,10 @@ export const TaskItem = memo(function TaskItem({
         setShowCustomRecurrence(true);
     }, [editRecurrenceRRule, monthlyAnchorDate, monthlyWeekdayCode]);
 
+    const handleSetEditTextDirection = useCallback((value: Task['textDirection']) => {
+        setEditTextDirection(value ?? 'auto');
+    }, []);
+
     const applyCustomRecurrence = useCallback(() => {
         const intervalValue = Number(customInterval);
         const safeInterval = Number.isFinite(intervalValue) && intervalValue > 0 ? intervalValue : 1;
@@ -479,7 +483,7 @@ export const TaskItem = memo(function TaskItem({
                 setEditTimeEstimate,
                 setEditContexts,
                 setEditTags,
-                setEditTextDirection,
+                setEditTextDirection: handleSetEditTextDirection,
                 updateTask,
                 resetTaskChecklist,
             }}
