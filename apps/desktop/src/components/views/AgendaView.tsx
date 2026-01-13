@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
@@ -100,6 +100,34 @@ export function AgendaView() {
         [filteredActiveTasks]
     );
 
+    const projectOrderMap = useMemo(() => {
+        const sorted = [...projects]
+            .filter((project) => !project.deletedAt)
+            .sort((a, b) => {
+                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return a.title.localeCompare(b.title);
+            });
+        const map = new Map<string, number>();
+        sorted.forEach((project, index) => map.set(project.id, index));
+        return map;
+    }, [projects]);
+
+    const sortByProjectOrder = useCallback((items: Task[]) => {
+        return [...items].sort((a, b) => {
+            const aProjectOrder = a.projectId ? (projectOrderMap.get(a.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            const bProjectOrder = b.projectId ? (projectOrderMap.get(b.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            if (aProjectOrder !== bProjectOrder) return aProjectOrder - bProjectOrder;
+            const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+            const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            const aCreated = safeParseDate(a.createdAt)?.getTime() ?? 0;
+            const bCreated = safeParseDate(b.createdAt)?.getTime() ?? 0;
+            return aCreated - bCreated;
+        });
+    }, [projectOrderMap]);
+
     // Categorize tasks
     const sections = useMemo(() => {
         const now = new Date();
@@ -179,10 +207,10 @@ export function AgendaView() {
         return {
             overdue: sortWith(overdue, (task) => safeParseDueDate(task.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY),
             dueToday: sortWith(dueToday, (task) => safeParseDueDate(task.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY),
-            nextActions: sortWith(nextActions, (task) => safeParseDate(task.startTime)?.getTime() ?? Number.POSITIVE_INFINITY),
+            nextActions: sortByProjectOrder(nextActions),
             reviewDue: sortWith(reviewDue, (task) => safeParseDate(task.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY),
         };
-    }, [filteredActiveTasks, projects, prioritiesEnabled]);
+    }, [filteredActiveTasks, projects, prioritiesEnabled, sortByProjectOrder]);
     const focusedCount = focusedTasks.length;
     const top3Candidates = useMemo(() => {
         const byId = new Map<string, Task>();

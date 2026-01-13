@@ -224,6 +224,34 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }, {} as Record<string, Project>);
     }, [projects]);
 
+    const projectOrderMap = useMemo(() => {
+        const sorted = [...projects]
+            .filter((project) => !project.deletedAt)
+            .sort((a, b) => {
+                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return a.title.localeCompare(b.title);
+            });
+        const map = new Map<string, number>();
+        sorted.forEach((project, index) => map.set(project.id, index));
+        return map;
+    }, [projects]);
+
+    const sortByProjectOrder = useCallback((items: Task[]) => {
+        return [...items].sort((a, b) => {
+            const aProjectOrder = a.projectId ? (projectOrderMap.get(a.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            const bProjectOrder = b.projectId ? (projectOrderMap.get(b.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            if (aProjectOrder !== bProjectOrder) return aProjectOrder - bProjectOrder;
+            const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+            const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            const aCreated = safeParseDate(a.createdAt)?.getTime() ?? 0;
+            const bCreated = safeParseDate(b.createdAt)?.getTime() ?? 0;
+            return aCreated - bCreated;
+        });
+    }, [projectOrderMap]);
+
     const tasksById = useMemo(() => {
         return tasks.reduce((acc, task) => {
             acc[task.id] = task;
@@ -324,8 +352,12 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             return true;
         });
 
+        if (statusFilter === 'next' && sortBy === 'default') {
+            return sortByProjectOrder(filtered);
+        }
+
         return sortTasksBy(filtered, sortBy);
-    }, [baseTasks, projects, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy]);
+    }, [baseTasks, projects, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder]);
 
     const shouldVirtualize = filteredTasks.length > VIRTUALIZATION_THRESHOLD;
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { DndContext, DragOverlay, useDraggable, useDroppable, DragEndEvent, DragStartEvent, closestCorners } from '@dnd-kit/core';
 import { TaskItem } from '../TaskItem';
-import { useTaskStore, sortTasksBy } from '@mindwtr/core';
+import { useTaskStore, sortTasksBy, safeParseDate } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
@@ -121,6 +121,19 @@ export function BoardView() {
         () => projects.filter(p => !p.deletedAt).sort((a, b) => a.title.localeCompare(b.title)),
         [projects]
     );
+    const projectOrderMap = React.useMemo(() => {
+        const sorted = [...projects]
+            .filter((project) => !project.deletedAt)
+            .sort((a, b) => {
+                const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+                const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return a.title.localeCompare(b.title);
+            });
+        const map = new Map<string, number>();
+        sorted.forEach((project, index) => map.set(project.id, index));
+        return map;
+    }, [projects]);
     const toggleProjectFilter = (projectId: string) => {
         setBoardFilters({
             selectedProjectIds: boardFilters.selectedProjectIds.includes(projectId)
@@ -191,6 +204,20 @@ export function BoardView() {
         return new Set(firstTaskIds);
     }, [filteredTasks, projects]);
 
+    const sortByProjectOrder = React.useCallback((items: Task[]) => {
+        return [...items].sort((a, b) => {
+            const aProjectOrder = a.projectId ? (projectOrderMap.get(a.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            const bProjectOrder = b.projectId ? (projectOrderMap.get(b.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            if (aProjectOrder !== bProjectOrder) return aProjectOrder - bProjectOrder;
+            const aOrder = Number.isFinite(a.orderNum) ? (a.orderNum as number) : Number.POSITIVE_INFINITY;
+            const bOrder = Number.isFinite(b.orderNum) ? (b.orderNum as number) : Number.POSITIVE_INFINITY;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            const aCreated = safeParseDate(a.createdAt)?.getTime() ?? 0;
+            const bCreated = safeParseDate(b.createdAt)?.getTime() ?? 0;
+            return aCreated - bCreated;
+        });
+    }, [projectOrderMap]);
+
     const getColumnTasks = React.useCallback((status: TaskStatus) => {
         let list = filteredTasks.filter((task) => task.status === status);
         if (status === 'next') {
@@ -200,9 +227,12 @@ export function BoardView() {
                 if (!project?.isSequential) return true;
                 return sequentialProjectFirstTasks.has(task.id);
             });
+            if (sortBy === 'default') {
+                return sortByProjectOrder(list);
+            }
         }
         return list;
-    }, [filteredTasks, projectMap, sequentialProjectFirstTasks]);
+    }, [filteredTasks, projectMap, sequentialProjectFirstTasks, sortBy, sortByProjectOrder]);
 
     const resolveText = React.useCallback((key: string, fallback: string) => {
         const value = t(key);
