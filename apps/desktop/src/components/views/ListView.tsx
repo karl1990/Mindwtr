@@ -259,15 +259,18 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         }, {} as Record<string, Task>);
     }, [tasks]);
 
+    const sequentialProjectIds = useMemo(() => {
+        return new Set(projects.filter((project) => project.isSequential).map((project) => project.id));
+    }, [projects]);
+
     // For sequential projects, get only the first task to show in Next view
     const sequentialProjectFirstTasks = useMemo(() => {
-        const sequentialIds = new Set(projects.filter(p => p.isSequential).map((p) => p.id));
-        if (sequentialIds.size === 0) return new Set<string>();
+        if (sequentialProjectIds.size === 0) return new Set<string>();
         const tasksByProject = new Map<string, Task[]>();
 
         for (const task of baseTasks) {
             if (task.deletedAt || task.status !== 'next' || !task.projectId) continue;
-            if (!sequentialIds.has(task.projectId)) continue;
+            if (!sequentialProjectIds.has(task.projectId)) continue;
             const list = tasksByProject.get(task.projectId) ?? [];
             list.push(task);
             tasksByProject.set(task.projectId, list);
@@ -291,7 +294,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         });
 
         return new Set(firstTaskIds);
-    }, [baseTasks, projects]);
+    }, [baseTasks, sequentialProjectIds]);
 
     useEffect(() => {
         let cancelled = false;
