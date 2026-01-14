@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, eachDayOfInterval } from 'date-fns';
 import { parseIcs, safeParseDate, safeParseDueDate, type ExternalCalendarEvent, type ExternalCalendarSubscription, useTaskStore, type Task } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
@@ -373,7 +374,8 @@ export function CalendarView() {
     };
 
     return (
-        <div className="space-y-6">
+        <ErrorBoundary>
+            <div className="space-y-6">
             <header className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold tracking-tight">{t('nav.calendar')}</h2>
                 <div className="text-lg font-medium text-muted-foreground">
@@ -637,6 +639,7 @@ export function CalendarView() {
                 </div>
             )}
         </div>
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
