@@ -859,7 +859,6 @@ export function ProjectsView() {
                 setPendingAreaAssignProjectId(null);
             }}
         />
-            </div>
         </ErrorBoundary>
     );
 }
