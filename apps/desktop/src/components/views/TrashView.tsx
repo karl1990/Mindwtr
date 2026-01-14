@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { useTaskStore, sortTasksBy, safeFormatDate } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { Undo2, Trash2 } from 'lucide-react';
@@ -35,7 +36,8 @@ export function TrashView() {
     };
 
     return (
-        <div className="space-y-6">
+        <ErrorBoundary>
+            <div className="space-y-6">
             <header className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold tracking-tight">{t('trash.title')}</h2>
                 <div className="flex items-center gap-3">
@@ -100,6 +102,7 @@ export function TrashView() {
                     ))
                 )}
             </div>
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
