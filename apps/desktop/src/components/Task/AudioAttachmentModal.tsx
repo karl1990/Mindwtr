@@ -4,7 +4,7 @@ import type { Attachment } from '@mindwtr/core';
 type AudioAttachmentModalProps = {
     attachment: Attachment | null;
     audioSource: string | null;
-    audioRef: RefObject<HTMLAudioElement>;
+    audioRef: RefObject<HTMLAudioElement | null>;
     audioError: string | null;
     onClose: () => void;
     onAudioError: () => void;

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { useTaskStore, Attachment, Task, type Project, type Area, generateUUID, safeFormatDate, safeParseDate, parseQuickAdd, PRESET_CONTEXTS, validateAttachmentForUpload } from '@mindwtr/core';
+import { useTaskStore, Attachment, Task, type Project, generateUUID, safeFormatDate, safeParseDate, parseQuickAdd, PRESET_CONTEXTS, validateAttachmentForUpload } from '@mindwtr/core';
 import { TaskInput } from '../Task/TaskInput';
 import { Folder } from 'lucide-react';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';

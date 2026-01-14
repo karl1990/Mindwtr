@@ -123,7 +123,6 @@ export function SettingsView() {
         isSyncing,
         syncError,
         syncBackend,
-        setSyncBackend,
         webdavUrl,
         setWebdavUrl,
         webdavUsername,
@@ -882,18 +881,18 @@ export function SettingsView() {
 
         if (updateInfo.platform === 'linux') {
             if (linuxFlavor === 'arch') {
-                return { label: 'AUR', url: null };
+                return { label: 'AUR' };
             }
             if (linuxFlavor === 'debian') {
                 const asset = findAsset([/\.deb$/i]);
-                return { label: '.deb', url: asset?.url ?? null };
+                return asset?.url ? { label: '.deb', url: asset.url } : null;
             }
             if (linuxFlavor === 'rpm') {
                 const asset = findAsset([/\.rpm$/i]);
-                return { label: '.rpm', url: asset?.url ?? null };
+                return asset?.url ? { label: '.rpm', url: asset.url } : null;
             }
             const asset = findAsset([/\.AppImage$/i]);
-            return { label: '.AppImage', url: asset?.url ?? null };
+            return asset?.url ? { label: '.AppImage', url: asset.url } : null;
         }
 
         return null;

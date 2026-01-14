@@ -5,7 +5,6 @@ import type { TaskPriority, TimeEstimate } from '@mindwtr/core';
 interface ListFiltersPanelProps {
     t: (key: string) => string;
     hasFilters: boolean;
-    filtersOpen: boolean;
     showFiltersPanel: boolean;
     onClearFilters: () => void;
     onToggleOpen: () => void;
@@ -27,7 +26,6 @@ interface ListFiltersPanelProps {
 export function ListFiltersPanel({
     t,
     hasFilters,
-    filtersOpen,
     showFiltersPanel,
     onClearFilters,
     onToggleOpen,

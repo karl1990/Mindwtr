@@ -808,7 +808,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                 <ListFiltersPanel
                     t={t}
                     hasFilters={hasFilters}
-                    filtersOpen={filtersOpen}
                     showFiltersPanel={showFiltersPanel}
                     onClearFilters={clearFilters}
                     onToggleOpen={() => setListFilters({ open: !filtersOpen })}
