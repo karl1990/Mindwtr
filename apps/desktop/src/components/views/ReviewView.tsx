@@ -49,10 +49,15 @@ export function ReviewView() {
     const statusCounts = useMemo(() => {
         const counts: Record<string, number> = { all: activeTasks.length };
         for (const status of statusOptions) {
-            counts[status] = activeTasks.filter((t) => t.status === status).length;
+            counts[status] = 0;
         }
+        activeTasks.forEach((task) => {
+            if (counts[task.status] !== undefined) {
+                counts[task.status] += 1;
+            }
+        });
         return counts;
-    }, [activeTasks]);
+    }, [activeTasks, statusOptions]);
 
     const filteredTasks = useMemo(() => {
         const list = filterStatus === 'all' ? activeTasks : activeTasks.filter((t) => t.status === filterStatus);
