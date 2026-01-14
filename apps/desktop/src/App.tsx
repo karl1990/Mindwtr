@@ -3,9 +3,9 @@ import { Layout } from './components/Layout';
 import { ListView } from './components/views/ListView';
 import { CalendarView } from './components/views/CalendarView';
 const BoardView = lazy(() => import('./components/views/BoardView').then((m) => ({ default: m.BoardView })));
-import { ProjectsView } from './components/views/ProjectsView';
+const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((m) => ({ default: m.ProjectsView })));
 import { ContextsView } from './components/views/ContextsView';
-import { ReviewView } from './components/views/ReviewView';
+const ReviewView = lazy(() => import('./components/views/ReviewView').then((m) => ({ default: m.ReviewView })));
 import { TutorialView } from './components/views/TutorialView';
 const SettingsView = lazy(() => import('./components/views/SettingsView').then((m) => ({ default: m.SettingsView })));
 import { ArchiveView } from './components/views/ArchiveView';
@@ -206,6 +206,8 @@ function App() {
         const id = idleCallback(() => {
             void import('./components/views/SettingsView');
             void import('./components/views/BoardView');
+            void import('./components/views/ProjectsView');
+            void import('./components/views/ReviewView');
         });
         return () => idleCancel(id);
     }, []);
