@@ -75,9 +75,17 @@ For other distributions, use the AppImage or build from source (see [[Developer 
 
 ## Windows
 
-### Scoop (Recommended)
+### Winget (Recommended)
 
-You can easily install and update Mindwtr using [Scoop](https://scoop.sh/):
+Winget is built into Windows 10 and 11. Install Mindwtr with:
+
+```powershell
+winget install dongdongbh.Mindwtr
+```
+
+### Alternative: Scoop
+
+If you use [Scoop](https://scoop.sh/):
 
 ```powershell
 scoop bucket add mindwtr https://github.com/dongdongbh/homebrew-mindwtr
