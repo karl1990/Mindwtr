@@ -43,17 +43,16 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 ## 功能
 
 ### GTD 工作流
-- **收集** - 随时快速添加任务（全局快捷键、托盘、分享）
+- **收集** - 随时快速添加任务（全局快捷键、托盘、分享、语音）
 - **澄清** - 2 分钟法则引导的收件箱处理
 - **组织** - 项目、情境与状态清单
 - **回顾** - 带提醒的每周回顾向导
 - **执行** - 基于情境筛选的下一步行动
-- **AI 辅助（可选）** - 使用自带密钥的 AI 完成澄清、拆解与回顾（OpenAI / Gemini / Claude）
+- **AI 辅助（可选）** - 使用自带密钥的 AI 完成澄清、拆解与回顾（OpenAI、Gemini、Claude）
 
 ### 视图
 - 📥 **收件箱** - 任务收集区与处理向导
-- ▶️ **下一步行动** - 基于情境过滤的可执行任务
-- 🗓️ **日程** - 每日聚焦与时间概览
+- 🎯 **聚焦** - 日程（时间维度）+ 下一步行动合并视图
 - 📁 **项目** - 多步骤结果与领域
 - 🏷️ **情境** - 层级情境（@work/meetings）
 - ⏳ **等待中** - 委派事项
@@ -69,9 +68,13 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - 🔗 **任务依赖** - 任务被前置事项阻塞
 - 📎 **附件** - 任务支持文件与链接
 - ✏️ **Markdown 备注** - 富文本描述 + 预览
+- 🗂️ **项目状态** - 进行中、等待中、将来/也许、归档
+- ♾️ **流动重复** - 固定日期或“完成后 X 天”
 - ♻️ **可复用清单** - 复制任务或重置清单
 - ✅ **清单模式** - 清单类任务的快速勾选
+- ✅ **语音收集** - 语音快速记录、自动转写并创建任务
 - 🧭 **Copilot 建议** - 可选的情境/标签/时间提示
+- 🧘 **专注 / 禅模式** - 减少干扰，突出重点
 - 🔔 **通知** - 截止提醒与稍后提醒
 - 📊 **每日摘要** - 早间简报 + 晚间回顾
 - 📅 **每周回顾** - 可定制的每周提醒
@@ -87,6 +90,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - 🔌 **CLI** - 终端添加/完成/搜索
 - 🌐 **REST API** - 本地 API 便于脚本化
 - 🌍 **Web 应用（PWA）** - 浏览器离线访问
+- 🧠 **MCP 服务器** - 本地 Model Context Protocol 服务用于 LLM 自动化
 
 ### 跨平台
 - 🖥️ **桌面端** - Tauri v2（macOS、Linux、Windows）
@@ -97,7 +101,29 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - 🌍 **国际化** - 英文、中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、韩语、意大利语、土耳其语
 - 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
 
+### 平台说明
+- **桌面端**：全局快捷键、键盘导航，无滑动操作、无禅模式。
+- **移动端**：滑动操作、禅模式、Android 小部件支持；无全局快捷键。
+
 ## 安装
+
+<p align="center">
+  <a href="https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/dongdongbh/Mindwtr">
+    <img src="https://img.shields.io/winget/v/dongdongbh.Mindwtr?label=Winget&logo=windows&logoColor=white&color=00D2FF" alt="Winget Version">
+  </a>
+
+  <a href="https://github.com/dongdongbh/homebrew-mindwtr">
+    <img src="https://img.shields.io/scoop/v/mindwtr?bucket=https://github.com/dongdongbh/homebrew-mindwtr&label=Scoop&logo=scoop&logoColor=white&color=E6E6E6" alt="Scoop Version">
+  </a>
+
+  <a href="https://github.com/dongdongbh/homebrew-mindwtr">
+    <img src="https://img.shields.io/badge/Homebrew-Install-orange?logo=homebrew&logoColor=white" alt="Homebrew">
+  </a>
+
+  <a href="https://aur.archlinux.org/packages/mindwtr-bin">
+    <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR" alt="AUR Version">
+  </a>
+</p>
 
 ### 桌面端（Linux）
 
@@ -166,8 +192,17 @@ brew install --cask mindwtr
 **Android：**
 从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
+关于 Android 版本，我已在 Google Play 上开启封闭测试轨道。
+
+要获取访问权限，需要被 Google 白名单。我创建了一个 Google Group 用于自动批准，无需逐个添加邮箱。
+
+加入方式：
+- 加入 Alpha 组：https://groups.google.com/g/mindwtr-alpha-testers
+- 加入后你的 Google 账号会自动获批
+- 从 Google Play 下载：[Android Link](https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr)。
+
 **iOS：**
-iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。
+iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。如果你希望获得 iOS 构建，请考虑 [赞助开发者](https://github.com/sponsors/dongdongbh) 以资助 Apple Developer 账号。
 
 ### Docker（PWA + 云同步）
 使用 Docker 运行 Web 应用（PWA）和自托管同步服务：
@@ -192,6 +227,11 @@ iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器�
 - ☁️ [云同步（自托管）](https://github.com/dongdongbh/Mindwtr/wiki/Cloud-Sync)
 - 🔌 [本地 API 服务](https://github.com/dongdongbh/Mindwtr/wiki/Local-API)
 - 🌐 [Web / PWA](https://github.com/dongdongbh/Mindwtr/wiki/Web-App-PWA)
+
+## 路线图
+
+- ✅ 为 Mindwtr 构建 MCP 服务器（LLM 集成与自动化）。
+- ⏳ 添加邮件收集（通过转发邮件创建任务）。
 
 ## 开发
 
