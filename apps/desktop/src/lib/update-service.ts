@@ -2,6 +2,8 @@
  * Update service for checking GitHub releases and downloading updates
  */
 
+import { reportError } from './report-error';
+
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/dongdongbh/Mindwtr/releases/latest';
 const GITHUB_RELEASES_URL = 'https://github.com/dongdongbh/Mindwtr/releases/latest';
 
@@ -151,7 +153,7 @@ export async function checkForUpdates(currentVersion: string): Promise<UpdateInf
             assets,
         };
     } catch (error) {
-        console.error('[UpdateService] Failed to check for updates:', error);
+        reportError('Failed to check for updates', error);
         throw error;
     }
 }
