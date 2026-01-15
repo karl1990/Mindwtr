@@ -233,6 +233,7 @@ The same workflow applies. Avoid editing on multiple devices simultaneously to p
 - **Check for duplicate attachment folders** (`attachments (1)`, etc.) and merge them.
 - **Make sure device clocks are correct** (large skew causes conflicts).
 - **Verify folder permissions** (Android SAF may block write access to some folders).
+- **Avoid editing on two devices at the same time** during initial sync.
 
 ---
 
