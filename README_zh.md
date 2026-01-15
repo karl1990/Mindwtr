@@ -95,6 +95,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - ⌨️ **键盘快捷键** - Vim 与 Emacs 预设
 - 🎨 **主题** - 明/暗模式
 - 🌍 **国际化** - 英文、中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、韩语、意大利语、土耳其语
+- 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
 
 ## 安装
 
@@ -130,7 +131,12 @@ sudo rpm -i mindwtr-*.rpm
 ```
 
 ### 桌面端（Windows）
-**Scoop（推荐）：**
+**Winget（推荐）：**
+```powershell
+winget install dongdongbh.Mindwtr
+```
+
+**可选：Scoop**
 ```powershell
 scoop bucket add mindwtr https://github.com/dongdongbh/homebrew-mindwtr
 scoop install mindwtr
@@ -162,6 +168,10 @@ brew install --cask mindwtr
 
 **iOS：**
 iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。
+
+### Docker（PWA + 云同步）
+使用 Docker 运行 Web 应用（PWA）和自托管同步服务：
+- 指南：[`docker/README.md`](docker/README.md)
 
 ## 数据存储
 

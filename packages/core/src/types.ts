@@ -143,7 +143,7 @@ export interface SavedSearch {
     groupBy?: string;
 }
 
-import type { MergeStats } from './sync';
+import type { MergeStats, SyncHistoryEntry } from './sync';
 
 export interface AppData {
     tasks: Task[];
@@ -206,6 +206,7 @@ export interface AppData {
         lastSyncStatus?: 'idle' | 'syncing' | 'success' | 'error' | 'conflict';
         lastSyncError?: string;
         lastSyncStats?: MergeStats;
+        lastSyncHistory?: SyncHistoryEntry[];
         diagnostics?: {
             loggingEnabled?: boolean;
         };

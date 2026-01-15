@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, addYears, format } from 'date-fns';
+import { addDays, addMonths, addWeeks, format } from 'date-fns';
 
 import { safeParseDate } from './date';
 import { generateUUID as uuidv4 } from './uuid';
@@ -155,13 +155,54 @@ function addInterval(base: Date, rule: RecurrenceRule, interval: number = 1): Da
         case 'weekly':
             return addWeeks(base, interval);
         case 'monthly':
-            return addMonths(base, interval);
+            return addMonthsClamped(base, interval);
         case 'yearly':
-            return addYears(base, interval);
+            return addYearsClamped(base, interval);
     }
 }
 
 const weekdayIndex = (weekday: RecurrenceWeekday): number => WEEKDAY_ORDER.indexOf(weekday);
+
+const getLastDayOfMonth = (year: number, month: number): number => {
+    return new Date(year, month + 1, 0).getDate();
+};
+
+const buildDateWithTime = (year: number, month: number, day: number, base: Date): Date => {
+    return new Date(
+        year,
+        month,
+        day,
+        base.getHours(),
+        base.getMinutes(),
+        base.getSeconds(),
+        base.getMilliseconds()
+    );
+};
+
+const addMonthsClamped = (base: Date, interval: number): Date => {
+    const seed = new Date(
+        base.getFullYear(),
+        base.getMonth() + interval,
+        1,
+        base.getHours(),
+        base.getMinutes(),
+        base.getSeconds(),
+        base.getMilliseconds()
+    );
+    const year = seed.getFullYear();
+    const month = seed.getMonth();
+    const lastDay = getLastDayOfMonth(year, month);
+    const day = Math.min(base.getDate(), lastDay);
+    return buildDateWithTime(year, month, day, base);
+};
+
+const addYearsClamped = (base: Date, interval: number): Date => {
+    const year = base.getFullYear() + interval;
+    const month = base.getMonth();
+    const lastDay = getLastDayOfMonth(year, month);
+    const day = Math.min(base.getDate(), lastDay);
+    return buildDateWithTime(year, month, day, base);
+};
 
 function nextWeeklyByDay(base: Date, byDay: RecurrenceByDay[], interval: number = 1): Date {
     const normalizedDays = normalizeWeeklyByDay(byDay);
@@ -294,7 +335,7 @@ function nextIsoFrom(
     const base = parsed || fallbackBase;
     const effectiveByDay = byDay && byDay.length > 0 ? byDay : undefined;
     const effectiveByMonthDay = byMonthDay && byMonthDay.length > 0 ? byMonthDay : undefined;
-    const nextDate = rule === 'weekly' && effectiveByDay
+    let nextDate = rule === 'weekly' && effectiveByDay
         ? nextWeeklyByDay(base, effectiveByDay, interval)
         : rule === 'monthly' && effectiveByDay
             ? nextMonthlyByDay(base, effectiveByDay, interval)
@@ -310,6 +351,10 @@ function nextIsoFrom(
         return format(nextDate, 'yyyy-MM-dd');
     }
     const hasTimezone = !!baseIso && /Z$|[+-]\d{2}:?\d{2}$/.test(baseIso);
+    const hasLocalTime = !!baseIso && /[T\s]\d{2}:\d{2}/.test(baseIso);
+    if (!hasTimezone && hasLocalTime) {
+        nextDate = buildDateWithTime(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate(), base);
+    }
     return hasTimezone ? nextDate.toISOString() : format(nextDate, "yyyy-MM-dd'T'HH:mm");
 }
 

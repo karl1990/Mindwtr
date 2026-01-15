@@ -36,7 +36,7 @@ import { Audio, type AVPlaybackStatus } from 'expo-av';
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from './markdown-text';
-import { buildAIConfig, buildCopilotConfig, loadAIKey } from '../lib/ai-config';
+import { buildAIConfig, loadAIKey } from '../lib/ai-config';
 import { ensureAttachmentAvailable } from '../lib/attachment-sync';
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { styles } from './task-edit/task-edit-modal.styles';
@@ -57,6 +57,7 @@ import {
     getRecurrenceByDayValue,
     getRecurrenceRRuleValue,
 } from './task-edit/recurrence-utils';
+import { useTaskEditCopilot } from './task-edit/use-task-edit-copilot';
 
 
 interface TaskEditModalProps {
@@ -145,18 +146,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const [aiModal, setAiModal] = useState<{ title: string; message?: string; actions: AIResponseAction[] } | null>(null);
     const aiEnabled = settings.ai?.enabled === true;
     const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
-    const [aiKey, setAiKey] = useState('');
-    const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; timeEstimate?: TimeEstimate; tags?: string[] } | null>(null);
-    const [copilotApplied, setCopilotApplied] = useState(false);
-    const [copilotContext, setCopilotContext] = useState<string | undefined>(undefined);
-    const [copilotEstimate, setCopilotEstimate] = useState<TimeEstimate | undefined>(undefined);
-    const [copilotTags, setCopilotTags] = useState<string[]>([]);
-    const contextOptionsRef = useRef<string[]>([]);
-    const tagOptionsRef = useRef<string[]>([]);
-    const copilotMountedRef = useRef(true);
-    const copilotAbortRef = useRef<AbortController | null>(null);
-    const [showAllContexts, setShowAllContexts] = useState(false);
-    const [showAllTags, setShowAllTags] = useState(false);
 
     // Compute most frequent tags from all tasks
     const suggestedTags = React.useMemo(() => {
@@ -208,6 +197,33 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         return Array.from(unique).slice(0, MAX_SUGGESTED_TAGS);
     }, [tasks]);
 
+    const {
+        copilotSuggestion,
+        copilotApplied,
+        copilotContext,
+        copilotEstimate,
+        copilotTags,
+        showAllContexts,
+        setShowAllContexts,
+        showAllTags,
+        setShowAllTags,
+        resetCopilotDraft,
+        resetCopilotState,
+        applyCopilotSuggestion,
+    } = useTaskEditCopilot({
+        settings,
+        aiEnabled,
+        aiProvider,
+        timeEstimatesEnabled,
+        titleDraft,
+        descriptionDraft,
+        contextOptions,
+        tagOptions,
+        editedTask,
+        visible,
+        setEditedTask,
+    });
+
     const visibleContextSuggestions = showAllContexts
         ? suggestedTags
         : suggestedTags.slice(0, MAX_VISIBLE_SUGGESTIONS);
@@ -252,11 +268,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 descriptionDraftRef.current = nextDescription;
                 setDescriptionDraft(nextDescription);
                 setEditTab(resolveInitialTab(defaultTab, normalizedTask));
-                setCopilotSuggestion(null);
-                setCopilotApplied(false);
-                setCopilotContext(undefined);
-                setCopilotEstimate(undefined);
-                setCopilotTags([]);
+                resetCopilotState();
             }
         } else if (visible) {
             setEditedTaskState({});
@@ -274,87 +286,11 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             setEditTab(resolveInitialTab(defaultTab, null));
             setCustomWeekdays([]);
         }
-    }, [liveTask, defaultTab, visible]);
-
-    useEffect(() => {
-        loadAIKey(aiProvider).then(setAiKey).catch(console.error);
-    }, [aiProvider]);
-
-    useEffect(() => {
-        copilotMountedRef.current = true;
-        return () => {
-            copilotMountedRef.current = false;
-        };
-    }, []);
-
-
-    useEffect(() => {
-        contextOptionsRef.current = contextOptions;
-        tagOptionsRef.current = tagOptions;
-    }, [contextOptions, tagOptions]);
-
-    useEffect(() => {
-        if (!aiEnabled || !aiKey) {
-            setCopilotSuggestion(null);
-            return;
-        }
-        const title = String(titleDraftRef.current ?? '').trim();
-        const description = String(descriptionDraftRef.current ?? '').trim();
-        const input = [title, description].filter(Boolean).join('\n');
-        if (input.length < 4) {
-            setCopilotSuggestion(null);
-            return;
-        }
-        let cancelled = false;
-        let localAbortController: AbortController | null = null;
-            const handle = setTimeout(async () => {
-                const abortController = typeof AbortController === 'function' ? new AbortController() : null;
-                localAbortController = abortController;
-                const previousController = copilotAbortRef.current;
-                if (abortController) {
-                    copilotAbortRef.current = abortController;
-                }
-                if (previousController) {
-                    previousController.abort();
-                }
-                try {
-                    const provider = createAIProvider(buildCopilotConfig(settings, aiKey));
-                    const suggestion = await provider.predictMetadata(
-                        { title: input, contexts: contextOptionsRef.current, tags: tagOptionsRef.current },
-                        abortController ? { signal: abortController.signal } : undefined
-                    );
-                    if (cancelled || !copilotMountedRef.current) return;
-                    if (!suggestion.context && (!timeEstimatesEnabled || !suggestion.timeEstimate) && !suggestion.tags?.length) {
-                        setCopilotSuggestion(null);
-                    } else {
-                        setCopilotSuggestion(suggestion);
-                    }
-                } catch {
-                    if (!cancelled && copilotMountedRef.current) setCopilotSuggestion(null);
-                }
-            }, 800);
-            return () => {
-                cancelled = true;
-                clearTimeout(handle);
-                if (copilotAbortRef.current && copilotAbortRef.current === localAbortController) {
-                    copilotAbortRef.current.abort();
-                    copilotAbortRef.current = null;
-                }
-            };
-    }, [aiEnabled, aiKey, titleDraft, descriptionDraft, settings, timeEstimatesEnabled]);
+    }, [liveTask, defaultTab, visible, resetCopilotState]);
 
     useEffect(() => {
         if (!visible) {
             setAiModal(null);
-            setCopilotSuggestion(null);
-            setCopilotApplied(false);
-            setCopilotContext(undefined);
-            setCopilotEstimate(undefined);
-            setCopilotTags([]);
-            if (copilotAbortRef.current) {
-                copilotAbortRef.current.abort();
-                copilotAbortRef.current = null;
-            }
         }
     }, [visible]);
 
@@ -383,12 +319,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     }, []);
 
     const closeAIModal = () => setAiModal(null);
-    const resetCopilotDraft = () => {
-        setCopilotApplied(false);
-        setCopilotContext(undefined);
-        setCopilotEstimate(undefined);
-        setCopilotTags([]);
-    };
     const setTitleImmediate = useCallback((text: string) => {
         if (titleDebounceRef.current) {
             clearTimeout(titleDebounceRef.current);
@@ -409,27 +339,6 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             setEditedTask((prev) => ({ ...prev, title: text }));
         }, 250);
     }, [resetCopilotDraft, setEditedTask]);
-
-    const applyCopilotSuggestion = () => {
-        if (!copilotSuggestion) return;
-        if (copilotSuggestion.context) {
-            const current = editedTask.contexts ?? [];
-            const next = Array.from(new Set([...current, copilotSuggestion.context]));
-            setEditedTask(prev => ({ ...prev, contexts: next }));
-            setCopilotContext(copilotSuggestion.context);
-        }
-        if (copilotSuggestion.tags?.length) {
-            const currentTags = editedTask.tags ?? [];
-            const nextTags = Array.from(new Set([...currentTags, ...copilotSuggestion.tags]));
-            setEditedTask(prev => ({ ...prev, tags: nextTags }));
-            setCopilotTags(copilotSuggestion.tags);
-        }
-        if (copilotSuggestion.timeEstimate && timeEstimatesEnabled) {
-            setEditedTask(prev => ({ ...prev, timeEstimate: copilotSuggestion.timeEstimate }));
-            setCopilotEstimate(copilotSuggestion.timeEstimate);
-        }
-        setCopilotApplied(true);
-    };
 
     const projectContext = useMemo(() => {
         const projectId = (editedTask.projectId as string | undefined) ?? task?.projectId;

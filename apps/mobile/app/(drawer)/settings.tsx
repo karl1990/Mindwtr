@@ -116,6 +116,25 @@ const maskCalendarUrl = (url: string): string => {
     return `${protocol}${host}/${suffix}`;
 };
 
+const formatClockSkew = (ms: number): string => {
+    if (!Number.isFinite(ms) || ms <= 0) return '0 ms';
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+    const minutes = seconds / 60;
+    return `${minutes.toFixed(1)} min`;
+};
+
+const isValidHttpUrl = (value: string): boolean => {
+    if (!value.trim()) return false;
+    try {
+        const url = new URL(value);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+};
+
 export default function SettingsPage() {
     const { themeMode, setThemeMode } = useTheme();
     const { language, setLanguage, t } = useLanguage();
@@ -157,6 +176,18 @@ export default function SettingsPage() {
     const weeklyReviewTime = settings.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings.weeklyReviewDay) ? settings.weeklyReviewDay as number : 0;
     const loggingEnabled = settings.diagnostics?.loggingEnabled === true;
+    const lastSyncStats = settings.lastSyncStats ?? null;
+    const syncConflictCount = (lastSyncStats?.tasks.conflicts || 0) + (lastSyncStats?.projects.conflicts || 0);
+    const maxClockSkewMs = Math.max(lastSyncStats?.tasks.maxClockSkewMs || 0, lastSyncStats?.projects.maxClockSkewMs || 0);
+    const timestampAdjustments = (lastSyncStats?.tasks.timestampAdjustments || 0) + (lastSyncStats?.projects.timestampAdjustments || 0);
+    const conflictIds = [
+        ...(lastSyncStats?.tasks.conflictIds ?? []),
+        ...(lastSyncStats?.projects.conflictIds ?? []),
+    ].slice(0, 6);
+    const syncHistory = settings.lastSyncHistory ?? [];
+    const syncHistoryEntries = syncHistory.slice(0, 5);
+    const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;
+    const cloudUrlError = cloudUrl.trim() ? !isValidHttpUrl(cloudUrl.trim()) : false;
     const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
     const aiEnabled = settings.ai?.enabled === true;
     const aiModel = settings.ai?.model ?? getDefaultAIConfig(aiProvider).model;
@@ -626,6 +657,13 @@ export default function SettingsPage() {
                     );
                     return;
                 }
+                if (webdavUrlError) {
+                    Alert.alert(
+                        localize('Invalid URL', '地址无效'),
+                        localize('Please enter a valid WebDAV URL (http/https).', '请输入有效的 WebDAV 地址（http/https）。')
+                    );
+                    return;
+                }
                 await AsyncStorage.multiSet([
                     [SYNC_BACKEND_KEY, 'webdav'],
                     [WEBDAV_URL_KEY, webdavUrl.trim()],
@@ -637,6 +675,13 @@ export default function SettingsPage() {
                     Alert.alert(
                         localize('Notice', '提示'),
                         localize('Please set a self-hosted URL first', '请先设置自托管地址')
+                    );
+                    return;
+                }
+                if (cloudUrlError) {
+                    Alert.alert(
+                        localize('Invalid URL', '地址无效'),
+                        localize('Please enter a valid self-hosted URL (http/https).', '请输入有效的自托管地址（http/https）。')
                     );
                     return;
                 }
@@ -671,6 +716,36 @@ export default function SettingsPage() {
         } finally {
             setIsSyncing(false);
         }
+    };
+
+    const renderSyncHistory = () => {
+        if (syncHistoryEntries.length === 0) return null;
+        return (
+            <View style={{ marginTop: 6 }}>
+                <Text style={[styles.settingDescription, { color: tc.secondaryText, fontWeight: '600' }]}>
+                    {localize('Sync history', '同步历史')}
+                </Text>
+                {syncHistoryEntries.map((entry) => {
+                    const statusLabel = entry.status === 'success'
+                        ? localize('Completed', '完成')
+                        : entry.status === 'conflict'
+                            ? localize('Conflicts', '冲突')
+                            : localize('Failed', '失败');
+                    const details = [
+                        entry.conflicts ? `${localize('Conflicts', '冲突')}: ${entry.conflicts}` : null,
+                        entry.maxClockSkewMs > 0 ? `${localize('Clock skew', '时钟偏差')}: ${formatClockSkew(entry.maxClockSkewMs)}` : null,
+                        entry.timestampAdjustments > 0 ? `${localize('Timestamp fixes', '时间修正')}: ${entry.timestampAdjustments}` : null,
+                    ].filter(Boolean);
+                    return (
+                        <Text key={`${entry.at}-${entry.status}`} style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                            {new Date(entry.at).toLocaleString()} • {statusLabel}
+                            {details.length ? ` • ${details.join(' • ')}` : ''}
+                            {entry.status === 'error' && entry.error ? ` • ${entry.error}` : ''}
+                        </Text>
+                    );
+                })}
+            </View>
+        );
     };
 
     const handleBackup = async () => {
@@ -2505,9 +2580,24 @@ export default function SettingsPage() {
                                             {settings.lastSyncStatus === 'error' && localize(' (failed)', '（失败）')}
                                             {settings.lastSyncStatus === 'conflict' && localize(' (conflicts)', '（有冲突）')}
                                         </Text>
-                                        {settings.lastSyncStats && (
+                                        {lastSyncStats && (
                                             <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                                {localize('Conflicts', '冲突')}: {(settings.lastSyncStats.tasks.conflicts || 0) + (settings.lastSyncStats.projects.conflicts || 0)}
+                                                {localize('Conflicts', '冲突')}: {syncConflictCount}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && maxClockSkewMs > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Clock skew', '时钟偏差')}: {formatClockSkew(maxClockSkewMs)}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && timestampAdjustments > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Timestamp fixes', '时间修正')}: {timestampAdjustments}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && conflictIds.length > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Conflict IDs', '冲突 ID')}: {conflictIds.join(', ')}
                                             </Text>
                                         )}
                                         {settings.lastSyncStatus === 'error' && settings.lastSyncError && (
@@ -2515,6 +2605,7 @@ export default function SettingsPage() {
                                                 {settings.lastSyncError}
                                             </Text>
                                         )}
+                                        {renderSyncHistory()}
                                     </View>
                                 </View>
                             </View>
@@ -2544,6 +2635,11 @@ export default function SettingsPage() {
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                         {localize('Point to a folder — Mindwtr will store data.json inside.', '填写文件夹地址，Mindwtr 会在其中存放 data.json。')}
                                     </Text>
+                                    {webdavUrlError && (
+                                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>
+                                            {localize('Invalid URL. Use http/https.', '地址无效，请使用 http/https。')}
+                                        </Text>
+                                    )}
                                 </View>
 
                                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -2574,6 +2670,13 @@ export default function SettingsPage() {
                                 <TouchableOpacity
                                     style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
                                     onPress={() => {
+                                        if (webdavUrlError || !webdavUrl.trim()) {
+                                            Alert.alert(
+                                                localize('Invalid URL', '地址无效'),
+                                                localize('Please enter a valid WebDAV URL (http/https).', '请输入有效的 WebDAV 地址（http/https）。')
+                                            );
+                                            return;
+                                        }
                                         AsyncStorage.multiSet([
                                             [SYNC_BACKEND_KEY, 'webdav'],
                                             [WEBDAV_URL_KEY, webdavUrl.trim()],
@@ -2583,9 +2686,12 @@ export default function SettingsPage() {
                                             Alert.alert(localize('Success', '成功'), t('settings.webdavSave'));
                                         }).catch(console.error);
                                     }}
+                                    disabled={webdavUrlError || !webdavUrl.trim()}
                                 >
                                     <View style={styles.settingInfo}>
-                                        <Text style={[styles.settingLabel, { color: tc.tint }]}>{t('settings.webdavSave')}</Text>
+                                        <Text style={[styles.settingLabel, { color: webdavUrlError || !webdavUrl.trim() ? tc.secondaryText : tc.tint }]}>
+                                            {t('settings.webdavSave')}
+                                        </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                             {t('settings.webdavUrl')}
                                         </Text>
@@ -2595,10 +2701,10 @@ export default function SettingsPage() {
                                 <TouchableOpacity
                                     style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
                                     onPress={handleSync}
-                                    disabled={isSyncing || !webdavUrl.trim()}
+                                    disabled={isSyncing || !webdavUrl.trim() || webdavUrlError}
                                 >
                                     <View style={styles.settingInfo}>
-                                        <Text style={[styles.settingLabel, { color: webdavUrl.trim() ? tc.tint : tc.secondaryText }]}>
+                                        <Text style={[styles.settingLabel, { color: webdavUrl.trim() && !webdavUrlError ? tc.tint : tc.secondaryText }]}>
                                             {localize('Sync', '同步')}
                                         </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
@@ -2620,9 +2726,24 @@ export default function SettingsPage() {
                                             {settings.lastSyncStatus === 'error' && localize(' (failed)', '（失败）')}
                                             {settings.lastSyncStatus === 'conflict' && localize(' (conflicts)', '（有冲突）')}
                                         </Text>
-                                        {settings.lastSyncStats && (
+                                        {lastSyncStats && (
                                             <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                                {localize('Conflicts', '冲突')}: {(settings.lastSyncStats.tasks.conflicts || 0) + (settings.lastSyncStats.projects.conflicts || 0)}
+                                                {localize('Conflicts', '冲突')}: {syncConflictCount}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && maxClockSkewMs > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Clock skew', '时钟偏差')}: {formatClockSkew(maxClockSkewMs)}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && timestampAdjustments > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Timestamp fixes', '时间修正')}: {timestampAdjustments}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && conflictIds.length > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Conflict IDs', '冲突 ID')}: {conflictIds.join(', ')}
                                             </Text>
                                         )}
                                         {settings.lastSyncStatus === 'error' && settings.lastSyncError && (
@@ -2630,6 +2751,7 @@ export default function SettingsPage() {
                                                 {settings.lastSyncError}
                                             </Text>
                                         )}
+                                        {renderSyncHistory()}
                                     </View>
                                 </View>
                             </View>
@@ -2659,6 +2781,11 @@ export default function SettingsPage() {
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                         {localize('Use the base URL — Mindwtr will append /data.', '填写基础地址，Mindwtr 会自动加上 /data。')}
                                     </Text>
+                                    {cloudUrlError && (
+                                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>
+                                            {localize('Invalid URL. Use http/https.', '地址无效，请使用 http/https。')}
+                                        </Text>
+                                    )}
                                 </View>
 
                                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -2678,6 +2805,13 @@ export default function SettingsPage() {
                                 <TouchableOpacity
                                     style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
                                     onPress={() => {
+                                        if (cloudUrlError || !cloudUrl.trim()) {
+                                            Alert.alert(
+                                                localize('Invalid URL', '地址无效'),
+                                                localize('Please enter a valid self-hosted URL (http/https).', '请输入有效的自托管地址（http/https）。')
+                                            );
+                                            return;
+                                        }
                                         AsyncStorage.multiSet([
                                             [SYNC_BACKEND_KEY, 'cloud'],
                                             [CLOUD_URL_KEY, cloudUrl.trim()],
@@ -2686,9 +2820,12 @@ export default function SettingsPage() {
                                             Alert.alert(localize('Success', '成功'), t('settings.cloudSave'));
                                         }).catch(console.error);
                                     }}
+                                    disabled={cloudUrlError || !cloudUrl.trim()}
                                 >
                                     <View style={styles.settingInfo}>
-                                        <Text style={[styles.settingLabel, { color: tc.tint }]}>{t('settings.cloudSave')}</Text>
+                                        <Text style={[styles.settingLabel, { color: cloudUrlError || !cloudUrl.trim() ? tc.secondaryText : tc.tint }]}>
+                                            {t('settings.cloudSave')}
+                                        </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                             {t('settings.cloudUrl')}
                                         </Text>
@@ -2698,10 +2835,10 @@ export default function SettingsPage() {
                                 <TouchableOpacity
                                     style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
                                     onPress={handleSync}
-                                    disabled={isSyncing || !cloudUrl.trim()}
+                                    disabled={isSyncing || !cloudUrl.trim() || cloudUrlError}
                                 >
                                     <View style={styles.settingInfo}>
-                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() ? tc.tint : tc.secondaryText }]}>
+                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() && !cloudUrlError ? tc.tint : tc.secondaryText }]}>
                                             {localize('Sync', '同步')}
                                         </Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
@@ -2723,9 +2860,24 @@ export default function SettingsPage() {
                                             {settings.lastSyncStatus === 'error' && localize(' (failed)', '（失败）')}
                                             {settings.lastSyncStatus === 'conflict' && localize(' (conflicts)', '（有冲突）')}
                                         </Text>
-                                        {settings.lastSyncStats && (
+                                        {lastSyncStats && (
                                             <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                                {localize('Conflicts', '冲突')}: {(settings.lastSyncStats.tasks.conflicts || 0) + (settings.lastSyncStats.projects.conflicts || 0)}
+                                                {localize('Conflicts', '冲突')}: {syncConflictCount}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && maxClockSkewMs > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Clock skew', '时钟偏差')}: {formatClockSkew(maxClockSkewMs)}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && timestampAdjustments > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Timestamp fixes', '时间修正')}: {timestampAdjustments}
+                                            </Text>
+                                        )}
+                                        {lastSyncStats && conflictIds.length > 0 && (
+                                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                                {localize('Conflict IDs', '冲突 ID')}: {conflictIds.join(', ')}
                                             </Text>
                                         )}
                                         {settings.lastSyncStatus === 'error' && settings.lastSyncError && (
@@ -2733,6 +2885,7 @@ export default function SettingsPage() {
                                                 {settings.lastSyncError}
                                             </Text>
                                         )}
+                                        {renderSyncHistory()}
                                     </View>
                                 </View>
                             </View>

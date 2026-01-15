@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile } from '@mindwtr/core';
+import { AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
-import { logSyncError, sanitizeLogMessage } from './app-log';
+import { logInfo, logSyncError, sanitizeLogMessage } from './app-log';
 import { readSyncFile, writeSyncFile } from './storage-file';
-import { getBaseSyncUrl, getCloudBaseUrl, sanitizeAppDataForRemote, syncCloudAttachments, syncFileAttachments, syncWebdavAttachments } from './attachment-sync';
+import { getBaseSyncUrl, getCloudBaseUrl, sanitizeAppDataForRemote, syncCloudAttachments, syncFileAttachments, syncWebdavAttachments, cleanupAttachmentTempFiles } from './attachment-sync';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   SYNC_PATH_KEY,
@@ -156,6 +156,29 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         },
       });
 
+      const stats = syncResult.stats;
+      const conflictCount = (stats.tasks.conflicts || 0) + (stats.projects.conflicts || 0);
+      const maxClockSkewMs = Math.max(stats.tasks.maxClockSkewMs || 0, stats.projects.maxClockSkewMs || 0);
+      const timestampAdjustments = (stats.tasks.timestampAdjustments || 0) + (stats.projects.timestampAdjustments || 0);
+      if (conflictCount > 0 || maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS || timestampAdjustments > 0) {
+        const conflictSamples = [
+          ...(stats.tasks.conflictIds || []),
+          ...(stats.projects.conflictIds || []),
+        ].slice(0, 6);
+        void logInfo(
+          `Sync merge summary: ${conflictCount} conflicts, max skew ${Math.round(maxClockSkewMs)}ms, ${timestampAdjustments} timestamp fixes.`,
+          {
+            scope: 'sync',
+            extra: {
+              conflicts: String(conflictCount),
+              maxClockSkewMs: String(Math.round(maxClockSkewMs)),
+              timestampFixes: String(timestampAdjustments),
+              conflictSamples: conflictSamples.join(','),
+            },
+          }
+        );
+      }
+
       let mergedData = syncResult.data;
 
       const webdavConfigValue = webdavConfig as { url: string; username: string; password: string } | null;
@@ -189,6 +212,8 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           wroteLocal = true;
         }
       }
+
+      await cleanupAttachmentTempFiles();
 
       if (shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
         step = 'attachments_cleanup';
@@ -255,6 +280,15 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       const logPath = await logSyncError(error, { backend, step, url: syncUrl });
       const logHint = logPath ? ` (log: ${logPath})` : '';
       const safeMessage = sanitizeLogMessage(String(error));
+      const nextHistory = appendSyncHistory(useTaskStore.getState().settings, {
+        at: now,
+        status: 'error',
+        conflicts: 0,
+        conflictIds: [],
+        maxClockSkewMs: 0,
+        timestampAdjustments: 0,
+        error: `${safeMessage}${logHint}`,
+      });
       try {
         if (wroteLocal) {
           await useTaskStore.getState().fetchData();
@@ -263,6 +297,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           lastSyncAt: now,
           lastSyncStatus: 'error',
           lastSyncError: `${safeMessage}${logHint}`,
+          lastSyncHistory: nextHistory,
         });
       } catch (e) {
         console.error('[Mobile] Failed to persist sync error', e);

@@ -116,6 +116,46 @@ const extractExtension = (value?: string): string => {
   return match ? match[0].toLowerCase() : '';
 };
 
+const buildTempUri = (targetUri: string): string => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  return `${targetUri}.tmp-${suffix}`;
+};
+
+const isTempAttachmentFile = (name: string): boolean => {
+  return name.includes('.tmp-') || name.endsWith('.tmp') || name.endsWith('.partial');
+};
+
+const writeBytesSafely = async (targetUri: string, bytes: Uint8Array): Promise<void> => {
+  const base64 = bytesToBase64(bytes);
+  const tempUri = buildTempUri(targetUri);
+  await FileSystem.writeAsStringAsync(tempUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+  try {
+    await FileSystem.moveAsync({ from: tempUri, to: targetUri });
+  } catch (error) {
+    await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+    try {
+      await FileSystem.deleteAsync(tempUri, { idempotent: true });
+    } catch {
+      // Ignore cleanup errors for temp file.
+    }
+  }
+};
+
+const copyFileSafely = async (sourceUri: string, targetUri: string): Promise<void> => {
+  const tempUri = buildTempUri(targetUri);
+  await FileSystem.copyAsync({ from: sourceUri, to: tempUri });
+  try {
+    await FileSystem.moveAsync({ from: tempUri, to: targetUri });
+  } catch (error) {
+    await FileSystem.copyAsync({ from: sourceUri, to: targetUri });
+    try {
+      await FileSystem.deleteAsync(tempUri, { idempotent: true });
+    } catch {
+      // Ignore cleanup errors for temp file.
+    }
+  }
+};
+
 const validateAttachmentHash = async (attachment: Attachment, bytes: Uint8Array): Promise<void> => {
   const expected = attachment.fileHash;
   if (!expected || expected.length !== 64) return;
@@ -210,6 +250,24 @@ const getAttachmentsDir = async (): Promise<string | null> => {
     }
   }
   return dir;
+};
+
+export const cleanupAttachmentTempFiles = async (): Promise<void> => {
+  const dir = await getAttachmentsDir();
+  if (!dir) return;
+  try {
+    const entries = await FileSystem.readDirectoryAsync(dir);
+    for (const entry of entries) {
+      if (!isTempAttachmentFile(entry)) continue;
+      try {
+        await FileSystem.deleteAsync(`${dir}${entry}`, { idempotent: true });
+      } catch (error) {
+        console.warn('Failed to remove temp attachment file', error);
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to scan temp attachment files', error);
+  }
 };
 
 const isSyncFilePath = (path: string) =>
@@ -546,7 +604,7 @@ export const syncFileAttachments = async (
         }
         if (syncDir.type === 'file') {
           const targetUri = `${syncDir.attachmentsDirUri}${filename}`;
-          await FileSystem.copyAsync({ from: uri, to: targetUri });
+          await copyFileSafely(uri, targetUri);
         } else {
           const base64 = await readFileAsBytes(uri).then(bytesToBase64);
           let targetUri = await findSafEntry(syncDir.attachmentsDirUri, filename);
@@ -587,13 +645,13 @@ const ensureFileAttachmentAvailable = async (attachment: Attachment, syncPath: s
       const sourceUri = `${syncDir.attachmentsDirUri}${filename}`;
       const exists = await fileExists(sourceUri);
       if (!exists) return null;
-      await FileSystem.copyAsync({ from: sourceUri, to: targetUri });
+      await copyFileSafely(sourceUri, targetUri);
       return { ...attachment, uri: targetUri, localStatus: 'available' };
     }
     const entry = await findSafEntry(syncDir.attachmentsDirUri, filename);
     if (!entry || !StorageAccessFramework?.readAsStringAsync) return null;
     const base64 = await StorageAccessFramework.readAsStringAsync(entry, { encoding: FileSystem.EncodingType.Base64 });
-    await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+    await writeBytesSafely(targetUri, base64ToBytes(base64));
     return { ...attachment, uri: targetUri, localStatus: 'available' };
   } catch (error) {
     console.warn(`Failed to copy attachment ${attachment.title} from sync folder`, error);
@@ -648,8 +706,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
       );
       const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
       await validateAttachmentHash(attachment, bytes);
-      const base64 = bytesToBase64(bytes);
-      await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await writeBytesSafely(targetUri, bytes);
       reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
       return { ...attachment, uri: targetUri, localStatus: 'available' };
     } catch (error) {
@@ -688,8 +745,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
       );
       const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
       await validateAttachmentHash(attachment, bytes);
-      const base64 = bytesToBase64(bytes);
-      await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await writeBytesSafely(targetUri, bytes);
       reportProgress(attachment.id, 'download', bytes.length, bytes.length, 'completed');
       return { ...attachment, uri: targetUri, localStatus: 'available' };
     } catch (error) {

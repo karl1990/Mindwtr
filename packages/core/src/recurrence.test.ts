@@ -114,4 +114,72 @@ describe('recurrence', () => {
         const next = createNextRecurringTask(task, '2025-02-01T08:00:00.000Z', 'done');
         expect(next?.dueDate).toBe('2025-03-01');
     });
+
+    it('clamps monthly recurrence to the last day of the month', () => {
+        const task: Task = {
+            id: 't7',
+            title: 'Month end report',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            dueDate: '2025-01-31',
+            recurrence: 'monthly',
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2025-01-31T12:00:00.000Z', 'done');
+        expect(next?.dueDate).toBe('2025-02-28');
+    });
+
+    it('clamps yearly recurrence for leap-day tasks', () => {
+        const task: Task = {
+            id: 't8',
+            title: 'Leap day reminder',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            dueDate: '2024-02-29',
+            recurrence: 'yearly',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2024-02-29T12:00:00.000Z', 'done');
+        expect(next?.dueDate).toBe('2025-02-28');
+    });
+
+    it('preserves local time across a DST boundary (spring forward)', () => {
+        const task: Task = {
+            id: 't9',
+            title: 'Morning check-in',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            dueDate: '2024-03-09T09:30',
+            recurrence: 'daily',
+            createdAt: '2024-03-01T00:00:00.000Z',
+            updatedAt: '2024-03-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2024-03-09T10:00:00.000Z', 'done');
+        expect(next?.dueDate).toBe('2024-03-10T09:30');
+    });
+
+    it('preserves local time across a DST boundary (fall back)', () => {
+        const task: Task = {
+            id: 't10',
+            title: 'Morning check-in',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            dueDate: '2024-11-02T09:30',
+            recurrence: 'daily',
+            createdAt: '2024-10-01T00:00:00.000Z',
+            updatedAt: '2024-10-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2024-11-02T10:00:00.000Z', 'done');
+        expect(next?.dueDate).toBe('2024-11-03T09:30');
+    });
 });

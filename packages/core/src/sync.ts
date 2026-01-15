@@ -13,6 +13,8 @@ export interface EntityMergeStats {
     resolvedUsingIncoming: number;
     deletionsWon: number;
     conflictIds: string[];
+    maxClockSkewMs: number;
+    timestampAdjustments: number;
 }
 
 export interface MergeStats {
@@ -25,7 +27,17 @@ export interface MergeResult {
     stats: MergeStats;
 }
 
-const CLOCK_SKEW_THRESHOLD_MS = 5 * 60 * 1000;
+export type SyncHistoryEntry = {
+    at: string;
+    status: 'success' | 'conflict' | 'error';
+    conflicts: number;
+    conflictIds: string[];
+    maxClockSkewMs: number;
+    timestampAdjustments: number;
+    error?: string;
+};
+
+export const CLOCK_SKEW_THRESHOLD_MS = 5 * 60 * 1000;
 
 export type SyncStep = 'read-local' | 'read-remote' | 'merge' | 'write-local' | 'write-remote';
 
@@ -42,6 +54,16 @@ export type SyncCycleResult = {
     data: AppData;
     stats: MergeStats;
     status: 'success' | 'conflict';
+};
+
+export const appendSyncHistory = (
+    settings: AppData['settings'] | undefined,
+    entry: SyncHistoryEntry,
+    limit: number = 20
+): SyncHistoryEntry[] => {
+    const history = Array.isArray(settings?.lastSyncHistory) ? settings?.lastSyncHistory ?? [] : [];
+    const next = [entry, ...history].filter((item) => item && typeof item.at === 'string');
+    return next.slice(0, Math.max(1, limit));
 };
 
 export const normalizeAppData = (data: AppData): AppData => ({
@@ -72,6 +94,8 @@ function createEmptyEntityStats(localTotal: number, incomingTotal: number): Enti
         resolvedUsingIncoming: 0,
         deletionsWon: 0,
         conflictIds: [],
+        maxClockSkewMs: 0,
+        timestampAdjustments: 0,
     };
 }
 
@@ -92,6 +116,7 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         const updatedTime = new Date(item.updatedAt).getTime();
         if (!Number.isFinite(createdTime) || !Number.isFinite(updatedTime)) return item;
         if (updatedTime >= createdTime) return item;
+        stats.timestampAdjustments += 1;
         return { ...item, updatedAt: item.createdAt } as Item;
     };
 
@@ -129,6 +154,10 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         }
 
         const timeDiff = safeIncomingTime - safeLocalTime;
+        const absoluteSkew = Math.abs(timeDiff);
+        if (absoluteSkew > stats.maxClockSkewMs) {
+            stats.maxClockSkewMs = absoluteSkew;
+        }
         const withinSkew = Math.abs(timeDiff) <= CLOCK_SKEW_THRESHOLD_MS;
         let winner = safeIncomingTime > safeLocalTime ? incomingItem : localItem;
         if (withinSkew) {
@@ -304,6 +333,25 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
     const conflictCount = (mergeResult.stats.tasks.conflicts || 0) + (mergeResult.stats.projects.conflicts || 0);
     const nextSyncStatus: SyncCycleResult['status'] = conflictCount > 0 ? 'conflict' : 'success';
     const nowIso = io.now ? io.now() : new Date().toISOString();
+    const conflictIds = [
+        ...(mergeResult.stats.tasks.conflictIds || []),
+        ...(mergeResult.stats.projects.conflictIds || []),
+    ].slice(0, 10);
+    const maxClockSkewMs = Math.max(
+        mergeResult.stats.tasks.maxClockSkewMs || 0,
+        mergeResult.stats.projects.maxClockSkewMs || 0
+    );
+    const timestampAdjustments = (mergeResult.stats.tasks.timestampAdjustments || 0)
+        + (mergeResult.stats.projects.timestampAdjustments || 0);
+    const historyEntry: SyncHistoryEntry = {
+        at: nowIso,
+        status: nextSyncStatus,
+        conflicts: conflictCount,
+        conflictIds,
+        maxClockSkewMs,
+        timestampAdjustments,
+    };
+    const nextHistory = appendSyncHistory(mergeResult.data.settings, historyEntry);
     const finalData: AppData = {
         ...mergeResult.data,
         settings: {
@@ -312,6 +360,7 @@ export async function performSyncCycle(io: SyncCycleIO): Promise<SyncCycleResult
             lastSyncStatus: nextSyncStatus,
             lastSyncError: undefined,
             lastSyncStats: mergeResult.stats,
+            lastSyncHistory: nextHistory,
         },
     };
 

@@ -1,4 +1,5 @@
 import type { AppData } from '@mindwtr/core';
+import { safeFormatDate } from '@mindwtr/core';
 import { Database, ExternalLink, Info, RefreshCw, Trash2 } from 'lucide-react';
 
 import { cn } from '../../../lib/utils';
@@ -39,6 +40,10 @@ type Labels = {
     lastSyncConflict: string;
     lastSyncError: string;
     lastSyncConflicts: string;
+    lastSyncSkew: string;
+    lastSyncAdjusted: string;
+    lastSyncConflictIds: string;
+    syncHistory: string;
     attachmentsCleanup: string;
     attachmentsCleanupDesc: string;
     attachmentsCleanupLastRun: string;
@@ -84,6 +89,7 @@ type SettingsSyncPageProps = {
     lastSyncDisplay: string;
     lastSyncStatus: AppData['settings']['lastSyncStatus'];
     lastSyncStats: AppData['settings']['lastSyncStats'] | null;
+    lastSyncHistory: AppData['settings']['lastSyncHistory'] | null;
     conflictCount: number;
     lastSyncError?: string;
     attachmentsLastCleanupDisplay: string;
@@ -99,6 +105,15 @@ const isValidHttpUrl = (value: string): boolean => {
     } catch {
         return false;
     }
+};
+
+const formatClockSkew = (ms: number): string => {
+    if (!Number.isFinite(ms) || ms <= 0) return '0 ms';
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+    const minutes = seconds / 60;
+    return `${minutes.toFixed(1)} min`;
 };
 
 export function SettingsSyncPage({
@@ -136,6 +151,7 @@ export function SettingsSyncPage({
     lastSyncDisplay,
     lastSyncStatus,
     lastSyncStats,
+    lastSyncHistory,
     conflictCount,
     lastSyncError,
     attachmentsLastCleanupDisplay,
@@ -150,6 +166,18 @@ export function SettingsSyncPage({
             : syncBackend === 'webdav'
                 ? !!webdavUrl.trim() && !webdavUrlError
                 : !!cloudUrl.trim() && !cloudUrlError;
+    const maxClockSkewMs = Math.max(lastSyncStats?.tasks.maxClockSkewMs ?? 0, lastSyncStats?.projects.maxClockSkewMs ?? 0);
+    const timestampAdjustments = (lastSyncStats?.tasks.timestampAdjustments ?? 0) + (lastSyncStats?.projects.timestampAdjustments ?? 0);
+    const conflictIds = [
+        ...(lastSyncStats?.tasks.conflictIds ?? []),
+        ...(lastSyncStats?.projects.conflictIds ?? []),
+    ].slice(0, 6);
+    const historyEntries = (lastSyncHistory ?? []).slice(0, 6);
+    const formatHistoryStatus = (status: 'success' | 'conflict' | 'error') => {
+        if (status === 'success') return t.lastSyncSuccess;
+        if (status === 'conflict') return t.lastSyncConflict;
+        return t.lastSyncError;
+    };
 
     return (
         <div className="space-y-8">
@@ -461,8 +489,44 @@ export function SettingsSyncPage({
                                 Projects {lastSyncStats.projects.mergedTotal}
                             </div>
                         )}
+                        {lastSyncStats && maxClockSkewMs > 0 && (
+                            <div>
+                                {t.lastSyncSkew}: {formatClockSkew(maxClockSkewMs)}
+                            </div>
+                        )}
+                        {lastSyncStats && timestampAdjustments > 0 && (
+                            <div>
+                                {t.lastSyncAdjusted}: {timestampAdjustments}
+                            </div>
+                        )}
+                        {lastSyncStats && conflictIds.length > 0 && (
+                            <div>
+                                {t.lastSyncConflictIds}: {conflictIds.join(', ')}
+                            </div>
+                        )}
                         {lastSyncStatus === 'error' && lastSyncError && (
                             <div className="text-destructive">{lastSyncError}</div>
+                        )}
+                        {historyEntries.length > 0 && (
+                            <div className="pt-2 space-y-1">
+                                <div className="text-xs font-medium text-muted-foreground">{t.syncHistory}</div>
+                                {historyEntries.map((entry) => {
+                                    const timestamp = safeFormatDate(entry.at, 'PPpp', entry.at);
+                                    const statusLabel = formatHistoryStatus(entry.status);
+                                    const parts = [
+                                        entry.conflicts ? `${t.lastSyncConflicts}: ${entry.conflicts}` : null,
+                                        entry.maxClockSkewMs > 0 ? `${t.lastSyncSkew}: ${formatClockSkew(entry.maxClockSkewMs)}` : null,
+                                        entry.timestampAdjustments > 0 ? `${t.lastSyncAdjusted}: ${entry.timestampAdjustments}` : null,
+                                    ].filter(Boolean);
+                                    return (
+                                        <div key={`${entry.at}-${entry.status}`} className="text-xs text-muted-foreground">
+                                            <span className="text-foreground">{timestamp}</span> • {statusLabel}
+                                            {parts.length > 0 && ` • ${parts.join(' • ')}`}
+                                            {entry.status === 'error' && entry.error && ` • ${entry.error}`}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 </div>

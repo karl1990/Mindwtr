@@ -13,6 +13,12 @@ Mindwtr sync is local-first and conflict-resilient.
 2. Within clock-skew threshold, prefer non-deleted.
 3. Preserve tombstones across devices.
 
+## Conflict visibility & clock skew
+
+- Each sync records conflict counts and a small sample of conflicting IDs.
+- Max observed clock skew (ms) and any timestamp corrections are tracked per sync.
+- Desktop/mobile Settings → Sync shows conflicts, skew, and timestamp fixes; diagnostics logging includes a summary when enabled.
+
 ## Attachment sync
 
 - JSON metadata sync first.
@@ -23,4 +29,3 @@ Mindwtr sync is local-first and conflict-resilient.
 
 - Writes are serialized via a save queue.
 - Errors surface in UI and logs; retries use backoff.
-

@@ -99,6 +99,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 - ⌨️ **Keyboard Shortcuts** - Vim and Emacs presets
 - 🎨 **Themes** - Light/Dark
 - 🌍 **i18n** - English, Chinese, Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese, Korean, Italian, Turkish
+- 🐳 **Docker** - Run the PWA + self-hosted sync server with Docker
 
 ### Platform Notes
 - **Desktop**: Global shortcuts, keyboard navigation, no swipe actions, no zen mode.
@@ -107,6 +108,10 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 ## Installation
 
 <p align="center">
+  <a href="https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/dongdongbh/Mindwtr">
+    <img src="https://img.shields.io/winget/v/dongdongbh.Mindwtr?label=Winget&logo=windows&logoColor=white&color=00D2FF" alt="Winget Version">
+  </a>
+
   <a href="https://github.com/dongdongbh/homebrew-mindwtr">
     <img src="https://img.shields.io/scoop/v/mindwtr?bucket=https://github.com/dongdongbh/homebrew-mindwtr&label=Scoop&logo=scoop&logoColor=white&color=E6E6E6" alt="Scoop Version">
   </a>
@@ -152,7 +157,12 @@ sudo rpm -i mindwtr-*.rpm
 ```
 
 ### Desktop (Windows)
-**Scoop (recommended):**
+**Winget (recommended):**
+```powershell
+winget install dongdongbh.Mindwtr
+```
+
+**Alternative: Scoop**
 ```powershell
 scoop bucket add mindwtr https://github.com/dongdongbh/homebrew-mindwtr
 scoop install mindwtr
@@ -193,6 +203,12 @@ How to join:
 
 **iOS:**
 iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only. If you want iOS builds, please consider [sponsoring the developer](https://github.com/sponsors/dongdongbh) so we can fund the Apple Developer account.
+
+### Docker (PWA + Cloud Sync)
+
+Run the web app (PWA) and the self-hosted sync server with Docker:
+
+- Guide: [`docker/README.md`](docker/README.md)
 
 ## Data Storage
 

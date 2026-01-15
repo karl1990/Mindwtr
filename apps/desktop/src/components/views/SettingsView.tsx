@@ -431,6 +431,7 @@ export function SettingsView() {
     const lastSyncAt = settings?.lastSyncAt;
     const lastSyncStats = settings?.lastSyncStats ?? null;
     const lastSyncStatus = settings?.lastSyncStatus;
+    const lastSyncHistory = settings?.lastSyncHistory ?? [];
     const lastSyncDisplay = lastSyncAt ? safeFormatDate(lastSyncAt, 'PPpp', lastSyncAt) : t.lastSyncNever;
     const conflictCount = (lastSyncStats?.tasks.conflicts || 0) + (lastSyncStats?.projects.conflicts || 0);
     const weeklyReviewEnabled = settings?.weeklyReviewEnabled === true;
@@ -559,6 +560,7 @@ export function SettingsView() {
                 lastSyncDisplay={lastSyncDisplay}
                 lastSyncStatus={lastSyncStatus}
                 lastSyncStats={lastSyncStats}
+                lastSyncHistory={lastSyncHistory}
                 conflictCount={conflictCount}
                 lastSyncError={settings?.lastSyncError}
                 attachmentsLastCleanupDisplay={attachmentsLastCleanupDisplay}

@@ -24,10 +24,12 @@ import {
     performSyncCycle,
     normalizeAppData,
     withRetry,
+    CLOCK_SKEW_THRESHOLD_MS,
+    appendSyncHistory,
 } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
 import { reportError } from './report-error';
-import { logSyncError, sanitizeLogMessage } from './app-log';
+import { logInfo, logSyncError, sanitizeLogMessage } from './app-log';
 import { webStorage } from './storage-adapter-web';
 
 type SyncBackend = 'file' | 'webdav' | 'cloud';
@@ -116,9 +118,88 @@ const extractExtension = (value?: string): string => {
     return match ? match[0].toLowerCase() : '';
 };
 
+const buildTempPath = (relativePath: string): string => {
+    const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    return `${relativePath}.tmp-${suffix}`;
+};
+
+const writeAttachmentFileSafely = async (
+    relativePath: string,
+    bytes: Uint8Array,
+    options: {
+        baseDir: any;
+        writeFile: (path: string, data: Uint8Array, opts: { baseDir: any }) => Promise<void>;
+        rename: (oldPath: string, newPath: string, opts: { oldPathBaseDir: any; newPathBaseDir: any }) => Promise<void>;
+        remove: (path: string, opts: { baseDir: any }) => Promise<void>;
+    }
+): Promise<void> => {
+    const tempPath = buildTempPath(relativePath);
+    await options.writeFile(tempPath, bytes, { baseDir: options.baseDir });
+    try {
+        await options.rename(tempPath, relativePath, {
+            oldPathBaseDir: options.baseDir,
+            newPathBaseDir: options.baseDir,
+        });
+    } catch (error) {
+        await options.writeFile(relativePath, bytes, { baseDir: options.baseDir });
+        try {
+            await options.remove(tempPath, { baseDir: options.baseDir });
+        } catch {
+            // Ignore cleanup errors for temp file.
+        }
+    }
+};
+
+const writeFileSafelyAbsolute = async (
+    path: string,
+    bytes: Uint8Array,
+    options: {
+        writeFile: (path: string, data: Uint8Array) => Promise<void>;
+        rename: (oldPath: string, newPath: string) => Promise<void>;
+        remove: (path: string) => Promise<void>;
+    }
+): Promise<void> => {
+    const tempPath = buildTempPath(path);
+    await options.writeFile(tempPath, bytes);
+    try {
+        await options.rename(tempPath, path);
+    } catch (error) {
+        await options.writeFile(path, bytes);
+        try {
+            await options.remove(tempPath);
+        } catch {
+            // Ignore cleanup errors for temp file.
+        }
+    }
+};
+
 const buildCloudKey = (attachment: Attachment): string => {
     const ext = extractExtension(attachment.title) || extractExtension(attachment.uri);
     return `${ATTACHMENTS_DIR_NAME}/${attachment.id}${ext}`;
+};
+
+const isTempAttachmentFile = (name: string): boolean => {
+    return name.includes('.tmp-') || name.endsWith('.tmp') || name.endsWith('.partial');
+};
+
+const cleanupAttachmentTempFiles = async (): Promise<void> => {
+    if (!isTauriRuntime()) return;
+    try {
+        const { BaseDirectory, readDir, remove } = await import('@tauri-apps/plugin-fs');
+        const entries = await readDir(ATTACHMENTS_DIR_NAME, { baseDir: BaseDirectory.Data });
+        for (const entry of entries) {
+            if (entry.children) continue;
+            const name = entry.name || '';
+            if (!isTempAttachmentFile(name)) continue;
+            try {
+                await remove(`${ATTACHMENTS_DIR_NAME}/${name}`, { baseDir: BaseDirectory.Data });
+            } catch (error) {
+                console.warn('Failed to remove temp attachment file', error);
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to scan temp attachment files', error);
+    }
 };
 
 const validateAttachmentHash = async (attachment: Attachment, bytes: Uint8Array): Promise<void> => {
@@ -181,6 +262,7 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
     const lastCleanupAt = new Date().toISOString();
 
     if (orphaned.length === 0) {
+        await cleanupAttachmentTempFiles();
         return {
             ...appData,
             settings: {
@@ -237,6 +319,8 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
             }
         }
     }
+
+    await cleanupAttachmentTempFiles();
 
     const cleaned = removeOrphanedAttachmentsFromData(appData);
     return {
@@ -336,7 +420,7 @@ async function syncAttachments(
     if (!webDavConfig.url) return false;
 
     const fetcher = await getTauriFetch();
-    const { BaseDirectory, exists, mkdir, readFile, writeFile } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     const attachmentsDirUrl = `${baseSyncUrl}/${ATTACHMENTS_DIR_NAME}`;
@@ -464,7 +548,12 @@ async function syncAttachments(
                 await validateAttachmentHash(attachment, bytes);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
                 const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
-                await writeFile(relativePath, bytes, { baseDir: BaseDirectory.Data });
+                await writeAttachmentFileSafely(relativePath, bytes, {
+                    baseDir: BaseDirectory.Data,
+                    writeFile,
+                    rename,
+                    remove,
+                });
                 const absolutePath = await join(baseDataDir, relativePath);
                 attachment.uri = absolutePath;
                 attachment.localStatus = 'available';
@@ -498,7 +587,7 @@ async function syncCloudAttachments(
     if (!cloudConfig.url) return false;
 
     const fetcher = await getTauriFetch();
-    const { BaseDirectory, exists, mkdir, readFile, writeFile } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     try {
@@ -613,7 +702,12 @@ async function syncCloudAttachments(
                 await validateAttachmentHash(attachment, bytes);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
                 const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
-                await writeFile(relativePath, bytes, { baseDir: BaseDirectory.Data });
+                await writeAttachmentFileSafely(relativePath, bytes, {
+                    baseDir: BaseDirectory.Data,
+                    writeFile,
+                    rename,
+                    remove,
+                });
                 const absolutePath = await join(baseDataDir, relativePath);
                 attachment.uri = absolutePath;
                 attachment.localStatus = 'available';
@@ -645,7 +739,7 @@ async function syncFileAttachments(
     if (!isTauriRuntime()) return false;
     if (!baseSyncDir) return false;
 
-    const { BaseDirectory, exists, mkdir, readFile, writeFile } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     const attachmentsDir = await join(baseSyncDir, ATTACHMENTS_DIR_NAME);
@@ -724,7 +818,11 @@ async function syncFileAttachments(
                     continue;
                 }
                 const targetPath = await join(baseSyncDir, cloudKey);
-                await writeFile(targetPath, fileData);
+                await writeFileSafelyAbsolute(targetPath, fileData, {
+                    writeFile,
+                    rename,
+                    remove,
+                });
                 attachment.cloudKey = cloudKey;
                 attachment.localStatus = 'available';
                 didMutate = true;
@@ -744,7 +842,12 @@ async function syncFileAttachments(
                 await validateAttachmentHash(attachment, fileData);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
                 const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
-                await writeFile(relativePath, fileData, { baseDir: BaseDirectory.Data });
+                await writeAttachmentFileSafely(relativePath, fileData, {
+                    baseDir: BaseDirectory.Data,
+                    writeFile,
+                    rename,
+                    remove,
+                });
                 const absolutePath = await join(baseDataDir, relativePath);
                 attachment.uri = absolutePath;
                 attachment.localStatus = 'available';
@@ -1182,6 +1285,27 @@ export class SyncService {
             });
             const stats = syncResult.stats;
             let mergedData = syncResult.data;
+            const conflictCount = (stats.tasks.conflicts || 0) + (stats.projects.conflicts || 0);
+            const maxClockSkewMs = Math.max(stats.tasks.maxClockSkewMs || 0, stats.projects.maxClockSkewMs || 0);
+            const timestampAdjustments = (stats.tasks.timestampAdjustments || 0) + (stats.projects.timestampAdjustments || 0);
+            if (isTauriRuntime() && (conflictCount > 0 || maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS || timestampAdjustments > 0)) {
+                const conflictSamples = [
+                    ...(stats.tasks.conflictIds || []),
+                    ...(stats.projects.conflictIds || []),
+                ].slice(0, 6);
+                void logInfo(
+                    `Sync merge summary: ${conflictCount} conflicts, max skew ${Math.round(maxClockSkewMs)}ms, ${timestampAdjustments} timestamp fixes.`,
+                    {
+                        scope: 'sync',
+                        extra: {
+                            conflicts: String(conflictCount),
+                            maxClockSkewMs: String(Math.round(maxClockSkewMs)),
+                            timestampFixes: String(timestampAdjustments),
+                            conflictSamples: conflictSamples.join(','),
+                        },
+                    }
+                );
+            }
 
             if ((backend === 'webdav' || backend === 'file' || backend === 'cloud') && isTauriRuntime()) {
                 step = 'attachments';
@@ -1219,6 +1343,8 @@ export class SyncService {
                 }
             }
 
+            await cleanupAttachmentTempFiles();
+
             if (isTauriRuntime() && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
                 step = 'attachments_cleanup';
                 mergedData = await cleanupOrphanedAttachments(mergedData, backend);
@@ -1255,6 +1381,15 @@ export class SyncService {
             });
             const logHint = logPath ? ` (log: ${logPath})` : '';
             const safeMessage = sanitizeLogMessage(String(error));
+            const nextHistory = appendSyncHistory(useTaskStore.getState().settings, {
+                at: now,
+                status: 'error',
+                conflicts: 0,
+                conflictIds: [],
+                maxClockSkewMs: 0,
+                timestampAdjustments: 0,
+                error: `${safeMessage}${logHint}`,
+            });
             useTaskStore.getState().setError(`${safeMessage}${logHint}`);
             try {
                 await useTaskStore.getState().fetchData();
@@ -1262,6 +1397,7 @@ export class SyncService {
                     lastSyncAt: now,
                     lastSyncStatus: 'error',
                     lastSyncError: `${safeMessage}${logHint}`,
+                    lastSyncHistory: nextHistory,
                 });
             } catch (e) {
                 console.error('Failed to persist sync error', e);

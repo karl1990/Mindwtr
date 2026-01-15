@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, sortTasksBy, Project, parseQuickAdd, matchesHierarchicalToken, safeParseDate } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
@@ -12,8 +13,6 @@ import { InboxProcessor } from './InboxProcessor';
 import { ListFiltersPanel } from './list/ListFiltersPanel';
 import { ListHeader } from './list/ListHeader';
 import { ListBulkActions } from './list/ListBulkActions';
-import { VirtualTaskRow } from './list/VirtualTaskRow';
-import { useVirtualList } from './list/useVirtualList';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { useListCopilot } from './list/useListCopilot';
@@ -54,10 +53,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [tagPromptIds, setTagPromptIds] = useState<string[]>([]);
     const addInputRef = useRef<HTMLInputElement>(null);
     const listScrollRef = useRef<HTMLDivElement>(null);
-    const rowHeightsRef = useRef<Map<string, number>>(new Map());
-    const [listScrollTop, setListScrollTop] = useState(0);
-    const [listHeight, setListHeight] = useState(0);
-    const [measureVersion, setMeasureVersion] = useState(0);
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const showQuickDone = statusFilter === 'next';
@@ -255,42 +250,15 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, [baseTasks, projects, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder]);
 
     const shouldVirtualize = filteredTasks.length > VIRTUALIZATION_THRESHOLD;
-
-    const handleListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-        setListScrollTop(event.currentTarget.scrollTop);
-    }, []);
-
-    const handleRowMeasure = useCallback((id: string, height: number) => {
-        const nextHeight = Math.max(40, height);
-        const prevHeight = rowHeightsRef.current.get(id);
-        if (prevHeight !== nextHeight) {
-            rowHeightsRef.current.set(id, nextHeight);
-            setMeasureVersion((version) => version + 1);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!shouldVirtualize) return;
-        const container = listScrollRef.current;
-        if (!container) return;
-        const updateHeight = () => setListHeight(container.clientHeight);
-        updateHeight();
-        if (typeof ResizeObserver === 'undefined') return;
-        const observer = new ResizeObserver(updateHeight);
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, [shouldVirtualize]);
-
-    const { rowOffsets, totalHeight, visibleTasks, startIndex } = useVirtualList({
-        tasks: filteredTasks,
-        shouldVirtualize,
-        rowHeightsRef,
-        measureVersion,
-        listScrollTop,
-        listHeight,
-        rowEstimate: VIRTUAL_ROW_ESTIMATE,
-        overscan: VIRTUAL_OVERSCAN,
+    const rowVirtualizer = useVirtualizer({
+        count: shouldVirtualize ? filteredTasks.length : 0,
+        getScrollElement: () => listScrollRef.current,
+        estimateSize: () => VIRTUAL_ROW_ESTIMATE,
+        overscan: Math.max(2, Math.ceil(VIRTUAL_OVERSCAN / VIRTUAL_ROW_ESTIMATE)),
+        getItemKey: (index) => filteredTasks[index]?.id ?? index,
     });
+    const virtualRows = shouldVirtualize ? rowVirtualizer.getVirtualItems() : [];
+    const totalHeight = shouldVirtualize ? rowVirtualizer.getTotalSize() : 0;
 
     useEffect(() => {
         setSelectedIndex(0);
@@ -315,10 +283,10 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             el.scrollIntoView({ block: 'nearest' });
             return;
         }
-        if (shouldVirtualize && listScrollRef.current && rowOffsets[selectedIndex] !== undefined) {
-            listScrollRef.current.scrollTo({ top: rowOffsets[selectedIndex], behavior: 'auto' });
+        if (shouldVirtualize && listScrollRef.current) {
+            rowVirtualizer.scrollToIndex(selectedIndex, { align: 'auto' });
         }
-    }, [filteredTasks, selectedIndex, shouldVirtualize, rowOffsets]);
+    }, [filteredTasks, selectedIndex, shouldVirtualize, rowVirtualizer]);
 
     const selectNext = useCallback(() => {
         if (filteredTasks.length === 0) return;
@@ -720,7 +688,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             </div>
             <div
                 ref={listScrollRef}
-                onScroll={handleListScroll}
                 className="flex-1 min-h-0 overflow-y-auto pt-3"
                 role="list"
                 aria-label={t('list.tasks') || 'Task list'}
@@ -734,25 +701,38 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                     />
                 ) : shouldVirtualize ? (
                     <div style={{ height: totalHeight, position: 'relative' }}>
-                        {visibleTasks.map((task, index) => {
-                            const actualIndex = startIndex + index;
+                        {virtualRows.map((virtualRow) => {
+                            const task = filteredTasks[virtualRow.index];
+                            if (!task) return null;
                             return (
-                                <VirtualTaskRow
-                                    key={task.id}
-                                    task={task}
-                                    project={task.projectId ? projectMap[task.projectId] : undefined}
-                                    index={actualIndex}
-                                    top={rowOffsets[actualIndex] ?? 0}
-                                    isSelected={actualIndex === selectedIndex}
-                                    onSelectIndex={handleSelectIndex}
-                                    selectionMode={selectionMode}
-                                    isMultiSelected={multiSelectedIds.has(task.id)}
-                                    onToggleSelectId={toggleMultiSelect}
-                                    onMeasure={handleRowMeasure}
-                                    showQuickDone={showQuickDone}
-                                    readOnly={readOnly}
-                                    compactMetaEnabled={showListDetails}
-                                />
+                                <div
+                                    key={virtualRow.key}
+                                    ref={rowVirtualizer.measureElement}
+                                    data-index={virtualRow.index}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                    }}
+                                >
+                                    <div className="pb-3">
+                                        <TaskItem
+                                            key={task.id}
+                                            task={task}
+                                            project={task.projectId ? projectMap[task.projectId] : undefined}
+                                            isSelected={virtualRow.index === selectedIndex}
+                                            onSelect={() => handleSelectIndex(virtualRow.index)}
+                                            selectionMode={selectionMode}
+                                            isMultiSelected={multiSelectedIds.has(task.id)}
+                                            onToggleSelect={() => toggleMultiSelect(task.id)}
+                                            showQuickDone={showQuickDone}
+                                            readOnly={readOnly}
+                                            compactMetaEnabled={showListDetails}
+                                        />
+                                    </div>
+                                </div>
                             );
                         })}
                     </div>
