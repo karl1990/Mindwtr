@@ -404,9 +404,15 @@ export function TaskItemEditor({
                     </button>
                     {schedulingOpen && (
                         <div className="mt-3 space-y-3">
-                            {schedulingFields.map((fieldId) => (
-                                <div key={fieldId}>{renderField(fieldId)}</div>
-                            ))}
+                            {schedulingFields.length === 0 ? (
+                                <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                    {t('taskEdit.schedulingEmpty')}
+                                </div>
+                            ) : (
+                                schedulingFields.map((fieldId) => (
+                                    <div key={fieldId}>{renderField(fieldId)}</div>
+                                ))
+                            )}
                         </div>
                     )}
                 </div>
