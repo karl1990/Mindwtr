@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { shallow, useTaskStore, TaskPriority, TimeEstimate, PRESET_CONTEXTS, PRESET_TAGS, matchesHierarchicalToken, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject } from '@mindwtr/core';
-import type { Task, TaskStatus } from '@mindwtr/core';
+import type { Task, TaskStatus, Project } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
-import { Clock, Star, Calendar, AlertCircle, ArrowRight, Filter, Check, type LucideIcon } from 'lucide-react';
+import { Clock, Star, Calendar, AlertCircle, ArrowRight, Filter, Check, Folder, type LucideIcon } from 'lucide-react';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 
@@ -90,6 +90,22 @@ export function AgendaView() {
             })
             .filter(matchesFilters);
     }, [tasks, projectMap, matchesFilters]);
+
+    const reviewDueProjects = useMemo(() => {
+        const now = new Date();
+        return projects
+            .filter((project) => {
+                if (project.deletedAt) return false;
+                if (project.status !== 'waiting' && project.status !== 'someday') return false;
+                return isDueForReview(project.reviewAt, now);
+            })
+            .sort((a, b) => {
+                const aReview = safeParseDate(a.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+                const bReview = safeParseDate(b.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+                if (aReview !== bReview) return aReview - bReview;
+                return a.title.localeCompare(b.title);
+            });
+    }, [projects]);
     const hasFilters = selectedTokens.length > 0 || activePriorities.length > 0 || activeTimeEstimates.length > 0;
     const showFiltersPanel = filtersOpen || hasFilters;
     const toggleTokenFilter = (token: string) => {
@@ -469,6 +485,46 @@ export function AgendaView() {
         );
     };
 
+    const ProjectSection = ({ title, icon: Icon, projects, color }: {
+        title: string;
+        icon: LucideIcon;
+        projects: Project[];
+        color: string;
+    }) => {
+        if (projects.length === 0) return null;
+
+        return (
+            <div className="space-y-3">
+                <h3 className={cn("font-semibold flex items-center gap-2", color)}>
+                    <Icon className="w-5 h-5" />
+                    {title}
+                    <span className="text-muted-foreground font-normal">({projects.length})</span>
+                </h3>
+                <div className="space-y-2">
+                    {projects.map((project) => (
+                        <div
+                            key={project.id}
+                            className="flex items-center justify-between rounded-lg border border-border bg-card/80 px-3 py-2"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Folder className="w-4 h-4" style={{ color: project.color }} />
+                                <span className="text-sm font-medium text-foreground">{project.title}</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {t(`status.${project.status}`)}
+                                </span>
+                            </div>
+                            {project.reviewAt && (
+                                <span className="text-xs text-muted-foreground">
+                                    {safeFormatDate(project.reviewAt, 'P')}
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     const visibleActive = filteredActiveTasks.length;
     const nextActionsCount = sections.nextActions.length;
 
@@ -682,6 +738,13 @@ export function AgendaView() {
                             icon={Clock}
                             tasks={sections.reviewDue}
                             color="text-purple-600"
+                        />
+
+                        <ProjectSection
+                            title={t('agenda.reviewDueProjects') || 'Projects to review'}
+                            icon={Folder}
+                            projects={reviewDueProjects}
+                            color="text-indigo-600"
                         />
                     </div>
                 </>

@@ -1,7 +1,8 @@
-import { getDailyDigestSummary, getNextScheduledAt, stripMarkdown, type Language, Task, parseTimeOfDay, getTranslationsSync, loadTranslations, loadStoredLanguageSync } from '@mindwtr/core';
+import { getDailyDigestSummary, getNextScheduledAt, stripMarkdown, type Language, Task, parseTimeOfDay, getTranslationsSync, loadTranslations, loadStoredLanguageSync, safeParseDate } from '@mindwtr/core';
 import { useTaskStore } from '@mindwtr/core';
 
 const notifiedAtByTask = new Map<string, string>();
+const notifiedAtByProject = new Map<string, string>();
 const digestSentOnByKind = new Map<'morning' | 'evening', string>();
 let intervalId: number | null = null;
 let storeSubscription: (() => void) | null = null;
@@ -113,6 +114,21 @@ function checkDueAndNotify() {
     const lang = getCurrentLanguage();
     void loadTranslations(lang);
     const tr = getTranslationsSync(lang);
+
+    if (includeReviewAt) {
+        projects.forEach((project) => {
+            if (project.deletedAt) return;
+            if (project.status === 'archived') return;
+            const review = safeParseDate(project.reviewAt);
+            if (!review) return;
+            const diffMs = review.getTime() - now.getTime();
+            if (diffMs < 0 || diffMs > CHECK_INTERVAL_MS) return;
+            const key = review.toISOString();
+            if (notifiedAtByProject.get(project.id) === key) return;
+            sendNotification(project.title, tr['review.projectsStep'] ?? 'Review project');
+            notifiedAtByProject.set(project.id, key);
+        });
+    }
 
     const morningEnabled = settings.dailyDigestMorningEnabled === true;
     const eveningEnabled = settings.dailyDigestEveningEnabled === true;

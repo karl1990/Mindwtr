@@ -1,4 +1,4 @@
-import { getNextScheduledAt, type Language, Task, useTaskStore, parseTimeOfDay, getTranslations, loadStoredLanguage } from '@mindwtr/core';
+import { getNextScheduledAt, type Language, Task, type Project, useTaskStore, parseTimeOfDay, getTranslations, loadStoredLanguage, safeParseDate } from '@mindwtr/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -24,6 +24,7 @@ type Subscription = { remove: () => void };
 type ScheduledEntry = { scheduledAtIso: string; notificationId: string };
 
 const scheduledByTask = new Map<string, ScheduledEntry>();
+const scheduledByProject = new Map<string, ScheduledEntry>();
 const scheduledDigestByKind = new Map<'morning' | 'evening', string>();
 let digestConfigKey: string | null = null;
 let weeklyReviewConfigKey: string | null = null;
@@ -200,17 +201,42 @@ async function scheduleForTask(api: NotificationsApi, task: Task, when: Date) {
   scheduledByTask.set(task.id, { scheduledAtIso: when.toISOString(), notificationId: id });
 }
 
+async function scheduleForProject(api: NotificationsApi, project: Project, when: Date, label: string) {
+  const content: NotificationContentInput = {
+    title: project.title,
+    body: label,
+    data: { projectId: project.id },
+    categoryIdentifier: 'project-review',
+  };
+
+  const secondsUntil = Math.max(1, Math.floor((when.getTime() - Date.now()) / 1000));
+  const id = await api.scheduleNotificationAsync({
+    content,
+    trigger: { seconds: secondsUntil, repeats: false } as any,
+  });
+
+  scheduledByProject.set(project.id, { scheduledAtIso: when.toISOString(), notificationId: id });
+}
+
 async function cancelTaskNotification(api: NotificationsApi, taskId: string, entry: ScheduledEntry) {
   await api.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError(`Failed to cancel task reminder (${taskId})`, error));
   scheduledByTask.delete(taskId);
 }
 
+async function cancelProjectNotification(api: NotificationsApi, projectId: string, entry: ScheduledEntry) {
+  await api.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError(`Failed to cancel project review reminder (${projectId})`, error));
+  scheduledByProject.delete(projectId);
+}
+
 async function rescheduleAll(api: NotificationsApi) {
   const now = new Date();
-  const { tasks, settings } = useTaskStore.getState();
+  const { tasks, projects, settings } = useTaskStore.getState();
   if (settings.notificationsEnabled === false) {
     for (const [taskId, entry] of scheduledByTask.entries()) {
       await cancelTaskNotification(api, taskId, entry);
+    }
+    for (const [projectId, entry] of scheduledByProject.entries()) {
+      await cancelProjectNotification(api, projectId, entry);
     }
     return;
   }
@@ -247,6 +273,52 @@ async function rescheduleAll(api: NotificationsApi) {
   for (const [taskId, entry] of scheduledByTask.entries()) {
     if (!activeTaskIds.has(taskId)) {
       await cancelTaskNotification(api, taskId, entry);
+    }
+  }
+
+  if (!includeReviewAt) {
+    for (const [projectId, entry] of scheduledByProject.entries()) {
+      await cancelProjectNotification(api, projectId, entry);
+    }
+    return;
+  }
+
+  const language = await getCurrentLanguage();
+  const tr = await getTranslations(language);
+  const reviewLabel = tr['review.projectsStep'] ?? 'Review project';
+
+  const activeProjectIds = new Set<string>();
+  for (const project of projects) {
+    if (project.deletedAt) continue;
+    if (project.status === 'archived') continue;
+    const reviewAt = safeParseDate(project.reviewAt);
+    if (!reviewAt || reviewAt.getTime() <= now.getTime()) {
+      const existing = scheduledByProject.get(project.id);
+      if (existing) {
+        await cancelProjectNotification(api, project.id, existing);
+      }
+      continue;
+    }
+
+    const existing = scheduledByProject.get(project.id);
+    const nextIso = reviewAt.toISOString();
+
+    if (existing && existing.scheduledAtIso === nextIso) {
+      activeProjectIds.add(project.id);
+      continue;
+    }
+
+    if (existing) {
+      await cancelProjectNotification(api, project.id, existing);
+    }
+
+    await scheduleForProject(api, project, reviewAt, reviewLabel);
+    activeProjectIds.add(project.id);
+  }
+
+  for (const [projectId, entry] of scheduledByProject.entries()) {
+    if (!activeProjectIds.has(projectId)) {
+      await cancelProjectNotification(api, projectId, entry);
     }
   }
 }
@@ -309,6 +381,14 @@ export async function startMobileNotifications() {
     },
   ]).catch((error) => logNotificationError('Failed to register notification category', error));
 
+  await api.setNotificationCategoryAsync('project-review', [
+    {
+      identifier: 'open',
+      buttonTitle: 'Open',
+      options: { opensAppToForeground: true },
+    },
+  ]).catch((error) => logNotificationError('Failed to register project notification category', error));
+
   await rescheduleAll(api);
   await rescheduleDailyDigest(api);
   await rescheduleWeeklyReview(api);
@@ -339,6 +419,9 @@ export async function stopMobileNotifications() {
     for (const entry of scheduledByTask.values()) {
       await Notifications.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError('Failed to cancel task reminder', error));
     }
+    for (const entry of scheduledByProject.values()) {
+      await Notifications.cancelScheduledNotificationAsync(entry.notificationId).catch((error) => logNotificationError('Failed to cancel project reminder', error));
+    }
     for (const id of scheduledDigestByKind.values()) {
       await Notifications.cancelScheduledNotificationAsync(id).catch((error) => logNotificationError('Failed to cancel daily digest', error));
     }
@@ -348,6 +431,7 @@ export async function stopMobileNotifications() {
   }
 
   scheduledByTask.clear();
+  scheduledByProject.clear();
   scheduledDigestByKind.clear();
   scheduledWeeklyReviewId = null;
   digestConfigKey = null;
