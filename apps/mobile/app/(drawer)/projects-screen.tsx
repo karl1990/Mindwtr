@@ -22,7 +22,7 @@ import { ListSectionHeader, defaultListContentStyle } from '@/components/list-la
 import { ensureAttachmentAvailable } from '../../lib/attachment-sync';
 import { AttachmentProgressIndicator } from '../../components/AttachmentProgressIndicator';
 
-type ProjectSectionItem = { type: 'project'; data: Project } | { type: 'task'; data: Task };
+type ProjectSectionItem = { type: 'project'; data: Project };
 
 export default function ProjectsScreen() {
   const { projects, tasks, areas, addProject, updateProject, deleteProject, toggleProjectFocus, addArea, updateArea, deleteArea, reorderAreas, updateTask, deleteTask } = useTaskStore();
@@ -53,8 +53,13 @@ export default function ProjectsScreen() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
   const ALL_TAGS = '__all__';
   const NO_TAGS = '__none__';
+  const ALL_AREAS = '__all__';
+  const NO_AREA = '__no_area__';
   const [selectedTagFilter, setSelectedTagFilter] = useState(ALL_TAGS);
   const [showTagPicker, setShowTagPicker] = useState(false);
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState(ALL_AREAS);
+  const [showAreaFilter, setShowAreaFilter] = useState(false);
+  const [showTagFilter, setShowTagFilter] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const resolveValidationMessage = (error?: string) => {
     if (error === 'file_too_large') return t('attachments.fileTooLarge');
@@ -168,22 +173,6 @@ export default function ProjectsScreen() {
     setSelectedProject({ ...selectedProject, tagIds: next });
   };
 
-  const areaTasksById = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    tasks.forEach((task) => {
-      if (task.deletedAt) return;
-      if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return;
-      if (task.projectId) return;
-      const areaKey = task.areaId && areaById.has(task.areaId) ? task.areaId : 'no-area';
-      if (!map.has(areaKey)) map.set(areaKey, []);
-      map.get(areaKey)!.push(task);
-    });
-    map.forEach((list) => {
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    });
-    return map;
-  }, [tasks, areaById]);
-
   const groupedProjects = useMemo(() => {
     const visible = projects.filter(p => !p.deletedAt);
     const sorted = [...visible].sort((a, b) => {
@@ -198,37 +187,40 @@ export default function ProjectsScreen() {
       if (selectedTagFilter === NO_TAGS) return tags.length === 0;
       return tags.includes(selectedTagFilter);
     });
+    const filteredByArea = filteredByTag.filter((project) => {
+      if (selectedAreaFilter === ALL_AREAS) return true;
+      const areaId = project.areaId && areaById.has(project.areaId) ? project.areaId : NO_AREA;
+      if (selectedAreaFilter === NO_AREA) return areaId === NO_AREA;
+      return areaId === selectedAreaFilter;
+    });
 
     const groups = new Map<string, Project[]>();
-    for (const project of filteredByTag) {
+    for (const project of filteredByArea) {
       const areaId = project.areaId && areaById.has(project.areaId) ? project.areaId : 'no-area';
       if (!groups.has(areaId)) groups.set(areaId, []);
       groups.get(areaId)!.push(project);
     }
 
     const sections = sortedAreas
-      .filter((area) => (groups.get(area.id) || []).length > 0 || (areaTasksById.get(area.id) || []).length > 0)
+      .filter((area) => (groups.get(area.id) || []).length > 0)
       .map((area) => {
         const projectItems = (groups.get(area.id) || []).map((project) => ({ type: 'project' as const, data: project }));
-        const taskItems = (areaTasksById.get(area.id) || []).map((task) => ({ type: 'task' as const, data: task }));
-        return { title: area.name, areaId: area.id, data: [...projectItems, ...taskItems] };
+        return { title: area.name, areaId: area.id, data: projectItems };
       });
 
     const noAreaProjects = groups.get('no-area') || [];
-    const noAreaTasks = areaTasksById.get('no-area') || [];
-    if (noAreaProjects.length > 0 || noAreaTasks.length > 0) {
+    if (noAreaProjects.length > 0) {
       sections.push({
         title: t('projects.noArea'),
         areaId: 'no-area',
         data: [
           ...noAreaProjects.map((project) => ({ type: 'project' as const, data: project })),
-          ...noAreaTasks.map((task) => ({ type: 'task' as const, data: task })),
         ],
       });
     }
 
     return sections;
-  }, [projects, t, sortedAreas, areaById, selectedTagFilter, ALL_TAGS, NO_TAGS, areaTasksById]);
+  }, [projects, t, sortedAreas, areaById, selectedTagFilter, selectedAreaFilter, ALL_TAGS, NO_TAGS, ALL_AREAS, NO_AREA]);
 
   const renderProjectRow = (project: Project) => {
     const projTasks = tasks.filter(t => t.projectId === project.id && t.status !== 'done' && t.status !== 'reference' && !t.deletedAt);
@@ -318,24 +310,7 @@ export default function ProjectsScreen() {
     );
   };
 
-  const renderTaskRow = (task: Task) => (
-    <View style={styles.areaTaskRow}>
-      <SwipeableTaskItem
-        task={task}
-        isDark={isDark}
-        tc={tc}
-        onPress={() => setEditingTask(task)}
-        onStatusChange={(status: TaskStatus) => updateTask(task.id, { status })}
-        onDelete={() => deleteTask(task.id)}
-        hideStatusBadge
-      />
-    </View>
-  );
-
   const renderSectionItem = ({ item }: { item: ProjectSectionItem }) => {
-    if (item.type === 'task') {
-      return renderTaskRow(item.data);
-    }
     return renderProjectRow(item.data);
   };
 
@@ -657,69 +632,151 @@ export default function ProjectsScreen() {
             <Text style={[styles.areaChipText, { color: tc.secondaryText }]}>+ {t('projects.areaLabel')}</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.tagFilterRow}>
-          <Text style={[styles.tagFilterLabel, { color: tc.text }]}>{t('projects.tagFilter')}</Text>
-          <View style={styles.tagFilterChips}>
-            <TouchableOpacity
-              style={[
-                styles.tagFilterChip,
-                selectedTagFilter === ALL_TAGS
-                  ? { borderColor: tc.tint, backgroundColor: tc.tint }
-                  : { borderColor: tc.border, backgroundColor: tc.cardBg },
-              ]}
-              onPress={() => setSelectedTagFilter(ALL_TAGS)}
-            >
-              <Text
-                style={[
-                  styles.tagFilterText,
-                  { color: selectedTagFilter === ALL_TAGS ? tc.onTint : tc.text },
-                ]}
-              >
-                {t('projects.allTags')}
-              </Text>
-            </TouchableOpacity>
-            {tagFilterOptions.list.map((tag) => (
+        <View style={styles.filterSection}>
+          <TouchableOpacity
+            style={styles.filterHeader}
+            onPress={() => setShowAreaFilter((prev) => !prev)}
+          >
+            <Text style={[styles.tagFilterLabel, { color: tc.text }]}>{t('projects.areaFilter')}</Text>
+            <Text style={[styles.filterToggleText, { color: tc.secondaryText }]}>
+              {showAreaFilter ? t('filters.hide') : t('filters.show')}
+            </Text>
+          </TouchableOpacity>
+          {showAreaFilter && (
+            <View style={styles.tagFilterChips}>
               <TouchableOpacity
-                key={tag}
                 style={[
                   styles.tagFilterChip,
-                  selectedTagFilter === tag
+                  selectedAreaFilter === ALL_AREAS
                     ? { borderColor: tc.tint, backgroundColor: tc.tint }
                     : { borderColor: tc.border, backgroundColor: tc.cardBg },
                 ]}
-                onPress={() => setSelectedTagFilter(tag)}
+                onPress={() => setSelectedAreaFilter(ALL_AREAS)}
               >
                 <Text
                   style={[
                     styles.tagFilterText,
-                    { color: selectedTagFilter === tag ? tc.onTint : tc.text },
+                    { color: selectedAreaFilter === ALL_AREAS ? tc.onTint : tc.text },
                   ]}
                 >
-                  {tag}
+                  {t('projects.allAreas')}
                 </Text>
               </TouchableOpacity>
-            ))}
-            {tagFilterOptions.hasNoTags && (
               <TouchableOpacity
                 style={[
                   styles.tagFilterChip,
-                  selectedTagFilter === NO_TAGS
+                  selectedAreaFilter === NO_AREA
                     ? { borderColor: tc.tint, backgroundColor: tc.tint }
                     : { borderColor: tc.border, backgroundColor: tc.cardBg },
                 ]}
-                onPress={() => setSelectedTagFilter(NO_TAGS)}
+                onPress={() => setSelectedAreaFilter(NO_AREA)}
               >
                 <Text
                   style={[
                     styles.tagFilterText,
-                    { color: selectedTagFilter === NO_TAGS ? tc.onTint : tc.text },
+                    { color: selectedAreaFilter === NO_AREA ? tc.onTint : tc.text },
                   ]}
                 >
-                  {t('projects.noTags')}
+                  {t('projects.noArea')}
                 </Text>
               </TouchableOpacity>
-            )}
-          </View>
+              {sortedAreas.map((area) => (
+                <TouchableOpacity
+                  key={area.id}
+                  style={[
+                    styles.tagFilterChip,
+                    selectedAreaFilter === area.id
+                      ? { borderColor: tc.tint, backgroundColor: tc.tint }
+                      : { borderColor: tc.border, backgroundColor: tc.cardBg },
+                  ]}
+                  onPress={() => setSelectedAreaFilter(area.id)}
+                >
+                  <Text
+                    style={[
+                      styles.tagFilterText,
+                      { color: selectedAreaFilter === area.id ? tc.onTint : tc.text },
+                    ]}
+                  >
+                    {area.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+        <View style={styles.filterSection}>
+          <TouchableOpacity
+            style={styles.filterHeader}
+            onPress={() => setShowTagFilter((prev) => !prev)}
+          >
+            <Text style={[styles.tagFilterLabel, { color: tc.text }]}>{t('projects.tagFilter')}</Text>
+            <Text style={[styles.filterToggleText, { color: tc.secondaryText }]}>
+              {showTagFilter ? t('filters.hide') : t('filters.show')}
+            </Text>
+          </TouchableOpacity>
+          {showTagFilter && (
+            <View style={styles.tagFilterChips}>
+              <TouchableOpacity
+                style={[
+                  styles.tagFilterChip,
+                  selectedTagFilter === ALL_TAGS
+                    ? { borderColor: tc.tint, backgroundColor: tc.tint }
+                    : { borderColor: tc.border, backgroundColor: tc.cardBg },
+                ]}
+                onPress={() => setSelectedTagFilter(ALL_TAGS)}
+              >
+                <Text
+                  style={[
+                    styles.tagFilterText,
+                    { color: selectedTagFilter === ALL_TAGS ? tc.onTint : tc.text },
+                  ]}
+                >
+                  {t('projects.allTags')}
+                </Text>
+              </TouchableOpacity>
+              {tagFilterOptions.list.map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  style={[
+                    styles.tagFilterChip,
+                    selectedTagFilter === tag
+                      ? { borderColor: tc.tint, backgroundColor: tc.tint }
+                      : { borderColor: tc.border, backgroundColor: tc.cardBg },
+                  ]}
+                  onPress={() => setSelectedTagFilter(tag)}
+                >
+                  <Text
+                    style={[
+                      styles.tagFilterText,
+                      { color: selectedTagFilter === tag ? tc.onTint : tc.text },
+                    ]}
+                  >
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {tagFilterOptions.hasNoTags && (
+                <TouchableOpacity
+                  style={[
+                    styles.tagFilterChip,
+                    selectedTagFilter === NO_TAGS
+                      ? { borderColor: tc.tint, backgroundColor: tc.tint }
+                      : { borderColor: tc.border, backgroundColor: tc.cardBg },
+                  ]}
+                  onPress={() => setSelectedTagFilter(NO_TAGS)}
+                >
+                  <Text
+                    style={[
+                      styles.tagFilterText,
+                      { color: selectedTagFilter === NO_TAGS ? tc.onTint : tc.text },
+                    ]}
+                  >
+                    {t('projects.noTags')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
         <TouchableOpacity
           onPress={handleAddProject}
@@ -1401,8 +1458,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  tagFilterRow: {
+  filterSection: {
     gap: 8,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   tagFilterLabel: {
     fontSize: 12,
@@ -1432,9 +1498,6 @@ const styles = StyleSheet.create({
   areaChipText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  areaTaskRow: {
-    marginTop: 6,
   },
   input: {
     borderWidth: 1,
