@@ -534,6 +534,7 @@ jobs:
           LicenseUrl: https://github.com/dongdongbh/Mindwtr/blob/HEAD/LICENSE
           ShortDescription: A complete Getting Things Done (GTD) productivity system.
           Description: A complete Getting Things Done (GTD) productivity system.
+          ReleaseNotes: See the release notes at ${TAG}.
           Moniker: mindwtr
           Tags:
             - cross-platform
