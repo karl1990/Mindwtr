@@ -311,7 +311,7 @@ export function ProjectsView() {
         }).then((result) => {
             if (cancelled) return;
             setProjectAllTasks(result);
-            setProjectTasks(result.filter((task) => task.status !== 'done' && task.status !== 'reference'));
+            setProjectTasks(result.filter((task) => task.status !== 'done' && task.status !== 'reference' && task.status !== 'archived'));
         }).catch(() => {
             if (cancelled) return;
             setProjectAllTasks([]);
