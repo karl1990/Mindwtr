@@ -1593,65 +1593,73 @@ fn ensure_data_file(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_data(app: tauri::AppHandle) -> Result<Value, String> {
-    ensure_data_file(&app)?;
-    let data_path = get_data_path(&app);
-    let backup_path = data_path.with_extension("json.bak");
-    let mut conn = open_sqlite(&app)?;
+async fn get_data(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ensure_data_file(&app)?;
+        let data_path = get_data_path(&app);
+        let backup_path = data_path.with_extension("json.bak");
+        let mut conn = open_sqlite(&app)?;
 
-    if !sqlite_has_any_data(&conn)? && data_path.exists() {
-        if let Ok(value) = read_json_with_retries(&data_path, 2) {
-            let _ = fs::copy(&data_path, &backup_path);
-            migrate_json_to_sqlite(&mut conn, &value)?;
-            ensure_fts_populated(&conn, true)?;
+        if !sqlite_has_any_data(&conn)? && data_path.exists() {
+            if let Ok(value) = read_json_with_retries(&data_path, 2) {
+                let _ = fs::copy(&data_path, &backup_path);
+                migrate_json_to_sqlite(&mut conn, &value)?;
+                ensure_fts_populated(&conn, true)?;
+            }
         }
-    }
 
-    match read_sqlite_data(&conn) {
-        Ok(value) => Ok(value),
-        Err(primary_err) => {
-            if data_path.exists() {
-                if let Ok(value) = read_json_with_retries(&data_path, 2) {
-                    return Ok(value);
+        match read_sqlite_data(&conn) {
+            Ok(value) => Ok(value),
+            Err(primary_err) => {
+                if data_path.exists() {
+                    if let Ok(value) = read_json_with_retries(&data_path, 2) {
+                        return Ok(value);
+                    }
                 }
-            }
-            if backup_path.exists() {
-                if let Ok(value) = read_json_with_retries(&backup_path, 2) {
-                    return Ok(value);
+                if backup_path.exists() {
+                    if let Ok(value) = read_json_with_retries(&backup_path, 2) {
+                        return Ok(value);
+                    }
                 }
+                Err(primary_err)
             }
-            Err(primary_err)
         }
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn save_data(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
-    ensure_data_file(&app)?;
-    let mut conn = open_sqlite(&app)?;
-    migrate_json_to_sqlite(&mut conn, &data)?;
+async fn save_data(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ensure_data_file(&app)?;
+        let mut conn = open_sqlite(&app)?;
+        migrate_json_to_sqlite(&mut conn, &data)?;
 
-    // Keep JSON backup updated for safety/rollbacks
-    let data_path = get_data_path(&app);
-    if let Some(parent) = data_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let backup_path = data_path.with_extension("json.bak");
-    if data_path.exists() {
-        let _ = fs::copy(&data_path, &backup_path);
-    }
-    let tmp_path = data_path.with_extension("json.tmp");
-    let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
-    {
-        let mut file = File::create(&tmp_path).map_err(|e| e.to_string())?;
-        file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
-        file.sync_all().map_err(|e| e.to_string())?;
-    }
-    if cfg!(windows) && data_path.exists() {
-        fs::remove_file(&data_path).map_err(|e| e.to_string())?;
-    }
-    fs::rename(&tmp_path, &data_path).map_err(|e| e.to_string())?;
-    Ok(true)
+        // Keep JSON backup updated for safety/rollbacks
+        let data_path = get_data_path(&app);
+        if let Some(parent) = data_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let backup_path = data_path.with_extension("json.bak");
+        if data_path.exists() {
+            let _ = fs::copy(&data_path, &backup_path);
+        }
+        let tmp_path = data_path.with_extension("json.tmp");
+        let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+        {
+            let mut file = File::create(&tmp_path).map_err(|e| e.to_string())?;
+            file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+            file.sync_all().map_err(|e| e.to_string())?;
+        }
+        if cfg!(windows) && data_path.exists() {
+            fs::remove_file(&data_path).map_err(|e| e.to_string())?;
+        }
+        fs::rename(&tmp_path, &data_path).map_err(|e| e.to_string())?;
+        Ok(true)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
