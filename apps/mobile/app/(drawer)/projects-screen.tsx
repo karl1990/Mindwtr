@@ -36,7 +36,6 @@ export default function ProjectsScreen() {
     archived: { text: tc.secondaryText, bg: tc.filterBg, border: tc.border },
   };
   const [newProjectTitle, setNewProjectTitle] = useState('');
-  const [newProjectAreaId, setNewProjectAreaId] = useState<string | undefined>(undefined);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [showNotesPreview, setShowNotesPreview] = useState(false);
@@ -317,12 +316,15 @@ export default function ProjectsScreen() {
 
   const handleAddProject = () => {
     if (newProjectTitle.trim()) {
-      const areaColor = newProjectAreaId ? areaById.get(newProjectAreaId)?.color : undefined;
+      const inferredAreaId =
+        selectedAreaFilter !== ALL_AREAS && selectedAreaFilter !== NO_AREA && areaById.has(selectedAreaFilter)
+          ? selectedAreaFilter
+          : undefined;
+      const areaColor = inferredAreaId ? areaById.get(inferredAreaId)?.color : undefined;
       addProject(newProjectTitle, areaColor || '#94a3b8', {
-        areaId: newProjectAreaId || undefined,
+        areaId: inferredAreaId,
       });
       setNewProjectTitle('');
-      setNewProjectAreaId(undefined);
     }
   };
 
@@ -562,76 +564,6 @@ export default function ProjectsScreen() {
           onSubmitEditing={handleAddProject}
           returnKeyType="done"
         />
-        <View style={styles.areaChipRow}>
-          <TouchableOpacity
-            style={[
-              styles.areaChip,
-              !newProjectAreaId
-                ? { borderColor: tc.tint, backgroundColor: tc.tint }
-                : { borderColor: tc.border, backgroundColor: tc.cardBg },
-            ]}
-            onPress={() => setNewProjectAreaId(undefined)}
-          >
-            <Text
-              style={[
-                styles.areaChipText,
-                { color: !newProjectAreaId ? tc.onTint : tc.text },
-              ]}
-            >
-              {t('projects.noArea')}
-            </Text>
-          </TouchableOpacity>
-          {sortedAreas.map((area) => (
-            <TouchableOpacity
-              key={area.id}
-              style={[
-                styles.areaChip,
-                newProjectAreaId === area.id
-                  ? { borderColor: tc.tint, backgroundColor: tc.tint }
-                  : { borderColor: tc.border, backgroundColor: tc.cardBg },
-              ]}
-              onPress={() => setNewProjectAreaId(area.id)}
-              onLongPress={() => {
-                const inUse = (areaUsage.get(area.id) || 0) > 0;
-                if (inUse) {
-                  Alert.alert(t('common.notice') || 'Notice', t('projects.areaInUse') || 'Area has projects.');
-                  return;
-                }
-                Alert.alert(
-                  t('projects.areaLabel'),
-                  t('projects.deleteConfirm'),
-                  [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                      text: t('common.delete'),
-                      style: 'destructive',
-                      onPress: () => deleteArea(area.id),
-                    },
-                  ]
-                );
-              }}
-            >
-              <Text
-                style={[
-                  styles.areaChipText,
-                  { color: newProjectAreaId === area.id ? tc.onTint : tc.text },
-                ]}
-              >
-                {area.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={[styles.areaChip, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
-            onPress={() => {
-              setNewAreaName('');
-              setNewAreaColor(colors[0]);
-              setShowAreaManager(true);
-            }}
-          >
-            <Text style={[styles.areaChipText, { color: tc.secondaryText }]}>+ {t('projects.areaLabel')}</Text>
-          </TouchableOpacity>
-        </View>
         <View style={styles.filterSection}>
           <TouchableOpacity
             style={styles.filterHeader}
@@ -1453,11 +1385,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
   },
-  areaChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
   filterSection: {
     gap: 8,
   },
@@ -1486,16 +1413,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tagFilterText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  areaChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  areaChipText: {
     fontSize: 12,
     fontWeight: '600',
   },
