@@ -31,3 +31,8 @@ bun run --filter @mindwtr/core test
 - Keep imports grouped (external/workspace/relative).
 - Prefer accessibility-friendly queries in tests.
 
+## Further Reading
+
+- Developer Guide: https://github.com/dongdongbh/Mindwtr/wiki/Developer-Guide
+- Architecture: https://github.com/dongdongbh/Mindwtr/wiki/Architecture
+- Contributing (wiki): https://github.com/dongdongbh/Mindwtr/wiki/Contributing
