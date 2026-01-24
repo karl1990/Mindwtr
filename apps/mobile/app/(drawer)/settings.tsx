@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect, useMemo } from 'react';
 import Constants from 'expo-constants';
 import {
     View,
@@ -18,7 +18,7 @@ import {
     Pressable,
 } from 'react-native';
 import { HeaderBackButton, type HeaderBackButtonProps } from '@react-navigation/elements';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -170,6 +170,7 @@ export default function SettingsPage() {
     const [speechOpen, setSpeechOpen] = useState(false);
 
     const tc = useThemeColors();
+    const insets = useSafeAreaInsets();
     const isExpoGo = Constants.appOwnership === 'expo';
     const notificationsEnabled = settings.notificationsEnabled !== false;
     const dailyDigestMorningEnabled = settings.dailyDigestMorningEnabled === true;
@@ -231,6 +232,15 @@ export default function SettingsPage() {
         : 7;
     const prioritiesEnabled = settings.features?.priorities === true;
     const timeEstimatesEnabled = settings.features?.timeEstimates === true;
+
+    const scrollContentStyle = useMemo(
+        () => [styles.scrollContent, { paddingBottom: 16 + insets.bottom }],
+        [insets.bottom],
+    );
+    const scrollContentStyleWithKeyboard = useMemo(
+        () => [styles.scrollContent, { paddingBottom: 140 + insets.bottom }],
+        [insets.bottom],
+    );
 
     const formatTimeEstimateLabel = (value: TimeEstimate) => {
         if (value === '5min') return '5m';
@@ -863,7 +873,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.notifications')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
@@ -1041,7 +1051,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.general')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.sectionTitle, { color: tc.secondaryText }]}>{t('settings.appearance')}</Text>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                         <TouchableOpacity style={styles.settingRow} onPress={() => setThemePickerOpen(true)}>
@@ -1162,7 +1172,7 @@ export default function SettingsPage() {
                     <ScrollView
                         style={styles.scrollView}
                         keyboardShouldPersistTaps="handled"
-                        contentContainerStyle={{ paddingBottom: 140 }}
+                        contentContainerStyle={scrollContentStyleWithKeyboard}
                     >
                         <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                             <TouchableOpacity
@@ -1824,7 +1834,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.gtd')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.description, { color: tc.secondaryText }]}>{t('settings.gtdDesc')}</Text>
                     <View style={[styles.menuCard, { backgroundColor: tc.cardBg }]}>
                         {timeEstimatesEnabled && (
@@ -1939,7 +1949,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.autoArchive')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.description, { color: tc.secondaryText }]}>{t('settings.autoArchiveDesc')}</Text>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                         {autoArchiveOptions.map((days, idx) => {
@@ -1967,7 +1977,7 @@ export default function SettingsPage() {
             return (
                 <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                     <SubHeader title={t('settings.timeEstimatePresets')} />
-                    <ScrollView style={styles.scrollView}>
+                    <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                         <Text style={[styles.description, { color: tc.secondaryText }]}>
                             {t('settings.timeEstimatePresetsDisabled')}
                         </Text>
@@ -2013,7 +2023,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.timeEstimatePresets')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.description, { color: tc.secondaryText }]}>{t('settings.timeEstimatePresetsDesc')}</Text>
 
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
@@ -2267,7 +2277,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.taskEditorLayout')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.description, { color: tc.secondaryText }]}>{t('settings.taskEditorLayoutDesc')}</Text>
                     <Text style={[styles.description, { color: tc.secondaryText, marginTop: -6 }]}>{t('settings.taskEditorLayoutHint')}</Text>
 
@@ -2355,7 +2365,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.calendar')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <Text style={[styles.description, { color: tc.secondaryText }]}>
                         {t('settings.calendarDesc')}
                     </Text>
@@ -2454,7 +2464,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.advanced')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <View style={[styles.menuCard, { backgroundColor: tc.cardBg }]}>
                         <MenuItem title={t('settings.ai')} onPress={() => setCurrentScreen('ai')} />
                         <MenuItem title={t('settings.calendar')} onPress={() => setCurrentScreen('calendar')} />
@@ -2469,7 +2479,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.dataSync')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginBottom: 12 }]}>
                         <View style={styles.settingRowColumn}>
                             <View style={styles.settingInfo}>
@@ -3004,7 +3014,7 @@ export default function SettingsPage() {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <SubHeader title={t('settings.about')} />
-                <ScrollView style={styles.scrollView}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
                         <View style={styles.settingRow}>
                             <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.version')}</Text>
@@ -3055,7 +3065,7 @@ export default function SettingsPage() {
     // ============ MAIN SETTINGS SCREEN ============
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
-            <ScrollView style={styles.scrollView}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                 <View style={[styles.menuCard, { backgroundColor: tc.cardBg, marginTop: 16 }]}>
                     <MenuItem title={t('settings.general')} onPress={() => setCurrentScreen('general')} />
                     <MenuItem title={t('settings.gtd')} onPress={() => setCurrentScreen('gtd')} />
@@ -3071,7 +3081,8 @@ export default function SettingsPage() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollView: { flex: 1, padding: 16 },
+    scrollView: { flex: 1 },
+    scrollContent: { padding: 16 },
     subHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
     backButton: { fontSize: 16, fontWeight: '500' },
     subHeaderTitle: { fontSize: 18, fontWeight: '600' },
