@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/theme-context';
 import { useLanguage } from '../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { ReviewModal } from '../../components/review-modal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TaskEditModal } from '@/components/task-edit-modal';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
@@ -28,6 +29,7 @@ export default function ReviewScreen() {
   const [moveModalVisible, setMoveModalVisible] = useState(false);
 
   const tc = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const tasksById = useMemo(() => {
     return tasks.reduce((acc, task) => {
@@ -241,7 +243,7 @@ export default function ReviewScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.taskList}>
+      <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}>
         {sortedTasks.map((task) => (
           <SwipeableTaskItem
             key={task.id}
