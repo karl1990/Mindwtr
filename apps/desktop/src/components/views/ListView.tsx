@@ -129,6 +129,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     }, []);
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isBatchDeleting, setIsBatchDeleting] = useState(false);
     const {
         allContexts,
         allTags,
@@ -471,8 +472,13 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         if (selectedIdsArray.length === 0) return;
         const confirmMessage = t('list.confirmBatchDelete') || 'Delete selected tasks?';
         if (!window.confirm(confirmMessage)) return;
-        await batchDeleteTasks(selectedIdsArray);
-        exitSelectionMode();
+        setIsBatchDeleting(true);
+        try {
+            await batchDeleteTasks(selectedIdsArray);
+            exitSelectionMode();
+        } finally {
+            setIsBatchDeleting(false);
+        }
     }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode]);
 
     const handleBatchAddTag = useCallback(async () => {
@@ -647,6 +653,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                             onMoveToStatus={handleBatchMove}
                             onAddTag={handleBatchAddTag}
                             onDelete={handleBatchDelete}
+                            isDeleting={isBatchDeleting}
                             t={t}
                         />
                     )}

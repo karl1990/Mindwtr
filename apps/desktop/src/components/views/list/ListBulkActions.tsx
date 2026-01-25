@@ -5,6 +5,7 @@ type ListBulkActionsProps = {
     onMoveToStatus: (status: TaskStatus) => void;
     onAddTag: () => void;
     onDelete: () => void;
+    isDeleting?: boolean;
     t: (key: string) => string;
 };
 
@@ -15,6 +16,7 @@ export function ListBulkActions({
     onMoveToStatus,
     onAddTag,
     onDelete,
+    isDeleting = false,
     t,
 }: ListBulkActionsProps) {
     if (selectionCount === 0) return null;
@@ -45,8 +47,10 @@ export function ListBulkActions({
             </button>
             <button
                 onClick={onDelete}
-                className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 aria-label={t('bulk.delete')}
+                disabled={isDeleting}
+                aria-busy={isDeleting}
             >
                 {t('bulk.delete')}
             </button>
