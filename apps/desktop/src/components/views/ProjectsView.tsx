@@ -124,6 +124,7 @@ export function ProjectsView() {
     const [projectTaskTitle, setProjectTaskTitle] = useState('');
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [isProjectAttachmentBusy, setIsProjectAttachmentBusy] = useState(false);
+    const [isProjectDeleting, setIsProjectDeleting] = useState(false);
     const ALL_AREAS = '__all__';
     const NO_AREA = '__none__';
     const ALL_TAGS = '__all__';
@@ -608,8 +609,13 @@ export function ProjectsView() {
             )
             : window.confirm(t('projects.deleteConfirm'));
         if (confirmed) {
-            deleteProject(selectedProject.id);
-            setSelectedProjectId(null);
+            setIsProjectDeleting(true);
+            try {
+                await Promise.resolve(deleteProject(selectedProject.id));
+                setSelectedProjectId(null);
+            } finally {
+                setIsProjectDeleting(false);
+            }
         }
     };
     const resolveValidationMessage = (error?: string) => {
@@ -804,6 +810,7 @@ export function ProjectsView() {
                                         onArchive={handleArchiveProject}
                                         onReactivate={() => updateProject(selectedProject.id, { status: 'active' })}
                                         onDelete={handleDeleteProject}
+                                        isDeleting={isProjectDeleting}
                                         projectProgress={projectProgress}
                                         t={t}
                                     />

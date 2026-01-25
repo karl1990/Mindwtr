@@ -1,4 +1,4 @@
-import { Archive as ArchiveIcon, ListOrdered, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive as ArchiveIcon, ListOrdered, RotateCcw, Trash2, Loader2 } from 'lucide-react';
 import type { Project } from '@mindwtr/core';
 import { cn } from '../../../lib/utils';
 
@@ -20,6 +20,7 @@ type ProjectDetailsHeaderProps = {
     onArchive: () => Promise<void> | void;
     onReactivate: () => void;
     onDelete: () => Promise<void> | void;
+    isDeleting?: boolean;
     projectProgress?: ProjectProgress | null;
     t: (key: string) => string;
 };
@@ -36,6 +37,7 @@ export function ProjectDetailsHeader({
     onArchive,
     onReactivate,
     onDelete,
+    isDeleting = false,
     projectProgress,
     t,
 }: ProjectDetailsHeaderProps) {
@@ -106,11 +108,17 @@ export function ProjectDetailsHeader({
                     <button
                         type="button"
                         onClick={onDelete}
-                        className="text-destructive hover:bg-destructive/10 h-8 w-8 rounded-md transition-colors flex items-center justify-center"
+                        className="text-destructive hover:bg-destructive/10 h-8 w-8 rounded-md transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                         title={t('common.delete')}
                         aria-label={t('common.delete')}
+                        disabled={isDeleting}
+                        aria-busy={isDeleting}
                     >
-                        <Trash2 className="w-4 h-4" />
+                        {isDeleting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="w-4 h-4" />
+                        )}
                     </button>
                 </div>
             </div>
