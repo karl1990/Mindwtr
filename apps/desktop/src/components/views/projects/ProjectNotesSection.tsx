@@ -12,6 +12,7 @@ type ProjectNotesSectionProps = {
     onTogglePreview: () => void;
     onAddFile: () => void;
     onAddLink: () => void;
+    attachmentsBusy?: boolean;
     visibleAttachments: Attachment[];
     attachmentError: string | null;
     onOpenAttachment: (attachment: Attachment) => void;
@@ -28,6 +29,7 @@ export function ProjectNotesSection({
     onTogglePreview,
     onAddFile,
     onAddLink,
+    attachmentsBusy = false,
     visibleAttachments,
     attachmentError,
     onOpenAttachment,
@@ -69,7 +71,9 @@ export function ProjectNotesSection({
                             <button
                                 type="button"
                                 onClick={onAddFile}
-                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled={attachmentsBusy}
+                                aria-busy={attachmentsBusy}
                             >
                                 <Paperclip className="w-3 h-3" />
                                 {t('attachments.addFile')}
@@ -77,7 +81,9 @@ export function ProjectNotesSection({
                             <button
                                 type="button"
                                 onClick={onAddLink}
-                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled={attachmentsBusy}
+                                aria-busy={attachmentsBusy}
                             >
                                 <Link2 className="w-3 h-3" />
                                 {t('attachments.addLink')}

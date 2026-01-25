@@ -123,6 +123,7 @@ export function ProjectsView() {
     const [editProjectTitle, setEditProjectTitle] = useState('');
     const [projectTaskTitle, setProjectTaskTitle] = useState('');
     const [isCreatingProject, setIsCreatingProject] = useState(false);
+    const [isProjectAttachmentBusy, setIsProjectAttachmentBusy] = useState(false);
     const ALL_AREAS = '__all__';
     const NO_AREA = '__none__';
     const ALL_TAGS = '__all__';
@@ -678,52 +679,58 @@ export function ProjectsView() {
 
     const addProjectFileAttachment = async () => {
         if (!selectedProject) return;
+        if (isProjectAttachmentBusy) return;
         if (!isTauriRuntime()) {
             setAttachmentError(t('attachments.fileNotSupported'));
             return;
         }
+        setIsProjectAttachmentBusy(true);
         setAttachmentError(null);
-        const { open } = await import('@tauri-apps/plugin-dialog');
-        const selected = await open({
-            multiple: false,
-            directory: false,
-            title: t('attachments.addFile'),
-        });
-        if (!selected || typeof selected !== 'string') return;
         try {
-            const fileSize = await size(selected);
-            const validation = await validateAttachmentForUpload(
-                {
-                    id: 'pending',
-                    kind: 'file',
-                    title: selected.split(/[/\\]/).pop() || selected,
-                    uri: selected,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                },
-                fileSize
-            );
-            if (!validation.valid) {
-                setAttachmentError(resolveValidationMessage(validation.error));
-                return;
-            }
-        } catch (error) {
-            void logWarn('Failed to validate attachment size', {
-                scope: 'attachment',
-                extra: { error: error instanceof Error ? error.message : String(error) },
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const selected = await open({
+                multiple: false,
+                directory: false,
+                title: t('attachments.addFile'),
             });
+            if (!selected || typeof selected !== 'string') return;
+            try {
+                const fileSize = await size(selected);
+                const validation = await validateAttachmentForUpload(
+                    {
+                        id: 'pending',
+                        kind: 'file',
+                        title: selected.split(/[/\\]/).pop() || selected,
+                        uri: selected,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    },
+                    fileSize
+                );
+                if (!validation.valid) {
+                    setAttachmentError(resolveValidationMessage(validation.error));
+                    return;
+                }
+            } catch (error) {
+                void logWarn('Failed to validate attachment size', {
+                    scope: 'attachment',
+                    extra: { error: error instanceof Error ? error.message : String(error) },
+                });
+            }
+            const now = new Date().toISOString();
+            const title = selected.split(/[/\\]/).pop() || selected;
+            const attachment: Attachment = {
+                id: generateUUID(),
+                kind: 'file',
+                title,
+                uri: selected,
+                createdAt: now,
+                updatedAt: now,
+            };
+            updateProject(selectedProject.id, { attachments: [...(selectedProject.attachments || []), attachment] });
+        } finally {
+            setIsProjectAttachmentBusy(false);
         }
-        const now = new Date().toISOString();
-        const title = selected.split(/[/\\]/).pop() || selected;
-        const attachment: Attachment = {
-            id: generateUUID(),
-            kind: 'file',
-            title,
-            uri: selected,
-            createdAt: now,
-            updatedAt: now,
-        };
-        updateProject(selectedProject.id, { attachments: [...(selectedProject.attachments || []), attachment] });
     };
 
     const addProjectLinkAttachment = () => {
@@ -815,6 +822,7 @@ export function ProjectsView() {
                                         onTogglePreview={() => setShowNotesPreview((value) => !value)}
                                         onAddFile={addProjectFileAttachment}
                                         onAddLink={addProjectLinkAttachment}
+                                        attachmentsBusy={isProjectAttachmentBusy}
                                         visibleAttachments={visibleAttachments}
                                         attachmentError={attachmentError}
                                         onOpenAttachment={openAttachment}
