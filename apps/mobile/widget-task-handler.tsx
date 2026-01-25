@@ -10,6 +10,7 @@ import {
     WIDGET_DATA_KEY,
     WIDGET_LANGUAGE_KEY,
 } from './lib/widget-data';
+import { logWarn } from './lib/app-log';
 
 const DEFAULT_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
 
@@ -33,7 +34,10 @@ async function loadWidgetContext() {
         return { data, language };
     } catch (error) {
         if (__DEV__) {
-            console.warn('[RNWidget] Failed to load widget payload', error);
+            void logWarn('[RNWidget] Failed to load widget payload', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
         }
         return { data: DEFAULT_DATA, language: 'en' as const };
     }
@@ -46,7 +50,10 @@ const widgetTaskHandler: WidgetTaskHandler = async ({ renderWidget, widgetInfo }
         renderWidget(buildTasksWidgetTree(tasksPayload));
     } catch (error) {
         if (__DEV__) {
-            console.warn('[RNWidget] Widget render failed', error);
+            void logWarn('[RNWidget] Widget render failed', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
         }
         renderWidget(buildTasksWidgetTree(tasksPayload));
     }

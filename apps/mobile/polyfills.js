@@ -1,5 +1,6 @@
 // Install shared URL/URLSearchParams shim up front so all modules see a consistent API
 const { URL: ShimURL, URLSearchParams: ShimURLSearchParams, setupURLPolyfill } = require('./shims/url-polyfill');
+const { logError } = require('./lib/app-log');
 setupURLPolyfill();
 
 if (typeof globalThis !== 'undefined' && typeof globalThis.window === 'undefined') {
@@ -31,5 +32,7 @@ try {
         if (typeof self !== 'undefined') self.SharedArrayBuffer = global.SharedArrayBuffer;
     }
 } catch (e) {
-    console.error('[Polyfills] Error applying polyfills:', e);
+    if (logError) {
+        logError(e, { scope: 'polyfill', extra: { message: 'Error applying polyfills' } });
+    }
 }

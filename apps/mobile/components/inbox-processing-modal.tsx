@@ -9,6 +9,7 @@ import { useLanguage } from '../contexts/language-context';
 import { useTheme } from '../contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { buildAIConfig, loadAIKey } from '../lib/ai-config';
+import { logWarn } from '../lib/app-log';
 
 type InboxProcessingModalProps = {
   visible: boolean;
@@ -396,7 +397,10 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
         actions,
       });
     } catch (error) {
-      console.warn(error);
+      void logWarn('Inbox processing failed', {
+        scope: 'inbox',
+        extra: { error: error instanceof Error ? error.message : String(error) },
+      });
       Alert.alert(t('ai.errorTitle'), t('ai.errorBody'));
     } finally {
       setIsAIWorking(false);

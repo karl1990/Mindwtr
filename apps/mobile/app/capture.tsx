@@ -5,6 +5,7 @@ import { createAIProvider, PRESET_CONTEXTS, PRESET_TAGS, parseQuickAdd, type Tas
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useLanguage } from '../contexts/language-context';
 import { buildCopilotConfig, loadAIKey } from '../lib/ai-config';
+import { logError } from '../lib/app-log';
 
 export default function CaptureScreen() {
   const params = useLocalSearchParams<{ text?: string }>();
@@ -40,7 +41,9 @@ export default function CaptureScreen() {
   const timeEstimatesEnabled = settings.features?.timeEstimates === true;
 
   useEffect(() => {
-    loadAIKey(aiProvider).then(setAiKey).catch(console.error);
+    loadAIKey(aiProvider).then(setAiKey).catch((error) => {
+      void logError(error, { scope: 'ai', extra: { message: 'Failed to load AI key' } });
+    });
   }, [aiProvider]);
 
   const contextOptions = React.useMemo(() => {

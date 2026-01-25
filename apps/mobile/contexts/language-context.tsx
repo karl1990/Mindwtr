@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { type Language, loadTranslations, loadStoredLanguage, saveStoredLanguage } from '@mindwtr/core';
+import { logError } from '../lib/app-log';
 
 export type { Language };
 
@@ -43,7 +44,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
             const saved = await loadStoredLanguage(AsyncStorage);
             setLanguageState(saved);
         } catch (error) {
-            console.error('Failed to load language', error);
+            void logError(error, { scope: 'i18n', extra: { message: 'Failed to load language' } });
         }
     };
 
@@ -52,7 +53,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
             await saveStoredLanguage(AsyncStorage, lang);
             setLanguageState(lang);
         } catch (error) {
-            console.error('Failed to save language', error);
+            void logError(error, { scope: 'i18n', extra: { message: 'Failed to save language' } });
         }
     };
 

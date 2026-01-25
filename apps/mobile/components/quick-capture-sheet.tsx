@@ -11,8 +11,20 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadAIKey } from '../lib/ai-config';
 import { processAudioCapture, type SpeechToTextResult } from '../lib/speech-to-text';
+import { logError, logWarn } from '../lib/app-log';
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
+
+const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const logCaptureWarn = (message: string, error?: unknown) => {
+  const extra = error ? { error: formatError(error) } : undefined;
+  void logWarn(message, { scope: 'capture', extra });
+};
+const logCaptureError = (message: string, error?: unknown) => {
+  const err = error instanceof Error ? error : new Error(message);
+  const extra = error ? { error: formatError(error), message } : { message };
+  void logError(err, { scope: 'capture', extra });
+};
 
 export function QuickCaptureSheet({
   visible,
@@ -83,12 +95,12 @@ export function QuickCaptureSheet({
     try {
       candidates.push(Paths.document);
     } catch (error) {
-      console.warn('Document directory unavailable', error);
+      logCaptureWarn('Document directory unavailable', error);
     }
     try {
       candidates.push(Paths.cache);
     } catch (error) {
-      console.warn('Cache directory unavailable', error);
+      logCaptureWarn('Cache directory unavailable', error);
     }
     for (const root of candidates) {
       try {
@@ -96,7 +108,7 @@ export function QuickCaptureSheet({
         dir.create({ intermediates: true, idempotent: true });
         return dir;
       } catch (error) {
-        console.warn('Failed to create audio directory', error);
+        logCaptureWarn('Failed to create audio directory', error);
       }
     }
     return null;
@@ -308,7 +320,7 @@ export function QuickCaptureSheet({
       );
       setRecording(nextRecording);
     } catch (error) {
-      console.error('Failed to start recording', error);
+      logCaptureError('Failed to start recording', error);
       Alert.alert(t('quickAdd.audioErrorTitle'), t('quickAdd.audioErrorBody'));
     } finally {
       setRecordingBusy(false);
@@ -350,13 +362,13 @@ export function QuickCaptureSheet({
           sourceFile.move(destinationFile);
           finalFile = destinationFile;
         } catch (error) {
-          console.warn('Move recording failed, falling back to copy', error);
+          logCaptureWarn('Move recording failed, falling back to copy', error);
           try {
             sourceFile.copy(destinationFile);
             sourceFile.delete();
             finalFile = destinationFile;
           } catch (copyError) {
-            console.warn('Copy recording failed, using original file', copyError);
+            logCaptureWarn('Copy recording failed, using original file', copyError);
             finalFile = sourceFile;
           }
         }
@@ -366,7 +378,7 @@ export function QuickCaptureSheet({
       try {
         fileInfo = finalFile.info();
       } catch (error) {
-        console.warn('Audio info lookup failed', error);
+        logCaptureWarn('Audio info lookup failed', error);
       }
       const nowIso = now.toISOString();
       const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
@@ -424,13 +436,13 @@ export function QuickCaptureSheet({
             timeZone,
           })
             .then((result) => applySpeechResult(taskId, result))
-            .catch((error) => console.warn('Speech-to-text failed', error))
+            .catch((error) => logCaptureWarn('Speech-to-text failed', error))
             .finally(() => {
               if (!saveAudioAttachments) {
                 try {
                   finalFile.delete();
                 } catch (error) {
-                  console.warn('Audio cleanup failed', error);
+                  logCaptureWarn('Audio cleanup failed', error);
                 }
               }
             });
@@ -438,11 +450,11 @@ export function QuickCaptureSheet({
         try {
           finalFile.delete();
         } catch (error) {
-          console.warn('Audio cleanup failed', error);
+          logCaptureWarn('Audio cleanup failed', error);
         }
       }
     } catch (error) {
-      console.error('Failed to save recording', error);
+      logCaptureError('Failed to save recording', error);
       Alert.alert(t('quickAdd.audioErrorTitle'), t('quickAdd.audioErrorBody'));
     } finally {
       setRecordingBusy(false);

@@ -4,7 +4,7 @@ import { type AppData, useTaskStore } from '@mindwtr/core';
 
 import { buildTasksWidgetTree } from '../components/TasksWidget';
 import { buildWidgetPayload, resolveWidgetLanguage, WIDGET_LANGUAGE_KEY } from './widget-data';
-import { logError } from './app-log';
+import { logError, logWarn } from './app-log';
 
 export function isAndroidWidgetSupported(): boolean {
     return Platform.OS === 'android';
@@ -19,7 +19,10 @@ async function getWidgetApi() {
         return api;
     } catch (error) {
         if (__DEV__) {
-            console.warn('[RNWidget] Android widget API unavailable', error);
+            void logWarn('[RNWidget] Android widget API unavailable', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
         }
         return null;
     }
@@ -47,7 +50,10 @@ export async function updateAndroidWidgetFromData(data: AppData): Promise<boolea
                     continue;
                 }
                 if (__DEV__) {
-                    console.warn('[RNWidget] Failed to update Android widget', error);
+                    void logWarn('[RNWidget] Failed to update Android widget', {
+                        scope: 'widget',
+                        extra: { error: error instanceof Error ? error.message : String(error) },
+                    });
                 }
                 void logError(error, { scope: 'widget', extra: { platform: 'android', attempt: String(attempt + 1) } });
                 return false;
@@ -56,7 +62,10 @@ export async function updateAndroidWidgetFromData(data: AppData): Promise<boolea
         return false;
     } catch (error) {
         if (__DEV__) {
-            console.warn('[RNWidget] Failed to update Android widget', error);
+            void logWarn('[RNWidget] Failed to update Android widget', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
         }
         void logError(error, { scope: 'widget', extra: { platform: 'android', attempt: 'setup' } });
         return false;

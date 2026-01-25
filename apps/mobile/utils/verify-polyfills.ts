@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { logError } from '../lib/app-log';
 
 /**
  * Runtime verification of critical polyfills.
@@ -56,7 +57,10 @@ export function verifyPolyfills() {
     }
 
     if (errors.length > 0) {
-        console.error('[Polyfill Check] Failed:', errors);
+        void logError(new Error('Polyfill checks failed'), {
+            scope: 'polyfill',
+            extra: { errors: errors.join('; ') },
+        });
         Alert.alert(
             '⚠️ Critical Polyfill Failure',
             'The application environment is unstable:\n\n' + errors.join('\n') + '\n\nPlease check metro.config.js and shims.',

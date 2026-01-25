@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { AppData } from '@mindwtr/core';
 import { Platform } from 'react-native';
-import { logError, logInfo } from './app-log';
+import { logError, logInfo, logWarn } from './app-log';
 
 // StorageAccessFramework is part of the legacy FileSystem module
 const StorageAccessFramework = (FileSystem as any).StorageAccessFramework;
@@ -101,8 +101,7 @@ export const pickAndParseSyncFile = async (): Promise<PickResult | null> => {
             __fileUri: fileUri,
         };
     } catch (error) {
-        console.error('Failed to import data:', error);
-        void logError(error, { scope: 'sync', extra: { operation: 'import' } });
+        void logError(error, { scope: 'sync', extra: { operation: 'import', message: 'Failed to import data' } });
         throw error;
     }
 };
@@ -123,7 +122,10 @@ const findSyncFileInDirectory = async (directoryUri: string): Promise<string | n
         );
         return matchEntry?.entry ?? null;
     } catch (error) {
-        console.warn('Failed to read sync folder contents', error);
+        void logWarn('Failed to read sync folder contents', {
+            scope: 'sync',
+            extra: { error: error instanceof Error ? error.message : String(error) },
+        });
         return null;
     }
 };
@@ -203,8 +205,7 @@ export const pickAndParseSyncFolder = async (): Promise<PickResult | null> => {
         const data = parseAppData(fileContent);
         return { ...data, __fileUri: fileUri };
     } catch (error) {
-        console.error('Failed to import data from folder:', error);
-        void logError(error, { scope: 'sync', extra: { operation: 'import' } });
+        void logError(error, { scope: 'sync', extra: { operation: 'import', message: 'Failed to import data from folder' } });
         throw error;
     }
 };
@@ -233,12 +234,11 @@ export const readSyncFile = async (fileUri: string): Promise<AppData | null> => 
             throw new Error('Cannot access the selected sync file. Please re-select it in Settings → Data & Sync.');
         }
         if (/JSON|Unexpected token|trailing characters|Invalid data format|Sync file is empty/i.test(message)) {
-            console.warn('[Sync] Invalid JSON in sync file. Using local data and repairing file.');
+            void logWarn('[Sync] Invalid JSON in sync file. Using local data and repairing file.', { scope: 'sync' });
             void logInfo('Invalid JSON in sync file; using local data.', { scope: 'sync', extra: { operation: 'read' } });
             return null;
         }
-        console.error('Failed to read sync file:', error);
-        void logError(error, { scope: 'sync', extra: { operation: 'read' } });
+        void logError(error, { scope: 'sync', extra: { operation: 'read', message: 'Failed to read sync file' } });
         throw error;
     }
 };
@@ -262,8 +262,7 @@ export const writeSyncFile = async (fileUri: string, data: AppData): Promise<voi
             console.log('[Sync] Written to sync file:', fileUri);
         }
     } catch (error) {
-        console.error('Failed to write sync file:', error);
-        void logError(error, { scope: 'sync', extra: { operation: 'write' } });
+        void logError(error, { scope: 'sync', extra: { operation: 'write', message: 'Failed to write sync file' } });
         throw error;
     }
 };
@@ -318,7 +317,7 @@ export const exportData = async (data: AppData): Promise<void> => {
             throw new Error('Sharing is not available on this device');
         }
     } catch (error) {
-        console.error('Failed to export data:', error);
+        void logError(error, { scope: 'sync', extra: { operation: 'export', message: 'Failed to export data' } });
         throw error;
     }
 };

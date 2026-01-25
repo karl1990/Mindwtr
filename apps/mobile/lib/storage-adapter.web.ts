@@ -1,4 +1,5 @@
 import { StorageAdapter, AppData } from '@mindwtr/core';
+import { logError } from './app-log';
 
 const DATA_KEY = 'mindwtr-data';
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
@@ -33,7 +34,7 @@ export const mobileStorage: StorageAdapter = {
             data.sections = Array.isArray(data.sections) ? data.sections : [];
             return data;
         } catch (e) {
-            console.error('Failed to load data', e);
+            void logError(e, { scope: 'storage', extra: { message: 'Failed to load data' } });
             throw new Error('Data appears corrupted. Please restore from backup.');
         }
     },
@@ -44,7 +45,7 @@ export const mobileStorage: StorageAdapter = {
                 localStorage.setItem(DATA_KEY, jsonValue);
             }
         } catch (e) {
-            console.error('Failed to save data', e);
+            void logError(e, { scope: 'storage', extra: { message: 'Failed to save data' } });
             throw new Error('Failed to save data: ' + (e as Error).message);
         }
     },

@@ -39,6 +39,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from './markdown-text';
 import { buildAIConfig, loadAIKey } from '../lib/ai-config';
 import { ensureAttachmentAvailable } from '../lib/attachment-sync';
+import { logError, logWarn } from '../lib/app-log';
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { styles } from './task-edit/task-edit-modal.styles';
 import { TaskEditViewTab } from './task-edit/TaskEditViewTab';
@@ -73,6 +74,16 @@ interface TaskEditModalProps {
 }
 
 const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done'];
+const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const logTaskWarn = (message: string, error?: unknown) => {
+    const extra = error ? { error: formatError(error) } : undefined;
+    void logWarn(message, { scope: 'task', extra });
+};
+const logTaskError = (message: string, error?: unknown) => {
+    const err = error instanceof Error ? error : new Error(message);
+    const extra = error ? { error: formatError(error), message } : { message };
+    void logError(err, { scope: 'task', extra });
+};
 const COMPACT_STATUS_LABELS: Record<TaskStatus, string> = {
     inbox: 'Inbox',
     next: 'Next',
@@ -417,7 +428,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 const created = await addProject(projectTitle, '#94a3b8');
                 resolvedProjectId = created?.id;
             } catch (error) {
-                console.error('Failed to create project from quick add', error);
+                logTaskError('Failed to create project from quick add', error);
             }
         }
         if (!resolvedProjectId) {
@@ -561,7 +572,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 message,
             });
         } catch (error) {
-            console.error('Share failed:', error);
+            logTaskError('Share failed:', error);
         }
     };
 
@@ -620,7 +631,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         try {
             imagePicker = await import('expo-image-picker');
         } catch (error) {
-            console.warn('Image picker unavailable', error);
+            logTaskWarn('Image picker unavailable', error);
             Alert.alert(t('attachments.photoUnavailableTitle'), t('attachments.photoUnavailableBody'));
             return;
         }
@@ -701,12 +712,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             try {
                 await sound.stopAsync();
             } catch (error) {
-                console.warn('Stop audio failed', error);
+                logTaskWarn('Stop audio failed', error);
             }
             try {
                 await sound.unloadAsync();
             } catch (error) {
-                console.warn('Unload audio failed', error);
+                logTaskWarn('Unload audio failed', error);
             }
         }
         setAudioStatus(null);
@@ -731,7 +742,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             audioSoundRef.current = sound;
             setAudioStatus(status);
         } catch (error) {
-            console.error('Failed to play audio attachment', error);
+            logTaskError('Failed to play audio attachment', error);
             Alert.alert(t('quickAdd.audioErrorTitle'), t('quickAdd.audioErrorBody'));
             setAudioModalVisible(false);
             setAudioAttachment(null);
@@ -757,7 +768,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 await sound.playAsync();
             }
         } catch (error) {
-            console.warn('Toggle audio playback failed', error);
+            logTaskWarn('Toggle audio playback failed', error);
         }
     }, [audioStatus]);
 
@@ -808,21 +819,21 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         }
 
         if (resolved.kind === 'link') {
-            Linking.openURL(resolved.uri).catch(console.error);
+            Linking.openURL(resolved.uri).catch((error) => logTaskError('Failed to open attachment URL', error));
             return;
         }
         if (isAudioAttachment(resolved)) {
-            openAudioAttachment(resolved).catch(console.error);
+            openAudioAttachment(resolved).catch((error) => logTaskError('Failed to open audio attachment', error));
             return;
         }
         const available = await Sharing.isAvailableAsync().catch((error) => {
-            console.warn('[Sharing] availability check failed', error);
+            logTaskWarn('[Sharing] availability check failed', error);
             return false;
         });
         if (available) {
-            Sharing.shareAsync(resolved.uri).catch(console.error);
+            Sharing.shareAsync(resolved.uri).catch((error) => logTaskError('Failed to share attachment', error));
         } else {
-            Linking.openURL(resolved.uri).catch(console.error);
+            Linking.openURL(resolved.uri).catch((error) => logTaskError('Failed to open attachment URL', error));
         }
     };
 
@@ -1248,18 +1259,18 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         if (current.length === 0 || !task) return;
         const reset = current.map((item) => ({ ...item, isCompleted: false }));
         applyChecklistUpdate(reset);
-        resetTaskChecklist(task.id).catch(console.error);
+        resetTaskChecklist(task.id).catch((error) => logTaskError('Failed to reset checklist', error));
     };
 
     const handleDuplicateTask = async () => {
         if (!task) return;
-        await duplicateTask(task.id, false).catch(console.error);
+        await duplicateTask(task.id, false).catch((error) => logTaskError('Failed to duplicate task', error));
         Alert.alert(t('taskEdit.duplicateDoneTitle'), t('taskEdit.duplicateDoneBody'));
     };
 
     const handleDeleteTask = async () => {
         if (!task) return;
-        await deleteTask(task.id).catch(console.error);
+        await deleteTask(task.id).catch((error) => logTaskError('Failed to delete task', error));
         onClose();
     };
 
@@ -1360,7 +1371,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 actions,
             });
         } catch (error) {
-            console.warn(error);
+            logTaskWarn(error);
             Alert.alert(t('ai.errorTitle'), t('ai.errorBody'));
         } finally {
             setIsAIWorking(false);
@@ -1407,7 +1418,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 ],
             });
         } catch (error) {
-            console.warn(error);
+            logTaskWarn(error);
             Alert.alert(t('ai.errorTitle'), t('ai.errorBody'));
         } finally {
             setIsAIWorking(false);

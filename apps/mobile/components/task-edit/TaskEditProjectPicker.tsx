@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View }
 import type { Project } from '@mindwtr/core';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { styles } from './task-edit-modal.styles';
+import { logError } from '../../lib/app-log';
 
 interface TaskEditProjectPickerProps {
     visible: boolean;
@@ -57,7 +58,7 @@ export function TaskEditProjectPicker({
             onSelectProject(created.id);
             onClose();
         } catch (error) {
-            console.error('Failed to create project', error);
+            void logError(error, { scope: 'project', extra: { message: 'Failed to create project' } });
         }
     };
 

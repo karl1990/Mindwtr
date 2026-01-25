@@ -1,6 +1,7 @@
 import { getNextScheduledAt, type Language, Task, type Project, useTaskStore, parseTimeOfDay, getTranslations, loadStoredLanguage, safeParseDate, hasTimeComponent } from '@mindwtr/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { logWarn } from './app-log';
 
 type NotificationsApi = typeof import('expo-notifications');
 type NotificationContentInput = {
@@ -35,8 +36,9 @@ let storeSubscription: (() => void) | null = null;
 
 let Notifications: NotificationsApi | null = null;
 
-const logNotificationError = (message: string, error: unknown) => {
-  console.warn(`[Notifications] ${message}`, error);
+const logNotificationError = (message: string, error?: unknown) => {
+  const extra = error ? { error: error instanceof Error ? error.message : String(error) } : undefined;
+  void logWarn(`[Notifications] ${message}`, { scope: 'notifications', extra });
 };
 
 async function loadNotifications(): Promise<NotificationsApi | null> {
@@ -61,7 +63,7 @@ async function loadNotifications(): Promise<NotificationsApi | null> {
     });
     return mod;
   } catch (error) {
-    console.warn('[Notifications] expo-notifications unavailable:', error);
+    logNotificationError('expo-notifications unavailable', error);
     return null;
   }
 }
@@ -405,16 +407,16 @@ export async function startMobileNotifications() {
 
   storeSubscription?.();
   storeSubscription = useTaskStore.subscribe(() => {
-    rescheduleAll(api).catch(console.error);
-    rescheduleDailyDigest(api).catch(console.error);
-    rescheduleWeeklyReview(api).catch(console.error);
+    rescheduleAll(api).catch((error) => logNotificationError('Failed to reschedule', error));
+    rescheduleDailyDigest(api).catch((error) => logNotificationError('Failed to reschedule daily digest', error));
+    rescheduleWeeklyReview(api).catch((error) => logNotificationError('Failed to reschedule weekly review', error));
   });
 
   responseSubscription?.remove();
   responseSubscription = api.addNotificationResponseReceivedListener((response: NotificationResponse) => {
     const taskId = (response.notification?.request?.content?.data as any)?.taskId as string | undefined;
     if (response.actionIdentifier === 'snooze10' && taskId) {
-      snoozeTask(api, taskId, 10).catch(console.error);
+      snoozeTask(api, taskId, 10).catch((error) => logNotificationError('Failed to snooze task', error));
     }
   });
 }

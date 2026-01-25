@@ -20,6 +20,7 @@ import { MarkdownText } from '../../components/markdown-text';
 import { ListSectionHeader, defaultListContentStyle } from '@/components/list-layout';
 import { ensureAttachmentAvailable } from '../../lib/attachment-sync';
 import { AttachmentProgressIndicator } from '../../components/AttachmentProgressIndicator';
+import { logError, logWarn } from '../../lib/app-log';
 
 type ProjectSectionItem = { type: 'project'; data: Project };
 
@@ -58,6 +59,11 @@ export default function ProjectsScreen() {
   const [selectedTagFilter, setSelectedTagFilter] = useState(ALL_TAGS);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [selectedAreaFilter, setSelectedAreaFilter] = useState(ALL_AREAS);
+
+  const logProjectError = useCallback((message: string, error?: unknown) => {
+    if (!error) return;
+    void logError(error, { scope: 'project', extra: { message } });
+  }, []);
   const [showAreaFilter, setShowAreaFilter] = useState(false);
   const [showTagFilter, setShowTagFilter] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
@@ -440,18 +446,21 @@ export default function ProjectsScreen() {
     }
 
     if (resolved.kind === 'link') {
-      Linking.openURL(resolved.uri).catch(console.error);
+      Linking.openURL(resolved.uri).catch((error) => logProjectError('Failed to open attachment URL', error));
       return;
     }
 
     const available = await Sharing.isAvailableAsync().catch((error) => {
-      console.warn('[Sharing] availability check failed', error);
+      void logWarn('[Sharing] availability check failed', {
+        scope: 'project',
+        extra: { error: error instanceof Error ? error.message : String(error) },
+      });
       return false;
     });
     if (available) {
-      Sharing.shareAsync(resolved.uri).catch(console.error);
+      Sharing.shareAsync(resolved.uri).catch((error) => logProjectError('Failed to share attachment', error));
     } else {
-      Linking.openURL(resolved.uri).catch(console.error);
+      Linking.openURL(resolved.uri).catch((error) => logProjectError('Failed to open attachment URL', error));
     }
   };
 

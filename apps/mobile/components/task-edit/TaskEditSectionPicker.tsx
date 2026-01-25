@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View }
 import type { Section } from '@mindwtr/core';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { styles } from './task-edit-modal.styles';
+import { logError } from '../../lib/app-log';
 
 interface TaskEditSectionPickerProps {
     visible: boolean;
@@ -67,7 +68,7 @@ export function TaskEditSectionPicker({
             }
             onClose();
         } catch (error) {
-            console.error('Failed to create section', error);
+            void logError(error, { scope: 'project', extra: { message: 'Failed to create section' } });
         }
     };
 

@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { buildAIConfig, loadAIKey } from '../lib/ai-config';
+import { logError } from '../lib/app-log';
 
 type ReviewStep = 'intro' | 'inbox' | 'ai' | 'waiting' | 'projects' | 'someday' | 'completed';
 
@@ -189,7 +190,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
         try {
             await AsyncStorage.setItem('lastWeeklyReview', new Date().toISOString());
         } catch (e) {
-            console.error('Failed to save review time', e);
+            void logError(e, { scope: 'review', extra: { message: 'Failed to save review time' } });
         }
         handleClose();
     };

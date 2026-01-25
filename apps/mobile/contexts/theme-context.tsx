@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
 import { useTaskStore } from '@mindwtr/core';
+import { logError } from '../lib/app-log';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'material3-light' | 'material3-dark' | 'eink' | 'nord' | 'sepia' | 'oled';
 type ThemePreset = 'default' | 'eink' | 'nord' | 'sepia' | 'oled';
@@ -78,7 +79,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                 setThemeStyleState(savedThemeStyle as ThemeStyle);
             }
         } catch (e) {
-            console.error('Failed to load theme preference:', e);
+            void logError(e, { scope: 'theme', extra: { message: 'Failed to load theme preference' } });
         } finally {
             setIsReady(true);
         }
@@ -96,7 +97,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                 setThemeStyleState('default');
             }
         } catch (e) {
-            console.error('Failed to save theme preference:', e);
+            void logError(e, { scope: 'theme', extra: { message: 'Failed to save theme preference' } });
         }
     };
 
@@ -105,7 +106,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             await AsyncStorage.setItem(THEME_STYLE_STORAGE_KEY, style);
             setThemeStyleState(style);
         } catch (e) {
-            console.error('Failed to save theme preference:', e);
+            void logError(e, { scope: 'theme', extra: { message: 'Failed to save theme preference' } });
         }
     };
 

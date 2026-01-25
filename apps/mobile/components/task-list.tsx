@@ -23,6 +23,7 @@ import { useLanguage } from '../contexts/language-context';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { buildCopilotConfig, loadAIKey } from '../lib/ai-config';
+import { logError } from '../lib/app-log';
 
 export interface TaskListProps {
   statusFilter: TaskStatus | 'all';
@@ -292,7 +293,9 @@ function TaskListComponent({
   }, [trigger, typeaheadOptions.length]);
 
   useEffect(() => {
-    loadAIKey(aiProvider).then(setAiKey).catch(console.error);
+    loadAIKey(aiProvider).then(setAiKey).catch((error) => {
+      void logError(error, { scope: 'ai', extra: { message: 'Failed to load AI key' } });
+    });
   }, [aiProvider]);
 
   useEffect(() => {

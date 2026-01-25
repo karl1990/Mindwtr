@@ -94,7 +94,15 @@ const moveDirectories = async (userInput) => {
       }`
     );
   } catch (error) {
-    console.error(`❌ Error during script execution: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "error",
+        scope: "script",
+        message: `reset-project failed: ${message}`,
+      }) + "\n"
+    );
   }
 };
 

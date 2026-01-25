@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import Constants from 'expo-constants';
 import type { AudioCaptureMode, AudioFieldStrategy } from '@mindwtr/core';
+import { logWarn } from './app-log';
 
 type SpeechProvider = 'openai' | 'gemini' | 'whisper';
 
@@ -317,7 +318,10 @@ const parseWithOpenAI = async (transcript: string, config: SpeechToTextConfig, o
   try {
     return await parseWithOpenAIResponses(transcript, config, overrideModel);
   } catch (error) {
-    console.warn('OpenAI responses parse failed, retrying with chat completions', error);
+    void logWarn('OpenAI responses parse failed, retrying with chat completions', {
+      scope: 'speech',
+      extra: { error: error instanceof Error ? error.message : String(error) },
+    });
     return parseWithOpenAIChat(transcript, config, overrideModel);
   }
 };
@@ -450,7 +454,10 @@ export async function processAudioCapture(
         transcript: parsed.transcript || transcript,
       };
     } catch (retryError) {
-      console.warn('OpenAI smart parse failed, falling back to transcript', retryError);
+      void logWarn('OpenAI smart parse failed, falling back to transcript', {
+        scope: 'speech',
+        extra: { error: retryError instanceof Error ? retryError.message : String(retryError) },
+      });
       return { transcript };
     }
   }

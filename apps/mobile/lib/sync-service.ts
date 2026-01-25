@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppData, MergeStats, useTaskStore, webdavGetJson, webdavPutJson, cloudGetJson, cloudPutJson, flushPendingSave, performSyncCycle, findOrphanedAttachments, removeOrphanedAttachmentsFromData, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
-import { logInfo, logSyncError, sanitizeLogMessage } from './app-log';
+import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, writeSyncFile } from './storage-file';
 import { getBaseSyncUrl, getCloudBaseUrl, sanitizeAppDataForRemote, syncCloudAttachments, syncFileAttachments, syncWebdavAttachments, cleanupAttachmentTempFiles } from './attachment-sync';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -19,6 +19,11 @@ const DEFAULT_SYNC_TIMEOUT_MS = 30_000;
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SYNC_FILE_NAME = 'data.json';
 const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
+
+const logSyncWarning = (message: string, error?: unknown) => {
+  const extra = error ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) } : undefined;
+  void logWarn(message, { scope: 'sync', extra });
+};
 
 const normalizeWebdavUrl = (rawUrl: string): string => {
   const trimmed = rawUrl.replace(/\/+$/, '');
@@ -43,7 +48,7 @@ const deleteAttachmentFile = async (uri?: string): Promise<void> => {
   try {
     await FileSystem.deleteAsync(uri, { idempotent: true });
   } catch (error) {
-    console.warn('Failed to delete attachment file', error);
+    logSyncWarning('Failed to delete attachment file', error);
   }
 };
 
@@ -248,7 +253,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
                   await FileSystem.deleteAsync(targetPath, { idempotent: true });
                 }
               } catch (error) {
-                console.warn('Failed to delete remote attachment', error);
+                logSyncWarning('Failed to delete remote attachment', error);
               }
             }
           }
@@ -272,7 +277,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           lastSyncError: undefined,
         });
       } catch (error) {
-        console.warn('[Mobile] Failed to persist sync status', error);
+        logSyncWarning('[Mobile] Failed to persist sync status', error);
       }
       return { success: true, stats: syncResult.stats };
     } catch (error) {
@@ -300,7 +305,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           lastSyncHistory: nextHistory,
         });
       } catch (e) {
-        console.error('[Mobile] Failed to persist sync error', e);
+        logSyncWarning('[Mobile] Failed to persist sync error', e);
       }
 
       return { success: false, error: `${safeMessage}${logHint}` };

@@ -21,6 +21,7 @@ import {
   WEBDAV_URL_KEY,
   WEBDAV_USERNAME_KEY,
 } from './sync-constants';
+import { logWarn, sanitizeLogMessage } from './app-log';
 
 const ATTACHMENTS_DIR_NAME = 'attachments';
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
@@ -41,6 +42,11 @@ const downloadLocks = new Map<string, Promise<Attachment | null>>();
 const FILE_BACKEND_VALIDATION_CONFIG = {
   maxFileSizeBytes: Number.POSITIVE_INFINITY,
   blockedMimeTypes: [],
+};
+
+const logAttachmentWarn = (message: string, error?: unknown) => {
+  const extra = error ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) } : undefined;
+  void logWarn(message, { scope: 'attachment', extra });
 };
 
 const reportProgress = (
@@ -246,7 +252,7 @@ const getAttachmentsDir = async (): Promise<string | null> => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.toLowerCase().includes('already exists')) {
-      console.warn('Failed to ensure attachments directory', error);
+      logAttachmentWarn('Failed to ensure attachments directory', error);
     }
   }
   return dir;
@@ -262,11 +268,11 @@ export const cleanupAttachmentTempFiles = async (): Promise<void> => {
       try {
         await FileSystem.deleteAsync(`${dir}${entry}`, { idempotent: true });
       } catch (error) {
-        console.warn('Failed to remove temp attachment file', error);
+        logAttachmentWarn('Failed to remove temp attachment file', error);
       }
     }
   } catch (error) {
-    console.warn('Failed to scan temp attachment files', error);
+    logAttachmentWarn('Failed to scan temp attachment files', error);
   }
 };
 
@@ -302,7 +308,7 @@ const resolveFileSyncDir = async (
         );
         attachmentsDirUri = matchEntry?.entry ?? null;
       } catch (innerError) {
-        console.warn('Failed to resolve SAF attachments directory', innerError);
+        logAttachmentWarn('Failed to resolve SAF attachments directory', innerError);
       }
     }
     if (!attachmentsDirUri) return null;
@@ -320,7 +326,7 @@ const resolveFileSyncDir = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.toLowerCase().includes('already exists')) {
-      console.warn('Failed to ensure sync attachments directory', error);
+      logAttachmentWarn('Failed to ensure sync attachments directory', error);
     }
   }
   return { type: 'file', dirUri, attachmentsDirUri };
@@ -339,7 +345,7 @@ const findSafEntry = async (dirUri: string, fileName: string): Promise<string | 
     );
     return matchEntry?.entry ?? null;
   } catch (error) {
-    console.warn('Failed to read SAF directory', error);
+    logAttachmentWarn('Failed to read SAF directory', error);
     return null;
   }
 };
@@ -365,7 +371,7 @@ const getAttachmentByteSize = async (attachment: Attachment, uri: string): Promi
     const info = await FileSystem.getInfoAsync(uri);
     return info.exists && typeof info.size === 'number' ? info.size : null;
   } catch (error) {
-    console.warn('Failed to read attachment size', error);
+    logAttachmentWarn('Failed to read attachment size', error);
     return attachment.size ?? null;
   }
 };
@@ -385,7 +391,7 @@ const fileExists = async (uri: string): Promise<boolean> => {
     const info = await FileSystem.getInfoAsync(uri);
     return info.exists;
   } catch (error) {
-    console.warn('Failed to check attachment file', error);
+    logAttachmentWarn('Failed to check attachment file', error);
     return false;
   }
 };
@@ -402,7 +408,7 @@ export const syncWebdavAttachments = async (
       password: webDavConfig.password,
     });
   } catch (error) {
-    console.warn('Failed to ensure WebDAV attachments directory', error);
+    logAttachmentWarn('Failed to ensure WebDAV attachments directory', error);
   }
 
   await getAttachmentsDir();
@@ -440,7 +446,7 @@ export const syncWebdavAttachments = async (
         const fileData = await readFileAsBytes(uri);
         const validation = await validateAttachmentForUpload(attachment, fileData.byteLength);
         if (!validation.valid) {
-          console.warn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
           continue;
         }
         reportProgress(attachment.id, 'upload', 0, fileData.byteLength, 'active');
@@ -469,7 +475,7 @@ export const syncWebdavAttachments = async (
           'failed',
           error instanceof Error ? error.message : String(error)
         );
-        console.warn(`Failed to upload attachment ${attachment.title}`, error);
+        logAttachmentWarn(`Failed to upload attachment ${attachment.title}`, error);
       }
     }
   }
@@ -517,7 +523,7 @@ export const syncCloudAttachments = async (
         const fileData = await readFileAsBytes(uri);
         const validation = await validateAttachmentForUpload(attachment, fileData.byteLength);
         if (!validation.valid) {
-          console.warn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
           continue;
         }
         reportProgress(attachment.id, 'upload', 0, fileData.byteLength, 'active');
@@ -545,7 +551,7 @@ export const syncCloudAttachments = async (
           'failed',
           error instanceof Error ? error.message : String(error)
         );
-        console.warn(`Failed to upload attachment ${attachment.title}`, error);
+        logAttachmentWarn(`Failed to upload attachment ${attachment.title}`, error);
       }
     }
   }
@@ -598,7 +604,7 @@ export const syncFileAttachments = async (
         if (size != null) {
           const validation = await validateAttachmentForUpload(attachment, size, FILE_BACKEND_VALIDATION_CONFIG);
           if (!validation.valid) {
-            console.warn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+            logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
             continue;
           }
         }
@@ -619,7 +625,7 @@ export const syncFileAttachments = async (
         attachment.localStatus = 'available';
         didMutate = true;
       } catch (error) {
-        console.warn(`Failed to copy attachment ${attachment.title} to sync folder`, error);
+        logAttachmentWarn(`Failed to copy attachment ${attachment.title} to sync folder`, error);
       }
     }
   }
@@ -654,7 +660,7 @@ const ensureFileAttachmentAvailable = async (attachment: Attachment, syncPath: s
     await writeBytesSafely(targetUri, base64ToBytes(base64));
     return { ...attachment, uri: targetUri, localStatus: 'available' };
   } catch (error) {
-    console.warn(`Failed to copy attachment ${attachment.title} from sync folder`, error);
+    logAttachmentWarn(`Failed to copy attachment ${attachment.title} from sync folder`, error);
     return null;
   }
 };
@@ -718,7 +724,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
         'failed',
         error instanceof Error ? error.message : String(error)
       );
-      console.warn(`Failed to download attachment ${attachment.title}`, error);
+      logAttachmentWarn(`Failed to download attachment ${attachment.title}`, error);
       return null;
     }
   }
@@ -757,7 +763,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
         'failed',
         error instanceof Error ? error.message : String(error)
       );
-      console.warn(`Failed to download attachment ${attachment.title}`, error);
+      logAttachmentWarn(`Failed to download attachment ${attachment.title}`, error);
       return null;
     }
   }

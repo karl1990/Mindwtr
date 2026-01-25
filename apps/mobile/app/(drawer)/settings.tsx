@@ -52,7 +52,7 @@ import {
 import { pickAndParseSyncFile, pickAndParseSyncFolder, exportData } from '../../lib/storage-file';
 import { fetchExternalCalendarEvents, getExternalCalendars, saveExternalCalendars } from '../../lib/external-calendar';
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
-import { clearLog, getLogPath, logInfo } from '../../lib/app-log';
+import { clearLog, getLogPath, logError, logInfo, logWarn } from '../../lib/app-log';
 import { performMobileSync } from '../../lib/sync-service';
 import {
     SYNC_PATH_KEY,
@@ -102,6 +102,29 @@ const WHISPER_MODELS: Array<{ id: string; fileName: string; label: string }> = [
     { id: 'whisper-base.en', fileName: 'ggml-base.en.bin', label: 'whisper-base.en' },
 ];
 const DEFAULT_WHISPER_MODEL = WHISPER_MODELS[0]?.id ?? 'whisper-tiny';
+
+const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const logSettingsWarn = (messageOrError: unknown, error?: unknown) => {
+    if (typeof messageOrError === 'string') {
+        const extra = error ? { error: formatError(error) } : undefined;
+        void logWarn(messageOrError, { scope: 'settings', extra });
+        return;
+    }
+    const err = messageOrError;
+    const extra = err ? { error: formatError(err) } : undefined;
+    void logWarn('Settings warning', { scope: 'settings', extra });
+};
+
+const logSettingsError = (messageOrError: unknown, error?: unknown) => {
+    if (typeof messageOrError === 'string') {
+        const err = error instanceof Error ? error : new Error(messageOrError);
+        const extra = error ? { error: formatError(error), message: messageOrError } : { message: messageOrError };
+        void logError(err, { scope: 'settings', extra });
+        return;
+    }
+    void logError(messageOrError, { scope: 'settings' });
+};
 
 const maskCalendarUrl = (url: string): string => {
     const trimmed = url.trim();
@@ -287,9 +310,9 @@ export default function SettingsPage() {
         const minutes = String(selected.getMinutes()).padStart(2, '0');
         const value = `${hours}:${minutes}`;
         if (picker === 'morning') {
-            updateSettings({ dailyDigestMorningTime: value }).catch(console.error);
+            updateSettings({ dailyDigestMorningTime: value }).catch(logSettingsError);
         } else {
-            updateSettings({ dailyDigestEveningTime: value }).catch(console.error);
+            updateSettings({ dailyDigestEveningTime: value }).catch(logSettingsError);
         }
     };
 
@@ -298,7 +321,7 @@ export default function SettingsPage() {
         if (!selected) return;
         const hours = String(selected.getHours()).padStart(2, '0');
         const minutes = String(selected.getMinutes()).padStart(2, '0');
-        updateSettings({ weeklyReviewTime: `${hours}:${minutes}` }).catch(console.error);
+        updateSettings({ weeklyReviewTime: `${hours}:${minutes}` }).catch(logSettingsError);
     };
 
     const getWeekdayLabel = (dayIndex: number) => {
@@ -337,15 +360,15 @@ export default function SettingsPage() {
             if (password) setWebdavPassword(password);
             if (cloudSyncUrl) setCloudUrl(cloudSyncUrl);
             if (cloudSyncToken) setCloudToken(cloudSyncToken);
-        }).catch(console.error);
+        }).catch(logSettingsError);
     }, []);
 
     useEffect(() => {
-        getExternalCalendars().then(setExternalCalendars).catch(console.error);
+        getExternalCalendars().then(setExternalCalendars).catch(logSettingsError);
     }, []);
 
     useEffect(() => {
-        loadAIKey(aiProvider).then(setAiApiKey).catch(console.error);
+        loadAIKey(aiProvider).then(setAiApiKey).catch(logSettingsError);
     }, [aiProvider]);
 
     useEffect(() => {
@@ -353,7 +376,7 @@ export default function SettingsPage() {
             setSpeechApiKey('');
             return;
         }
-        loadAIKey(speechProvider).then(setSpeechApiKey).catch(console.error);
+        loadAIKey(speechProvider).then(setSpeechApiKey).catch(logSettingsError);
     }, [speechProvider]);
 
     const handleSettingsBack = useCallback(() => {
@@ -416,7 +439,7 @@ export default function SettingsPage() {
     const currentThemeLabel = themeOptions.find((opt) => opt.value === themeMode)?.label ?? t('settings.system');
     const openLink = (url: string) => Linking.openURL(url);
     const updateAISettings = (next: Partial<NonNullable<typeof settings.ai>>) => {
-        updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(console.error);
+        updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(logSettingsError);
     };
     const updateSpeechSettings = (
         next: Partial<NonNullable<NonNullable<typeof settings.ai>['speechToText']>>
@@ -429,12 +452,12 @@ export default function SettingsPage() {
         try {
             candidates.push(new Directory(Paths.document, 'whisper-models'));
         } catch (error) {
-            console.warn('Whisper document directory unavailable', error);
+            logSettingsWarn('Whisper document directory unavailable', error);
         }
         try {
             candidates.push(new Directory(Paths.cache, 'whisper-models'));
         } catch (error) {
-            console.warn('Whisper cache directory unavailable', error);
+            logSettingsWarn('Whisper cache directory unavailable', error);
         }
         return candidates.length ? candidates[0] : null;
     };
@@ -443,7 +466,7 @@ export default function SettingsPage() {
         try {
             return Paths.info(uri);
         } catch (error) {
-            console.warn('Whisper path info failed', error);
+            logSettingsWarn('Whisper path info failed', error);
             return null;
         }
     };
@@ -476,7 +499,7 @@ export default function SettingsPage() {
                     whisperSizeLabel = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
                 }
             } catch (error) {
-                console.warn('Whisper file info failed', error);
+                logSettingsWarn('Whisper file info failed', error);
             }
         }
     }
@@ -510,7 +533,7 @@ export default function SettingsPage() {
                     conflict.delete();
                 }
             } catch (cleanupError) {
-                console.warn('Whisper model cleanup failed', cleanupError);
+                logSettingsWarn('Whisper model cleanup failed', cleanupError);
             }
             const existingInfo = safePathInfo(targetFile.uri);
             if (existingInfo?.exists && existingInfo.isDirectory === false) {
@@ -523,7 +546,7 @@ export default function SettingsPage() {
                         return;
                     }
                 } catch (error) {
-                    console.warn('Whisper existing file check failed', error);
+                    logSettingsWarn('Whisper existing file check failed', error);
                 }
             }
             try {
@@ -544,7 +567,7 @@ export default function SettingsPage() {
             const message = error instanceof Error ? error.message : String(error);
             setWhisperDownloadError(message);
             setWhisperDownloadState('error');
-            console.warn('Whisper model download failed', error);
+            logSettingsWarn('Whisper model download failed', error);
             Alert.alert(t('settings.speechOfflineDownloadError'), message);
             return;
         }
@@ -567,7 +590,7 @@ export default function SettingsPage() {
             }
             updateSpeechSettings({ offlineModelPath: undefined });
         } catch (error) {
-            console.warn('Whisper model delete failed', error);
+            logSettingsWarn('Whisper model delete failed', error);
             Alert.alert(t('settings.speechOfflineDeleteError'), t('settings.speechOfflineDeleteErrorBody'));
         }
     };
@@ -657,7 +680,7 @@ export default function SettingsPage() {
                 );
             }
         } catch (error) {
-            console.error('Update check failed:', error);
+            logSettingsError('Update check failed:', error);
             Alert.alert(
                 localize('Error', '错误'),
                 localize('Failed to check for updates', '检查更新失败')
@@ -686,7 +709,7 @@ export default function SettingsPage() {
                 }
             }
         } catch (error) {
-            console.error(error);
+            logSettingsError(error);
             const message = String(error);
             if (/read-only|read only|not writable|isn't writable|permission denied|EACCES/i.test(message)) {
                 Alert.alert(
@@ -771,7 +794,7 @@ export default function SettingsPage() {
                 throw new Error(result.error || 'Unknown error');
             }
         } catch (error) {
-            console.error(error);
+            logSettingsError(error);
             Alert.alert(localize('Error', '错误'), localize('Sync failed', '同步失败'));
         } finally {
             setIsSyncing(false);
@@ -813,7 +836,7 @@ export default function SettingsPage() {
         try {
             await exportData({ tasks, projects, sections, areas, settings });
         } catch (error) {
-            console.error(error);
+            logSettingsError(error);
             Alert.alert(localize('Error', '错误'), localize('Failed to export data', '导出失败'));
         } finally {
             setIsSyncing(false);
@@ -832,7 +855,7 @@ export default function SettingsPage() {
                     await logInfo('Debug logging enabled', { scope: 'diagnostics' });
                 }
             })
-            .catch(console.error);
+            .catch(logSettingsError);
     };
 
     const handleShareLog = async () => {
@@ -865,7 +888,7 @@ export default function SettingsPage() {
                 ...(settings.features ?? {}),
                 ...next,
             },
-        }).catch(console.error);
+        }).catch(logSettingsError);
     };
 
     // Sub-screen header
@@ -899,7 +922,7 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={notificationsEnabled}
-                                onValueChange={(value) => updateSettings({ notificationsEnabled: value }).catch(console.error)}
+                                onValueChange={(value) => updateSettings({ notificationsEnabled: value }).catch(logSettingsError)}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>
@@ -915,7 +938,7 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={weeklyReviewEnabled}
-                                onValueChange={(value) => updateSettings({ weeklyReviewEnabled: value }).catch(console.error)}
+                                onValueChange={(value) => updateSettings({ weeklyReviewEnabled: value }).catch(logSettingsError)}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                                 disabled={!notificationsEnabled}
                             />
@@ -976,7 +999,7 @@ export default function SettingsPage() {
                                                     { borderColor: tc.border, backgroundColor: selected ? tc.filterBg : 'transparent' },
                                                 ]}
                                                 onPress={() => {
-                                                    updateSettings({ weeklyReviewDay: idx }).catch(console.error);
+                                                    updateSettings({ weeklyReviewDay: idx }).catch(logSettingsError);
                                                     setWeeklyReviewDayPickerOpen(false);
                                                 }}
                                             >
@@ -1011,7 +1034,7 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={dailyDigestMorningEnabled}
-                                onValueChange={(value) => updateSettings({ dailyDigestMorningEnabled: value }).catch(console.error)}
+                                onValueChange={(value) => updateSettings({ dailyDigestMorningEnabled: value }).catch(logSettingsError)}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>
@@ -1040,7 +1063,7 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={dailyDigestEveningEnabled}
-                                onValueChange={(value) => updateSettings({ dailyDigestEveningEnabled: value }).catch(console.error)}
+                                onValueChange={(value) => updateSettings({ dailyDigestEveningEnabled: value }).catch(logSettingsError)}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>
@@ -1143,7 +1166,7 @@ export default function SettingsPage() {
                                                 ]}
                                                 onPress={() => {
                                                     setThemeMode(option.value);
-                                                    updateSettings({ theme: mapThemeToSetting(option.value) }).catch(console.error);
+                                                    updateSettings({ theme: mapThemeToSetting(option.value) }).catch(logSettingsError);
                                                     setThemePickerOpen(false);
                                                 }}
                                             >
@@ -1515,7 +1538,7 @@ export default function SettingsPage() {
                                 value={aiApiKey}
                                 onChangeText={(value) => {
                                     setAiApiKey(value);
-                                    saveAIKey(aiProvider, value).catch(console.error);
+                                    saveAIKey(aiProvider, value).catch(logSettingsError);
                                 }}
                                 placeholder={t('settings.aiApiKeyPlaceholder')}
                                 placeholderTextColor={tc.secondaryText}
@@ -1715,7 +1738,7 @@ export default function SettingsPage() {
                                             value={speechApiKey}
                                             onChangeText={(value) => {
                                                 setSpeechApiKey(value);
-                                                saveAIKey(speechProvider, value).catch(console.error);
+                                                saveAIKey(speechProvider, value).catch(logSettingsError);
                                             }}
                                             placeholder={t('settings.aiApiKeyPlaceholder')}
                                             placeholderTextColor={tc.secondaryText}
@@ -1930,7 +1953,7 @@ export default function SettingsPage() {
                                                 ...(settings.gtd ?? {}),
                                                 defaultCaptureMethod: 'text',
                                             },
-                                        }).catch(console.error);
+                                        }).catch(logSettingsError);
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: defaultCaptureMethod === 'text' ? tc.tint : tc.secondaryText }]}>
@@ -1948,7 +1971,7 @@ export default function SettingsPage() {
                                                 ...(settings.gtd ?? {}),
                                                 defaultCaptureMethod: 'audio',
                                             },
-                                        }).catch(console.error);
+                                        }).catch(logSettingsError);
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: defaultCaptureMethod === 'audio' ? tc.tint : tc.secondaryText }]}>
@@ -1973,7 +1996,7 @@ export default function SettingsPage() {
                                                 ...(settings.gtd ?? {}),
                                                 saveAudioAttachments: value,
                                             },
-                                        }).catch(console.error);
+                                        }).catch(logSettingsError);
                                     }}
                                     trackColor={{ false: '#767577', true: '#3B82F6' }}
                                 />
@@ -1999,7 +2022,7 @@ export default function SettingsPage() {
                     ...(settings.gtd ?? {}),
                     autoArchiveDays: days,
                 },
-            }).catch(console.error);
+            }).catch(logSettingsError);
         };
 
         return (
@@ -2064,7 +2087,7 @@ export default function SettingsPage() {
                     ...(settings.gtd ?? {}),
                     timeEstimatePresets: ordered,
                 },
-            }).catch(console.error);
+            }).catch(logSettingsError);
         };
 
         const resetToDefault = () => {
@@ -2073,7 +2096,7 @@ export default function SettingsPage() {
                     ...(settings.gtd ?? {}),
                     timeEstimatePresets: [...defaultTimeEstimatePresets],
                 },
-            }).catch(console.error);
+            }).catch(logSettingsError);
         };
 
         return (
@@ -2212,7 +2235,7 @@ export default function SettingsPage() {
                         ...(next.hidden ? { hidden: next.hidden } : null),
                     },
                 },
-            }).catch(console.error);
+            }).catch(logSettingsError);
         };
 
         const toggleFieldVisibility = (fieldId: TaskEditorFieldId) => {
@@ -2413,7 +2436,7 @@ export default function SettingsPage() {
                     language === 'zh' ? `已加载 ${events.length} 个日程` : translateText(`Loaded ${events.length} events`, language)
                 );
             } catch (error) {
-                console.error(error);
+                logSettingsError(error);
                 Alert.alert(localize('Error', '错误'), localize('Failed to load events', '加载失败'));
             }
         };
@@ -2557,7 +2580,7 @@ export default function SettingsPage() {
                                         { borderColor: tc.border, backgroundColor: syncBackend === 'off' ? tc.filterBg : 'transparent' },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off').catch(console.error);
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off').catch(logSettingsError);
                                         setSyncBackend('off');
                                     }}
                                 >
@@ -2571,7 +2594,7 @@ export default function SettingsPage() {
                                         { borderColor: tc.border, backgroundColor: syncBackend === 'file' ? tc.filterBg : 'transparent' },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file').catch(console.error);
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file').catch(logSettingsError);
                                         setSyncBackend('file');
                                     }}
                                 >
@@ -2585,7 +2608,7 @@ export default function SettingsPage() {
                                         { borderColor: tc.border, backgroundColor: syncBackend === 'webdav' ? tc.filterBg : 'transparent' },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'webdav').catch(console.error);
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'webdav').catch(logSettingsError);
                                         setSyncBackend('webdav');
                                     }}
                                 >
@@ -2599,7 +2622,7 @@ export default function SettingsPage() {
                                         { borderColor: tc.border, backgroundColor: syncBackend === 'cloud' ? tc.filterBg : 'transparent' },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(console.error);
+                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(logSettingsError);
                                         setSyncBackend('cloud');
                                     }}
                                 >
@@ -2789,7 +2812,7 @@ export default function SettingsPage() {
                                             [WEBDAV_PASSWORD_KEY, webdavPassword],
                                         ]).then(() => {
                                             Alert.alert(localize('Success', '成功'), t('settings.webdavSave'));
-                                        }).catch(console.error);
+                                        }).catch(logSettingsError);
                                     }}
                                     disabled={webdavUrlError || !webdavUrl.trim()}
                                 >
@@ -2923,7 +2946,7 @@ export default function SettingsPage() {
                                             [CLOUD_TOKEN_KEY, cloudToken],
                                         ]).then(() => {
                                             Alert.alert(localize('Success', '成功'), t('settings.cloudSave'));
-                                        }).catch(console.error);
+                                        }).catch(logSettingsError);
                                     }}
                                     disabled={cloudUrlError || !cloudUrl.trim()}
                                 >

@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 
 import { WIDGET_DATA_KEY } from './widget-data';
 import { updateAndroidWidgetFromData } from './widget-service';
+import { logError, logWarn } from './app-log';
 
 const DATA_KEY = WIDGET_DATA_KEY;
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
@@ -18,9 +19,22 @@ let sqliteStatePromise: Promise<SqliteState> | null = null;
 let preferJsonBackup = false;
 let didWarnPreferJsonBackup = false;
 
+const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const logStorageWarn = (message: string, error?: unknown) => {
+    const extra = error ? { error: formatError(error) } : undefined;
+    void logWarn(message, { scope: 'storage', extra });
+};
+
+const logStorageError = (message: string, error?: unknown) => {
+    const err = error instanceof Error ? error : new Error(message);
+    const extra = error ? { error: formatError(error), message } : { message };
+    void logError(err, { scope: 'storage', extra });
+};
+
 const warnPreferJsonBackup = () => {
     if (didWarnPreferJsonBackup) return;
-    console.warn('[Storage] SQLite unavailable; using JSON backup for reads until restart.');
+    logStorageWarn('[Storage] SQLite unavailable; using JSON backup for reads until restart.');
     didWarnPreferJsonBackup = true;
 };
 
@@ -101,7 +115,7 @@ const createSqliteClient = async (): Promise<SqliteClient> => {
             }
         } catch (error) {
             if (__DEV__) {
-                console.warn('[Storage] Async SQLite open failed, falling back to legacy API', error);
+                logStorageWarn('[Storage] Async SQLite open failed, falling back to legacy API', error);
             }
         }
     }
@@ -145,7 +159,7 @@ const initSqliteState = async (): Promise<SqliteState> => {
         await adapter.ensureSchema();
     } catch (error) {
         if (__DEV__) {
-            console.warn('[Storage] SQLite schema init failed, retrying with legacy API', error);
+            logStorageWarn('[Storage] SQLite schema init failed, retrying with legacy API', error);
         }
         const SQLite = await import('expo-sqlite');
         const legacyDb = (SQLite as any).openDatabase(SQLITE_DB_NAME);
@@ -158,7 +172,7 @@ const initSqliteState = async (): Promise<SqliteState> => {
         hasData = await sqliteHasAnyData(client);
     } catch (error) {
         if (__DEV__) {
-            console.warn('[Storage] SQLite availability check failed', error);
+            logStorageWarn('[Storage] SQLite availability check failed', error);
         }
         hasData = false;
     }
@@ -172,7 +186,7 @@ const initSqliteState = async (): Promise<SqliteState> => {
                 await AsyncStorage.setItem(DATA_KEY, JSON.stringify(data));
                 await adapter.saveData(data);
             } catch (error) {
-                console.warn('[Storage] Failed to migrate JSON data to SQLite', error);
+                logStorageWarn('[Storage] Failed to migrate JSON data to SQLite', error);
             }
         }
     }
@@ -223,7 +237,7 @@ const createStorage = (): StorageAdapter => {
                     return data;
                 } catch (e) {
                     // JSON parse error - data corrupted, throw so user is notified
-                    console.error('Failed to parse stored data - may be corrupted', e);
+                    logStorageError('Failed to parse stored data - may be corrupted', e);
                     throw new Error('Data appears corrupted. Please restore from backup.');
                 }
             },
@@ -234,7 +248,7 @@ const createStorage = (): StorageAdapter => {
                         localStorage.setItem(DATA_KEY, jsonValue);
                     }
                 } catch (e) {
-                    console.error('Failed to save data', e);
+                    logStorageError('Failed to save data', e);
                     throw new Error('Failed to save data: ' + (e as Error).message);
                 }
             },
@@ -254,11 +268,11 @@ const createStorage = (): StorageAdapter => {
                         const data = JSON.parse(jsonValue) as AppData;
                         data.areas = Array.isArray(data.areas) ? data.areas : [];
                         updateAndroidWidgetFromData(data).catch((error) => {
-                            console.warn('[Widgets] Failed to update Android widget from backup', error);
+                            logStorageWarn('[Widgets] Failed to update Android widget from backup', error);
                         });
                         return data;
                     } catch (parseError) {
-                        console.error('Failed to parse stored data - may be corrupted', parseError);
+                        logStorageError('Failed to parse stored data - may be corrupted', parseError);
                     }
                 }
                 throw new Error('Data appears corrupted. Please restore from backup.');
@@ -279,16 +293,16 @@ const createStorage = (): StorageAdapter => {
                 const data = await adapter.getData();
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
                 updateAndroidWidgetFromData(data).catch((error) => {
-                    console.warn('[Widgets] Failed to update Android widget from storage load', error);
+                    logStorageWarn('[Widgets] Failed to update Android widget from storage load', error);
                 });
                 preferJsonBackup = false;
                 didWarnPreferJsonBackup = false;
                 return data;
             } catch (e) {
                 if (__DEV__ && !shouldUseSqlite && String(e).includes('Expo Go')) {
-                    console.warn('[Storage] SQLite disabled in Expo Go, falling back to JSON backup');
+                    logStorageWarn('[Storage] SQLite disabled in Expo Go, falling back to JSON backup');
                 } else {
-                    console.warn('[Storage] SQLite load failed, falling back to JSON backup', e);
+                    logStorageWarn('[Storage] SQLite load failed, falling back to JSON backup', e);
                 }
                 return loadJsonBackup();
             }
@@ -306,9 +320,9 @@ const createStorage = (): StorageAdapter => {
                 preferJsonBackup = true;
                 warnPreferJsonBackup();
                 if (__DEV__ && !shouldUseSqlite && String(error).includes('Expo Go')) {
-                    console.warn('[Storage] SQLite disabled in Expo Go, keeping JSON backup');
+                    logStorageWarn('[Storage] SQLite disabled in Expo Go, keeping JSON backup');
                 } else {
-                    console.warn('[Storage] SQLite save failed, keeping JSON backup', error);
+                    logStorageWarn('[Storage] SQLite save failed, keeping JSON backup', error);
                 }
             }
             try {
@@ -316,7 +330,7 @@ const createStorage = (): StorageAdapter => {
                 await AsyncStorage.setItem(DATA_KEY, jsonValue);
                 await updateAndroidWidgetFromData(data);
             } catch (e) {
-                console.error('Failed to save data', e);
+                logStorageError('Failed to save data', e);
                 throw new Error('Failed to save data: ' + (e as Error).message);
             }
         },
@@ -327,7 +341,7 @@ const createStorage = (): StorageAdapter => {
                     return (adapter as any).queryTasks(options);
                 }
             } catch (error) {
-                console.warn('[Storage] SQLite query failed, falling back to in-memory filter', error);
+                logStorageWarn('[Storage] SQLite query failed, falling back to in-memory filter', error);
             }
             const data = await mobileStorage.getData();
             const statusFilter = options.status;
@@ -350,7 +364,7 @@ const createStorage = (): StorageAdapter => {
                     return (adapter as any).searchAll(query);
                 }
             } catch (error) {
-                console.warn('[Storage] SQLite search failed, falling back to in-memory search', error);
+                logStorageWarn('[Storage] SQLite search failed, falling back to in-memory search', error);
             }
             const data = await mobileStorage.getData();
             const { searchAll } = await import('@mindwtr/core');

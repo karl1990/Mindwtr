@@ -7,6 +7,7 @@ import { useLanguage } from '../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { ReviewModal } from '../../components/review-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { logError } from '../../lib/app-log';
 
 import { TaskEditModal } from '@/components/task-edit-modal';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
@@ -108,7 +109,7 @@ export default function ReviewScreen() {
       await Share.share({ message });
       exitSelectionMode();
     } catch (error) {
-      console.error('Share failed:', error);
+      void logError(error, { scope: 'review', extra: { message: 'Share failed' } });
     }
   }, [hasSelection, selectedIdsArray, tasksById, exitSelectionMode]);
 

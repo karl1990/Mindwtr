@@ -3,6 +3,7 @@ import type { AppData, Task, TimeEstimate } from '@mindwtr/core';
 import { createAIProvider } from '@mindwtr/core';
 import type { AIProviderId } from '@mindwtr/core';
 import { buildCopilotConfig, loadAIKey } from '../../lib/ai-config';
+import { logError } from '../../lib/app-log';
 
 type CopilotSuggestion = {
     context?: string;
@@ -51,7 +52,9 @@ export function useTaskEditCopilot({
     const tagOptionsRef = useRef<string[]>([]);
 
     useEffect(() => {
-        loadAIKey(aiProvider).then(setAiKey).catch(console.error);
+        loadAIKey(aiProvider).then(setAiKey).catch((error) => {
+            void logError(error, { scope: 'ai', extra: { message: 'Failed to load AI key' } });
+        });
     }, [aiProvider]);
 
     useEffect(() => {

@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useLanguage } from '../../contexts/language-context';
 import { fetchExternalCalendarEvents } from '../../lib/external-calendar';
+import { logError } from '../../lib/app-log';
 import { GestureDetector, Gesture, ScrollView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { TaskEditModal } from '@/components/task-edit-modal';
@@ -77,6 +78,9 @@ export function CalendarView() {
   const [pendingScrollMinutes, setPendingScrollMinutes] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { openQuickCapture } = useQuickCapture();
+  const logCalendarError = (error: unknown) => {
+    void logError(error, { scope: 'calendar' });
+  };
 
   // Theme colors
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -275,7 +279,7 @@ export function CalendarView() {
       })
       .catch((error) => {
         if (cancelled) return;
-        console.error(error);
+        logCalendarError(error);
         setExternalError(String(error));
         setExternalEvents([]);
       })
@@ -334,7 +338,7 @@ export function CalendarView() {
       return;
     }
 
-    updateTask(taskId, { startTime: slot.toISOString() }).catch(console.error);
+    updateTask(taskId, { startTime: slot.toISOString() }).catch(logCalendarError);
     setScheduleQuery('');
     setPendingScrollMinutes((slot.getHours() * 60 + slot.getMinutes()) - DAY_START_HOUR * 60);
     setViewMode('day');
@@ -390,7 +394,7 @@ export function CalendarView() {
       );
       return;
     }
-    updateTask(taskId, { startTime: nextStart.toISOString() }).catch(console.error);
+    updateTask(taskId, { startTime: nextStart.toISOString() }).catch(logCalendarError);
   };
 
   const setTimelineScrollEnabled = (enabled: boolean) => {
@@ -413,7 +417,7 @@ export function CalendarView() {
     if (task.startTime) {
       buttons?.push({
         text: t('calendar.unschedule'),
-        onPress: () => updateTask(task.id, { startTime: undefined }).catch(console.error),
+        onPress: () => updateTask(task.id, { startTime: undefined }).catch(logCalendarError),
       });
     }
 
@@ -421,7 +425,7 @@ export function CalendarView() {
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: () => deleteTask(task.id).catch(console.error),
+        onPress: () => deleteTask(task.id).catch(logCalendarError),
       },
       { text: t('common.cancel'), style: 'cancel' },
     );

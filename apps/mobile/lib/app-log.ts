@@ -49,7 +49,7 @@ const ICS_URL_PATTERN = /\b(?:https?|webcal|webcals):\/\/[^\s'")]+/gi;
 
 type LogEntry = {
   ts: string;
-  level: 'info' | 'error';
+  level: 'info' | 'warn' | 'error';
   scope: string;
   message: string;
   stack?: string;
@@ -134,7 +134,6 @@ function ensureLogFile(): boolean {
           try {
             strayDir.delete();
           } catch (deleteError) {
-            console.warn('[Mobile] Failed to remove stray log directory', deleteError);
             return false;
           }
         }
@@ -166,7 +165,6 @@ async function appendLogLine(entry: LogEntry): Promise<string | null> {
     LOG_FILE.write(next, { encoding: 'utf8' });
     return LOG_FILE.uri;
   } catch (error) {
-    console.warn('[Mobile] Failed to write log', error);
     return null;
   }
 }
@@ -189,7 +187,6 @@ export async function clearLog(): Promise<void> {
       }
     }
   } catch (error) {
-    console.warn('[Mobile] Failed to clear log', error);
   }
 }
 
@@ -228,6 +225,20 @@ export async function logInfo(
     ts: new Date().toISOString(),
     level: 'info',
     scope: context?.scope ?? 'info',
+    message: safeMessage,
+    context: sanitizeContext(context?.extra),
+  });
+}
+
+export async function logWarn(
+  message: string,
+  context?: { scope?: string; extra?: Record<string, string> }
+): Promise<string | null> {
+  const safeMessage = redactSensitiveText(message);
+  return appendLogLine({
+    ts: new Date().toISOString(),
+    level: 'warn',
+    scope: context?.scope ?? 'warn',
     message: safeMessage,
     context: sanitizeContext(context?.extra),
   });

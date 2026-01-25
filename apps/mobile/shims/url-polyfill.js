@@ -3,6 +3,8 @@
 // IMPORTANT: This file is loaded via Metro's getModulesRunBeforeMainModule
 // to ensure it runs before any other module that might need URL.
 
+import { logWarn } from '../lib/app-log';
+
 class FallbackURLSearchParams {
     constructor(init = '') {
         this._map = new Map();
@@ -93,7 +95,9 @@ class FallbackURL {
      * returning '' is safer and prevents the crash, though function will assume it failed or got nothing.
      */
     static createObjectURL() {
-        console.warn('[Mindwtr] URL.createObjectURL called but not supported by shim. Returning empty string to prevent crash.');
+        void logWarn('[Mindwtr] URL.createObjectURL called but not supported by shim. Returning empty string to prevent crash.', {
+            scope: 'polyfill',
+        });
         return '';
     }
     static revokeObjectURL() { }

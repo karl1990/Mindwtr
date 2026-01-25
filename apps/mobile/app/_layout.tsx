@@ -19,15 +19,19 @@ import { performMobileSync } from '../lib/sync-service';
 import { updateAndroidWidgetFromStore } from '../lib/widget-service';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
-import { logError, setupGlobalErrorLogging } from '../lib/app-log';
+import { logError, logWarn, setupGlobalErrorLogging } from '../lib/app-log';
 
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
+const logAppError = (error: unknown) => {
+  void logError(error, { scope: 'app' });
+};
+
 try {
   setStorageAdapter(mobileStorage);
 } catch (e) {
   storageInitError = e as Error;
-  console.error('[Mobile] Failed to initialize storage adapter:', e);
+  void logError(e, { scope: 'app', extra: { message: 'Failed to initialize storage adapter' } });
 }
 
 // Keep splash visible until app is ready.
@@ -79,7 +83,7 @@ function RootLayoutContent() {
     syncPending.current = false;
 
     syncInFlight.current = (async () => {
-      await flushPendingSave().catch(console.error);
+      await flushPendingSave().catch(logAppError);
       const result = await performMobileSync().catch((error) => ({ success: false, error: String(error) }));
       if (!result.success && result.error) {
         const nowMs = Date.now();
@@ -164,13 +168,13 @@ function RootLayoutContent() {
         if (now - lastAutoSyncAt.current > 30_000) {
           requestSync(0);
         }
-        updateAndroidWidgetFromStore().catch(console.error);
+        updateAndroidWidgetFromStore().catch(logAppError);
         if (widgetRefreshTimer.current) {
           clearTimeout(widgetRefreshTimer.current);
         }
         widgetRefreshTimer.current = setTimeout(() => {
           if (!isActive.current) return;
-          updateAndroidWidgetFromStore().catch(console.error);
+          updateAndroidWidgetFromStore().catch(logAppError);
         }, 800);
       }
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
@@ -208,7 +212,7 @@ function RootLayoutContent() {
       }
       syncInFlight.current = null;
       // Flush on unmount/reload as well
-      flushPendingSave().catch(console.error);
+      flushPendingSave().catch(logAppError);
     };
   }, [requestSync]);
 
@@ -243,18 +247,18 @@ function RootLayoutContent() {
         await store.fetchData();
         if (cancelled) return;
         if (store.settings.notificationsEnabled !== false) {
-          startMobileNotifications().catch(console.error);
+          startMobileNotifications().catch(logAppError);
         }
-        updateAndroidWidgetFromStore().catch(console.error);
+        updateAndroidWidgetFromStore().catch(logAppError);
         if (widgetRefreshTimer.current) {
           clearTimeout(widgetRefreshTimer.current);
         }
         widgetRefreshTimer.current = setTimeout(() => {
           if (!isActive.current) return;
-          updateAndroidWidgetFromStore().catch(console.error);
+          updateAndroidWidgetFromStore().catch(logAppError);
         }, 800);
       } catch (e) {
-        console.error('[Mobile] Failed to load data:', e);
+        void logError(e, { scope: 'app', extra: { message: 'Failed to load data' } });
         if (cancelled) return;
         if (loadAttempts.current < 3 && isActive.current) {
           if (retryLoadTimer.current) {
@@ -305,9 +309,9 @@ function RootLayoutContent() {
       previousEnabled = enabled;
 
       if (enabled === false) {
-        stopMobileNotifications().catch(console.error);
+        stopMobileNotifications().catch(logAppError);
       } else {
-        startMobileNotifications().catch(console.error);
+        startMobileNotifications().catch(logAppError);
       }
     });
 
@@ -319,7 +323,12 @@ function RootLayoutContent() {
   useEffect(() => {
     if (!isAppReady) return;
     if (typeof SplashScreen?.hideAsync === 'function') {
-      SplashScreen.hideAsync().catch(console.warn);
+      SplashScreen.hideAsync().catch((error) => {
+        void logWarn('Failed to hide splash screen', {
+          scope: 'app',
+          extra: { error: error instanceof Error ? error.message : String(error) },
+        });
+      });
     }
   }, [isAppReady]);
 
