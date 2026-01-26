@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, eachDayOfInterval } from 'date-fns';
+import { addMonths, endOfMonth, endOfWeek, format, getMonth, getYear, isSameDay, isSameMonth, isToday, setMonth, setYear, startOfMonth, startOfWeek, subMonths, eachDayOfInterval } from 'date-fns';
 import { shallow, parseIcs, safeParseDate, safeParseDueDate, type ExternalCalendarEvent, type ExternalCalendarSubscription, useTaskStore, type Task, isTaskInActiveProject } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { isTauriRuntime } from '../../lib/runtime';
@@ -27,9 +27,16 @@ export function CalendarView() {
     );
     const { projectMap } = getDerivedState();
     const { t } = useLanguage();
+    const resolveText = useCallback(
+        (key: string, fallback: string) => {
+            const value = t(key);
+            return value === key ? fallback : value;
+        },
+        [t]
+    );
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const today = new Date();
-    const [currentMonth] = useState(today);
+    const [currentMonth, setCurrentMonth] = useState(today);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [scheduleQuery, setScheduleQuery] = useState('');
     const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -408,14 +415,84 @@ export function CalendarView() {
         setEditingTimeTaskId(null);
         setEditingTimeValue('');
     };
+    const monthNames = useMemo(
+        () => Array.from({ length: 12 }, (_, index) => format(new Date(2000, index, 1), 'MMMM')),
+        []
+    );
+    const currentYear = getYear(currentMonth);
+    const yearOptions = useMemo(
+        () => Array.from({ length: 11 }, (_, index) => currentYear - 5 + index),
+        [currentYear]
+    );
+    const handleMonthChange = (monthIndex: number) => {
+        setSelectedDate(null);
+        setScheduleQuery('');
+        setScheduleError(null);
+        setCurrentMonth((prev) => setMonth(prev, monthIndex));
+    };
+    const handleYearChange = (yearValue: number) => {
+        setSelectedDate(null);
+        setScheduleQuery('');
+        setScheduleError(null);
+        setCurrentMonth((prev) => setYear(prev, yearValue));
+    };
+    const handlePrevMonth = () => {
+        setSelectedDate(null);
+        setScheduleQuery('');
+        setScheduleError(null);
+        setCurrentMonth((prev) => subMonths(prev, 1));
+    };
+    const handleNextMonth = () => {
+        setSelectedDate(null);
+        setScheduleQuery('');
+        setScheduleError(null);
+        setCurrentMonth((prev) => addMonths(prev, 1));
+    };
 
     return (
         <ErrorBoundary>
             <div className="space-y-6">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-3xl font-bold tracking-tight">{t('nav.calendar')}</h2>
-                <div className="text-lg font-medium text-muted-foreground">
-                    {format(currentMonth, 'MMMM yyyy')}
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        className="rounded border border-border bg-muted/50 p-2 text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={resolveText('calendar.prevMonth', 'Previous month')}
+                    >
+                        ‹
+                    </button>
+                    <div className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1">
+                        <select
+                            className="bg-transparent text-sm focus:outline-none"
+                            value={getMonth(currentMonth)}
+                            onChange={(event) => handleMonthChange(Number(event.target.value))}
+                            aria-label={resolveText('calendar.month', 'Month')}
+                        >
+                            {monthNames.map((label, index) => (
+                                <option key={label} value={index}>{label}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="bg-transparent text-sm focus:outline-none"
+                            value={currentYear}
+                            onChange={(event) => handleYearChange(Number(event.target.value))}
+                            aria-label={resolveText('calendar.year', 'Year')}
+                        >
+                            {yearOptions.map((year) => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        className="rounded border border-border bg-muted/50 p-2 text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={resolveText('calendar.nextMonth', 'Next month')}
+                    >
+                        ›
+                    </button>
                 </div>
             </header>
 
