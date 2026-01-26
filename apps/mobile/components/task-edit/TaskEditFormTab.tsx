@@ -76,6 +76,7 @@ export function TaskEditFormTab({
     titleDraft,
     onTitleDraftChange,
 }: TaskEditFormTabProps) {
+    const [titleFocused, setTitleFocused] = React.useState(false);
     const countFilledFields = (fieldIds: TaskEditorFieldId[]): number => {
         return fieldIds.filter((fieldId) => {
             switch (fieldId) {
@@ -127,6 +128,9 @@ export function TaskEditFormTab({
                             value={titleDraft}
                             onChangeText={(text) => onTitleDraftChange(text)}
                             placeholderTextColor={tc.secondaryText}
+                            onFocus={() => setTitleFocused(true)}
+                            onBlur={() => setTitleFocused(false)}
+                            selection={titleFocused ? undefined : { start: 0, end: 0 }}
                         />
                     </View>
                     {aiEnabled && (

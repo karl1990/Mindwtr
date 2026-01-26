@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput, Platform, Alert, Share, ActivityIndicator } from 'react-native';
 
-import { useTaskStore, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, safeFormatDate, safeParseDate, type Task, type AIProviderId } from '@mindwtr/core';
+import { useTaskStore, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, safeFormatDate, safeParseDate, resolveTextDirection, type Task, type AIProviderId } from '@mindwtr/core';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 
@@ -32,6 +32,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const [projectSearch, setProjectSearch] = useState('');
   const [processingTitle, setProcessingTitle] = useState('');
   const [processingDescription, setProcessingDescription] = useState('');
+  const [processingTitleFocused, setProcessingTitleFocused] = useState(false);
   const [pendingStartDate, setPendingStartDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [isAIWorking, setIsAIWorking] = useState(false);
@@ -56,6 +57,15 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const currentTask = useMemo(() => processingQueue[currentIndex] || null, [processingQueue, currentIndex]);
   const totalCount = inboxTasks.length;
   const processedCount = totalCount - processingQueue.length + currentIndex;
+  const resolvedTitleDirection = useMemo(() => {
+    if (!currentTask) return 'ltr';
+    const text = (processingTitle || currentTask.title || '').trim();
+    return resolveTextDirection(text, currentTask.textDirection);
+  }, [currentTask, processingTitle]);
+  const titleDirectionStyle = useMemo(() => ({
+    writingDirection: resolvedTitleDirection,
+    textAlign: resolvedTitleDirection === 'rtl' ? 'right' : 'left',
+  }), [resolvedTitleDirection]);
 
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -493,11 +503,14 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
               <View style={styles.refineContainer}>
                 <Text style={[styles.refineLabel, { color: tc.secondaryText }]}>{t('taskEdit.titleLabel')}</Text>
                 <TextInput
-                  style={[styles.refineTitleInput, { borderColor: tc.border, color: tc.text, backgroundColor: tc.cardBg }]}
+                  style={[styles.refineTitleInput, titleDirectionStyle, { borderColor: tc.border, color: tc.text, backgroundColor: tc.cardBg }]}
                   value={processingTitle}
                   onChangeText={setProcessingTitle}
                   placeholder={t('taskEdit.titleLabel')}
                   placeholderTextColor={tc.secondaryText}
+                  onFocus={() => setProcessingTitleFocused(true)}
+                  onBlur={() => setProcessingTitleFocused(false)}
+                  selection={processingTitleFocused ? undefined : { start: 0, end: 0 }}
                 />
                 <Text style={[styles.refineLabel, { color: tc.secondaryText }]}>{t('taskEdit.descriptionLabel')}</Text>
                 <TextInput
@@ -512,7 +525,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
               </View>
             ) : (
               <>
-                <Text style={[styles.taskTitle, { color: tc.text }]}>
+                <Text style={[styles.taskTitle, titleDirectionStyle, { color: tc.text }]}>
                   {processingTitle || currentTask.title}
                 </Text>
                 {processingDescription ? (
