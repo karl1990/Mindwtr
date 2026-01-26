@@ -352,13 +352,18 @@ const findSafEntry = async (dirUri: string, fileName: string): Promise<string | 
 
 const readFileAsBytes = async (uri: string): Promise<Uint8Array> => {
   if (uri.startsWith('content://')) {
-    if (!StorageAccessFramework?.readAsStringAsync) {
-      throw new Error('Storage Access Framework not available.');
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      return base64ToBytes(base64);
+    } catch (error) {
+      if (!StorageAccessFramework?.readAsStringAsync) {
+        throw error;
+      }
+      const base64 = await StorageAccessFramework.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64ToBytes(base64);
     }
-    const base64 = await StorageAccessFramework.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    return base64ToBytes(base64);
   }
   const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
   return base64ToBytes(base64);
@@ -596,36 +601,53 @@ export const syncFileAttachments = async (
       didMutate = true;
     }
 
-    if (!attachment.cloudKey && hasLocal && existsLocally && !isHttp) {
-      const cloudKey = buildCloudKey(attachment);
+    if (hasLocal && existsLocally && !isHttp) {
+      const cloudKey = attachment.cloudKey || buildCloudKey(attachment);
       const filename = cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.title)}`;
-      try {
-        const size = await getAttachmentByteSize(attachment, uri);
-        if (size != null) {
-          const validation = await validateAttachmentForUpload(attachment, size, FILE_BACKEND_VALIDATION_CONFIG);
-          if (!validation.valid) {
-            logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
-            continue;
+      let remoteExists = false;
+      if (syncDir.type === 'file') {
+        const targetUri = `${syncDir.attachmentsDirUri}${filename}`;
+        remoteExists = await fileExists(targetUri);
+      } else {
+        remoteExists = Boolean(await findSafEntry(syncDir.attachmentsDirUri, filename));
+      }
+      if (!remoteExists) {
+        try {
+          const size = await getAttachmentByteSize(attachment, uri);
+          if (size != null) {
+            const validation = await validateAttachmentForUpload(attachment, size, FILE_BACKEND_VALIDATION_CONFIG);
+            if (!validation.valid) {
+              logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+              continue;
+            }
           }
+          if (syncDir.type === 'file') {
+            const targetUri = `${syncDir.attachmentsDirUri}${filename}`;
+            if (uri.startsWith('content://')) {
+              const bytes = await readFileAsBytes(uri);
+              await writeBytesSafely(targetUri, bytes);
+            } else {
+              await copyFileSafely(uri, targetUri);
+            }
+          } else {
+            const base64 = await readFileAsBytes(uri).then(bytesToBase64);
+            let targetUri = await findSafEntry(syncDir.attachmentsDirUri, filename);
+            if (!targetUri && StorageAccessFramework?.createFileAsync) {
+              targetUri = await StorageAccessFramework.createFileAsync(syncDir.attachmentsDirUri, filename, attachment.mimeType || DEFAULT_CONTENT_TYPE);
+            }
+            if (targetUri && StorageAccessFramework?.writeAsStringAsync) {
+              await StorageAccessFramework.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+            }
+          }
+        } catch (error) {
+          logAttachmentWarn(`Failed to copy attachment ${attachment.title} to sync folder`, error);
+          continue;
         }
-        if (syncDir.type === 'file') {
-          const targetUri = `${syncDir.attachmentsDirUri}${filename}`;
-          await copyFileSafely(uri, targetUri);
-        } else {
-          const base64 = await readFileAsBytes(uri).then(bytesToBase64);
-          let targetUri = await findSafEntry(syncDir.attachmentsDirUri, filename);
-          if (!targetUri && StorageAccessFramework?.createFileAsync) {
-            targetUri = await StorageAccessFramework.createFileAsync(syncDir.attachmentsDirUri, filename, attachment.mimeType || DEFAULT_CONTENT_TYPE);
-          }
-          if (targetUri && StorageAccessFramework?.writeAsStringAsync) {
-            await StorageAccessFramework.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-          }
-        }
+      }
+      if (!attachment.cloudKey) {
         attachment.cloudKey = cloudKey;
         attachment.localStatus = 'available';
         didMutate = true;
-      } catch (error) {
-        logAttachmentWarn(`Failed to copy attachment ${attachment.title} to sync folder`, error);
       }
     }
   }
