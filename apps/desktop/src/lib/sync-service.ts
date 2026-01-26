@@ -97,6 +97,7 @@ const normalizeCloudUrl = (rawUrl: string): string => {
 };
 
 const ATTACHMENTS_DIR_NAME = 'attachments';
+const LOCAL_ATTACHMENTS_DIR = `mindwtr/${ATTACHMENTS_DIR_NAME}`;
 const FILE_BACKEND_VALIDATION_CONFIG = {
     maxFileSizeBytes: Number.POSITIVE_INFINITY,
     blockedMimeTypes: [],
@@ -193,13 +194,13 @@ const cleanupAttachmentTempFiles = async (): Promise<void> => {
     if (!isTauriRuntime()) return;
     try {
         const { BaseDirectory, readDir, remove } = await import('@tauri-apps/plugin-fs');
-        const entries = await readDir(ATTACHMENTS_DIR_NAME, { baseDir: BaseDirectory.Data });
+        const entries = await readDir(LOCAL_ATTACHMENTS_DIR, { baseDir: BaseDirectory.Data });
         for (const entry of entries) {
             if (!entry.isFile) continue;
             const name = entry.name;
             if (!isTempAttachmentFile(name)) continue;
             try {
-                await remove(`${ATTACHMENTS_DIR_NAME}/${name}`, { baseDir: BaseDirectory.Data });
+                await remove(`${LOCAL_ATTACHMENTS_DIR}/${name}`, { baseDir: BaseDirectory.Data });
             } catch (error) {
                 logSyncWarning('Failed to remove temp attachment file', error);
             }
@@ -443,7 +444,7 @@ async function syncAttachments(
     }
 
     try {
-        await mkdir(ATTACHMENTS_DIR_NAME, { baseDir: BaseDirectory.Data, recursive: true });
+        await mkdir(LOCAL_ATTACHMENTS_DIR, { baseDir: BaseDirectory.Data, recursive: true });
     } catch (error) {
         logSyncWarning('Failed to ensure local attachments directory', error);
     }
@@ -555,7 +556,7 @@ async function syncAttachments(
                 const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
                 await validateAttachmentHash(attachment, bytes);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
-                const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
+                const relativePath = `${LOCAL_ATTACHMENTS_DIR}/${filename}`;
                 await writeAttachmentFileSafely(relativePath, bytes, {
                     baseDir: BaseDirectory.Data,
                     writeFile,
@@ -599,7 +600,7 @@ async function syncCloudAttachments(
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     try {
-        await mkdir(ATTACHMENTS_DIR_NAME, { baseDir: BaseDirectory.Data, recursive: true });
+        await mkdir(LOCAL_ATTACHMENTS_DIR, { baseDir: BaseDirectory.Data, recursive: true });
     } catch (error) {
         logSyncWarning('Failed to ensure local attachments directory', error);
     }
@@ -709,7 +710,7 @@ async function syncCloudAttachments(
                 const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
                 await validateAttachmentHash(attachment, bytes);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
-                const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
+                const relativePath = `${LOCAL_ATTACHMENTS_DIR}/${filename}`;
                 await writeAttachmentFileSafely(relativePath, bytes, {
                     baseDir: BaseDirectory.Data,
                     writeFile,
@@ -758,7 +759,7 @@ async function syncFileAttachments(
     }
 
     try {
-        await mkdir(ATTACHMENTS_DIR_NAME, { baseDir: BaseDirectory.Data, recursive: true });
+        await mkdir(LOCAL_ATTACHMENTS_DIR, { baseDir: BaseDirectory.Data, recursive: true });
     } catch (error) {
         logSyncWarning('Failed to ensure local attachments directory', error);
     }
@@ -849,7 +850,7 @@ async function syncFileAttachments(
                 const fileData = await readFile(sourcePath);
                 await validateAttachmentHash(attachment, fileData);
                 const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
-                const relativePath = `${ATTACHMENTS_DIR_NAME}/${filename}`;
+                const relativePath = `${LOCAL_ATTACHMENTS_DIR}/${filename}`;
                 await writeAttachmentFileSafely(relativePath, fileData, {
                     baseDir: BaseDirectory.Data,
                     writeFile,
