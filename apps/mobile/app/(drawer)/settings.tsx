@@ -54,6 +54,7 @@ import { fetchExternalCalendarEvents, getExternalCalendars, saveExternalCalendar
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
 import { clearLog, getLogPath, logError, logInfo, logWarn } from '../../lib/app-log';
 import { performMobileSync } from '../../lib/sync-service';
+import { requestNotificationPermission, startMobileNotifications } from '../../lib/notification-service';
 import {
     SYNC_PATH_KEY,
     SYNC_BACKEND_KEY,
@@ -964,6 +965,18 @@ export default function SettingsPage() {
             },
         }).catch(logSettingsError);
     };
+    const ensureNotificationsPermission = async () => {
+        const granted = await requestNotificationPermission();
+        if (granted) {
+            startMobileNotifications().catch(logSettingsError);
+            return true;
+        }
+        Alert.alert(
+            localize('Notifications disabled', '通知已禁用'),
+            localize('Please enable notifications in system settings.', '请在系统设置中启用通知。'),
+        );
+        return false;
+    };
 
     // Sub-screen header
     const SubHeader = ({ title }: { title: string }) => (
@@ -1005,7 +1018,18 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={notificationsEnabled}
-                                onValueChange={(value) => updateSettings({ notificationsEnabled: value }).catch(logSettingsError)}
+                                onValueChange={(value) => {
+                                    if (!value) {
+                                        updateSettings({ notificationsEnabled: false }).catch(logSettingsError);
+                                        return;
+                                    }
+                                    ensureNotificationsPermission()
+                                        .then((granted) => {
+                                            if (!granted) return;
+                                            updateSettings({ notificationsEnabled: true }).catch(logSettingsError);
+                                        })
+                                        .catch(logSettingsError);
+                                }}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>
@@ -1021,7 +1045,18 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={weeklyReviewEnabled}
-                                onValueChange={(value) => updateSettings({ weeklyReviewEnabled: value }).catch(logSettingsError)}
+                                onValueChange={(value) => {
+                                    if (!value) {
+                                        updateSettings({ weeklyReviewEnabled: false }).catch(logSettingsError);
+                                        return;
+                                    }
+                                    ensureNotificationsPermission()
+                                        .then((granted) => {
+                                            if (!granted) return;
+                                            updateSettings({ weeklyReviewEnabled: true }).catch(logSettingsError);
+                                        })
+                                        .catch(logSettingsError);
+                                }}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                                 disabled={!notificationsEnabled}
                             />
@@ -1117,7 +1152,18 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={dailyDigestMorningEnabled}
-                                onValueChange={(value) => updateSettings({ dailyDigestMorningEnabled: value }).catch(logSettingsError)}
+                                onValueChange={(value) => {
+                                    if (!value) {
+                                        updateSettings({ dailyDigestMorningEnabled: false }).catch(logSettingsError);
+                                        return;
+                                    }
+                                    ensureNotificationsPermission()
+                                        .then((granted) => {
+                                            if (!granted) return;
+                                            updateSettings({ dailyDigestMorningEnabled: true }).catch(logSettingsError);
+                                        })
+                                        .catch(logSettingsError);
+                                }}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>
@@ -1146,7 +1192,18 @@ export default function SettingsPage() {
                             </View>
                             <Switch
                                 value={dailyDigestEveningEnabled}
-                                onValueChange={(value) => updateSettings({ dailyDigestEveningEnabled: value }).catch(logSettingsError)}
+                                onValueChange={(value) => {
+                                    if (!value) {
+                                        updateSettings({ dailyDigestEveningEnabled: false }).catch(logSettingsError);
+                                        return;
+                                    }
+                                    ensureNotificationsPermission()
+                                        .then((granted) => {
+                                            if (!granted) return;
+                                            updateSettings({ dailyDigestEveningEnabled: true }).catch(logSettingsError);
+                                        })
+                                        .catch(logSettingsError);
+                                }}
                                 trackColor={{ false: '#767577', true: '#3B82F6' }}
                             />
                         </View>

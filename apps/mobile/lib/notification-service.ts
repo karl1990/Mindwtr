@@ -83,6 +83,17 @@ async function ensurePermission(api: NotificationsApi) {
   return request.status === 'granted';
 }
 
+export async function requestNotificationPermission() {
+  const api = await loadNotifications();
+  if (!api) return false;
+  try {
+    return await ensurePermission(api);
+  } catch (error) {
+    logNotificationError('Failed to request notification permission', error);
+    return false;
+  }
+}
+
 async function cancelDailyDigests(api: NotificationsApi) {
   for (const id of scheduledDigestByKind.values()) {
     await api.cancelScheduledNotificationAsync(id).catch((error) => logNotificationError('Failed to cancel daily digest', error));
