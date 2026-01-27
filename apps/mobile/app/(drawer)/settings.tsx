@@ -966,15 +966,24 @@ export default function SettingsPage() {
         }).catch(logSettingsError);
     };
     const ensureNotificationsPermission = async () => {
-        const granted = await requestNotificationPermission();
-        if (granted) {
+        const result = await requestNotificationPermission();
+        if (result.granted) {
             startMobileNotifications().catch(logSettingsError);
             return true;
         }
-        Alert.alert(
-            localize('Notifications disabled', '通知已禁用'),
-            localize('Please enable notifications in system settings.', '请在系统设置中启用通知。'),
-        );
+        if (result.canAskAgain === false) {
+            Alert.alert(
+                localize('Notifications disabled', '通知已禁用'),
+                localize('Please enable notifications in system settings.', '请在系统设置中启用通知。'),
+                [
+                    { text: localize('Cancel', '取消'), style: 'cancel' },
+                    {
+                        text: localize('Open settings', '打开设置'),
+                        onPress: () => Linking.openSettings().catch(logSettingsError),
+                    },
+                ],
+            );
+        }
         return false;
     };
 

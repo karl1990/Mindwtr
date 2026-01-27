@@ -76,21 +76,31 @@ async function getCurrentLanguage(): Promise<Language> {
   }
 }
 
-async function ensurePermission(api: NotificationsApi) {
-  const { status } = await api.getPermissionsAsync();
-  if (status === 'granted') return true;
+type NotificationPermissionResult = {
+  granted: boolean;
+  canAskAgain: boolean;
+};
+
+async function ensurePermission(api: NotificationsApi): Promise<NotificationPermissionResult> {
+  const current = await api.getPermissionsAsync();
+  if (current.status === 'granted') {
+    return { granted: true, canAskAgain: current.canAskAgain ?? true };
+  }
+  if (current.canAskAgain === false) {
+    return { granted: false, canAskAgain: false };
+  }
   const request = await api.requestPermissionsAsync();
-  return request.status === 'granted';
+  return { granted: request.status === 'granted', canAskAgain: request.canAskAgain ?? true };
 }
 
-export async function requestNotificationPermission() {
+export async function requestNotificationPermission(): Promise<NotificationPermissionResult> {
   const api = await loadNotifications();
-  if (!api) return false;
+  if (!api) return { granted: false, canAskAgain: false };
   try {
     return await ensurePermission(api);
   } catch (error) {
     logNotificationError('Failed to request notification permission', error);
-    return false;
+    return { granted: false, canAskAgain: false };
   }
 }
 
