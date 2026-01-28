@@ -93,13 +93,16 @@ jobs:
         shell: pwsh
         run: |
           $msixPath = "mindwtr.msix"
-          $makeappx = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\makeappx.exe"
+          $makeappx = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits" -Recurse -Filter "makeappx.exe" |
+            Where-Object { $_.FullName -like "*\\x64\\*" } |
+            Select-Object -First 1 -ExpandProperty FullName
 
-          if (-not (Test-Path $makeappx)) {
-            $makeappx = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $makeappx) {
+            throw "makeappx.exe not found for x64"
           }
 
-          & $makeappx pack /d msix-staging /p $msixPath
+          Write-Host "Using MakeAppx at: $makeappx"
+          & $makeappx pack /d msix-staging /p $msixPath /o
 
       - name: Upload MSIX
         uses: actions/upload-artifact@v4
