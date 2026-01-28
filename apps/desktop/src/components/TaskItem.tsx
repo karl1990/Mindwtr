@@ -49,6 +49,8 @@ interface TaskItemProps {
     isMultiSelected?: boolean;
     onToggleSelect?: () => void;
     showQuickDone?: boolean;
+    showStatusSelect?: boolean;
+    showProjectBadgeInActions?: boolean;
     focusToggle?: {
         isFocused: boolean;
         canToggle: boolean;
@@ -69,6 +71,8 @@ export const TaskItem = memo(function TaskItem({
     isMultiSelected = false,
     onToggleSelect,
     showQuickDone = true,
+    showStatusSelect = true,
+    showProjectBadgeInActions = true,
     focusToggle,
     readOnly = false,
     compactMetaEnabled = true,
@@ -871,6 +875,8 @@ export const TaskItem = memo(function TaskItem({
                             timeEstimatesEnabled={timeEstimatesEnabled}
                             isStagnant={isStagnant}
                             showQuickDone={showQuickDone}
+                            showStatusSelect={showStatusSelect}
+                            showProjectBadgeInActions={showProjectBadgeInActions}
                             onToggleChecklistItem={handleToggleChecklistItem}
                             focusToggle={focusToggle}
                             readOnly={effectiveReadOnly}

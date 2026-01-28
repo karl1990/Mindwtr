@@ -28,6 +28,8 @@ interface TaskItemDisplayProps {
     timeEstimatesEnabled: boolean;
     isStagnant: boolean;
     showQuickDone: boolean;
+    showStatusSelect?: boolean;
+    showProjectBadgeInActions?: boolean;
     onToggleChecklistItem?: (index: number) => void;
     focusToggle?: {
         isFocused: boolean;
@@ -80,6 +82,8 @@ export function TaskItemDisplay({
     timeEstimatesEnabled,
     isStagnant,
     showQuickDone,
+    showStatusSelect = true,
+    showProjectBadgeInActions = true,
     onToggleChecklistItem,
     focusToggle,
     readOnly,
@@ -418,7 +422,7 @@ export function TaskItemDisplay({
                     className="relative flex items-center gap-2"
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {project && (
+                    {showProjectBadgeInActions && project && (
                         <div className="hidden md:flex items-center max-w-[180px]">
                             {renderProjectBadge()}
                         </div>
@@ -486,21 +490,23 @@ export function TaskItemDisplay({
                                     <BookOpen className="w-4 h-4" />
                                 </button>
                             )}
-                            <select
-                                value={task.status}
-                                aria-label={t('task.aria.status')}
-                                onChange={(e) => onStatusChange(e.target.value as TaskStatus)}
-                                className="text-xs px-2 py-1 rounded cursor-pointer bg-muted/50 text-foreground border border-border hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            >
-                                <option value="inbox">{t('status.inbox')}</option>
-                                <option value="next">{t('status.next')}</option>
-                                <option value="waiting">{t('status.waiting')}</option>
-                                <option value="someday">{t('status.someday')}</option>
-                                {task.status === 'reference' && (
-                                    <option value="reference">{t('status.reference')}</option>
-                                )}
-                                <option value="done">{t('status.done')}</option>
-                            </select>
+                            {showStatusSelect && (
+                                <select
+                                    value={task.status}
+                                    aria-label={t('task.aria.status')}
+                                    onChange={(e) => onStatusChange(e.target.value as TaskStatus)}
+                                    className="text-xs px-2 py-1 rounded cursor-pointer bg-muted/50 text-foreground border border-border hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                >
+                                    <option value="inbox">{t('status.inbox')}</option>
+                                    <option value="next">{t('status.next')}</option>
+                                    <option value="waiting">{t('status.waiting')}</option>
+                                    <option value="someday">{t('status.someday')}</option>
+                                    {task.status === 'reference' && (
+                                        <option value="reference">{t('status.reference')}</option>
+                                    )}
+                                    <option value="done">{t('status.done')}</option>
+                                </select>
+                            )}
                             <button
                                 onClick={onDelete}
                                 aria-label={t('task.aria.delete')}

@@ -94,14 +94,14 @@ function DraggableTask({ task }: { task: Task }) {
     if (isDragging) {
         return (
             <div ref={setNodeRef} style={style} className="opacity-50">
-                <TaskItem task={task} readOnly={task.status === 'done'} />
+                <TaskItem task={task} readOnly={task.status === 'done'} showStatusSelect={false} showProjectBadgeInActions={false} />
             </div>
         );
     }
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
-            <TaskItem task={task} readOnly={task.status === 'done'} />
+            <TaskItem task={task} readOnly={task.status === 'done'} showStatusSelect={false} showProjectBadgeInActions={false} />
         </div>
     );
 }
@@ -422,7 +422,7 @@ export function BoardView() {
                     <DragOverlay>
                         {activeTask ? (
                             <div className="w-80 rotate-3 cursor-grabbing">
-                                <TaskItem task={activeTask} />
+                                <TaskItem task={activeTask} showStatusSelect={false} showProjectBadgeInActions={false} />
                             </div>
                         ) : null}
                     </DragOverlay>
