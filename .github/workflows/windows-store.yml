@@ -93,20 +93,20 @@ jobs:
         shell: pwsh
         run: |
           $msixPath = "mindwtr.msix"
-          $kitsRoot = "C:\Program Files (x86)\Windows Kits"
-          Write-Host "Searching for x64 makeappx.exe in $kitsRoot..."
-          $makeappx = Get-ChildItem -Path $kitsRoot -Recurse -Filter "makeappx.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match "\\\\x64\\\\" } |
-            Sort-Object FullName -Descending |
-            Select-Object -First 1 -ExpandProperty FullName
+          $makeappx = "C:\\Program Files (x86)\\Windows Kits\\10\\App Certification Kit\\makeappx.exe"
 
-          if (-not $makeappx) {
-            Write-Error "Could not find x64 makeappx.exe. Listing all candidates:"
-            Get-ChildItem -Path $kitsRoot -Recurse -Filter "makeappx.exe" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-            exit 1
+          Write-Host "Checking for MakeAppx at: $makeappx"
+
+          if (-not (Test-Path $makeappx)) {
+            $vsPath = & "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.Windows10SDK.19041 -find **\\makeappx.exe | Select-Object -First 1
+            if ($vsPath) { $makeappx = $vsPath }
           }
 
-          Write-Host "Using MakeAppx at: $makeappx"
+          if (-not (Test-Path $makeappx)) {
+            throw "MakeAppx.exe could not be found in standard locations!"
+          }
+
+          Write-Host "Found Tool: $makeappx"
           & $makeappx pack /d msix-staging /p $msixPath /o
 
       - name: Upload MSIX
