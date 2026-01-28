@@ -50,8 +50,9 @@ describe('URL Polyfill Shim', () => {
         const result = globalThis.URL.createObjectURL({} as any);
         expect(result).toBe('');
 
-        if (logWarn.mock.calls.length > 0) {
-            expect(logWarn).toHaveBeenCalledWith(
+        const warnMock = vi.mocked(logWarn);
+        if (warnMock.mock.calls.length > 0) {
+            expect(warnMock).toHaveBeenCalledWith(
                 expect.stringContaining('not supported'),
                 expect.any(Object)
             );
