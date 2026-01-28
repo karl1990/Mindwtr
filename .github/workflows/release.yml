@@ -131,6 +131,21 @@ jobs:
           URL_DMG_INTEL="https://github.com/${{ github.repository }}/releases/download/${TAG}/mindwtr_${VERSION}_x64.dmg"
           URL_EXE="https://github.com/${{ github.repository }}/releases/download/${TAG}/mindwtr_${VERSION}_x64-setup.exe"
 
+          echo "Waiting for release assets to become available..."
+          for attempt in $(seq 1 10); do
+            if curl -fsI "$URL_DMG_ARM" >/dev/null && \
+               curl -fsI "$URL_DMG_INTEL" >/dev/null && \
+               curl -fsI "$URL_EXE" >/dev/null; then
+              echo "Release assets are available."
+              break
+            fi
+            if [ "$attempt" -eq 10 ]; then
+              echo "Release assets not available after waiting."
+              exit 1
+            fi
+            sleep 15
+          done
+
           curl -fL -o mindwtr-arm.dmg "$URL_DMG_ARM"
           curl -fL -o mindwtr-intel.dmg "$URL_DMG_INTEL"
           curl -fL -o mindwtr.exe "$URL_EXE"
