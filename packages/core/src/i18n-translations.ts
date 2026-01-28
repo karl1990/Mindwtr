@@ -795,6 +795,8 @@ const en: Record<string, string> = {
         'bulk.selected': 'selected',
         'bulk.moveTo': 'Move to',
         'bulk.addTag': 'Add tag',
+        'bulk.addContext': 'Add context',
+        'bulk.removeContext': 'Remove context',
         'bulk.delete': 'Delete selected',
         'bulk.confirmDeleteTitle': 'Delete tasks',
         'bulk.confirmDeleteBody': 'Delete selected tasks?',
@@ -1701,6 +1703,8 @@ const zh: Record<string, string> = {
         'bulk.selected': '已选择',
         'bulk.moveTo': '移动到',
         'bulk.addTag': '添加标签',
+        'bulk.addContext': '添加情境',
+        'bulk.removeContext': '移除情境',
         'bulk.delete': '删除所选',
         'bulk.confirmDeleteTitle': '删除任务',
         'bulk.confirmDeleteBody': '删除选中的任务？',
@@ -2495,6 +2499,8 @@ const esOverrides: Record<string, string> = {
         'bulk.selected': 'seleccionadas',
         'bulk.moveTo': 'Mover a',
         'bulk.addTag': 'Añadir etiqueta',
+        'bulk.addContext': 'Añadir contexto',
+        'bulk.removeContext': 'Quitar contexto',
         'bulk.delete': 'Eliminar seleccionadas',
 
         // Sorting

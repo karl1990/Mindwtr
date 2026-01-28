@@ -1,12 +1,15 @@
-import { useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { shallow, useTaskStore, filterTasksBySearch, sortTasksBy, Project } from '@mindwtr/core';
+import { shallow, useTaskStore, filterTasksBySearch, sortTasksBy, Project, TaskStatus, Task } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
 import { useLanguage } from '../../contexts/language-context';
 import { Trash2 } from 'lucide-react';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
+import { ListBulkActions } from './list/ListBulkActions';
+import { PromptModal } from '../PromptModal';
+import { cn } from '../../lib/utils';
 
 interface SearchViewProps {
     savedSearchId: string;
@@ -15,17 +18,27 @@ interface SearchViewProps {
 
 export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
     const perf = usePerformanceMonitor('SearchView');
-    const { tasks, projects, settings, updateSettings } = useTaskStore(
+    const { tasks, projects, settings, updateSettings, batchUpdateTasks, batchDeleteTasks, batchMoveTasks } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
             projects: state.projects,
             settings: state.settings,
             updateSettings: state.updateSettings,
+            batchUpdateTasks: state.batchUpdateTasks,
+            batchDeleteTasks: state.batchDeleteTasks,
+            batchMoveTasks: state.batchMoveTasks,
         }),
         shallow
     );
     const { t } = useLanguage();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+    const [tagPromptOpen, setTagPromptOpen] = useState(false);
+    const [tagPromptIds, setTagPromptIds] = useState<string[]>([]);
+    const [contextPromptOpen, setContextPromptOpen] = useState(false);
+    const [contextPromptMode, setContextPromptMode] = useState<'add' | 'remove'>('add');
+    const [contextPromptIds, setContextPromptIds] = useState<string[]>([]);
 
     const savedSearch = settings?.savedSearches?.find(s => s.id === savedSearchId);
     const query = savedSearch?.query || '';
@@ -49,6 +62,63 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
         if (!query) return [];
         return sortTasksBy(filterTasksBySearch(tasks, projects, query), sortBy);
     }, [tasks, projects, query, sortBy]);
+
+    const tasksById = useMemo(() => {
+        return tasks.reduce((acc, task) => {
+            acc.set(task.id, task);
+            return acc;
+        }, new Map<string, Task>());
+    }, [tasks]);
+
+    const exitSelectionMode = useCallback(() => {
+        setSelectionMode(false);
+        setMultiSelectedIds(new Set());
+    }, []);
+
+    const toggleMultiSelect = useCallback((taskId: string) => {
+        setMultiSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    }, []);
+
+    const selectedIdsArray = useMemo(() => Array.from(multiSelectedIds), [multiSelectedIds]);
+
+    const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
+        if (selectedIdsArray.length === 0) return;
+        await batchMoveTasks(selectedIdsArray, newStatus);
+        exitSelectionMode();
+    }, [batchMoveTasks, selectedIdsArray, exitSelectionMode]);
+
+    const handleBatchDelete = useCallback(async () => {
+        if (selectedIdsArray.length === 0) return;
+        const confirmMessage = t('list.confirmBatchDelete') || 'Delete selected tasks?';
+        if (!window.confirm(confirmMessage)) return;
+        await batchDeleteTasks(selectedIdsArray);
+        exitSelectionMode();
+    }, [batchDeleteTasks, selectedIdsArray, exitSelectionMode, t]);
+
+    const handleBatchAddTag = useCallback(() => {
+        if (selectedIdsArray.length === 0) return;
+        setTagPromptIds(selectedIdsArray);
+        setTagPromptOpen(true);
+    }, [selectedIdsArray]);
+
+    const handleBatchAddContext = useCallback(() => {
+        if (selectedIdsArray.length === 0) return;
+        setContextPromptIds(selectedIdsArray);
+        setContextPromptMode('add');
+        setContextPromptOpen(true);
+    }, [selectedIdsArray]);
+
+    const handleBatchRemoveContext = useCallback(() => {
+        if (selectedIdsArray.length === 0) return;
+        setContextPromptIds(selectedIdsArray);
+        setContextPromptMode('remove');
+        setContextPromptOpen(true);
+    }, [selectedIdsArray]);
 
     const handleDelete = useCallback(async () => {
         if (!savedSearch) return;
@@ -75,15 +145,43 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
                     )}
                 </div>
                 {savedSearch && (
-                    <button
-                        onClick={handleDelete}
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                        title={t('common.delete') || 'Delete'}
-                    >
-                        <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                if (selectionMode) exitSelectionMode();
+                                else setSelectionMode(true);
+                            }}
+                            className={cn(
+                                "text-xs px-3 py-1 rounded-md border transition-colors",
+                                selectionMode
+                                    ? "bg-primary/10 text-primary border-primary"
+                                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                            )}
+                        >
+                            {selectionMode ? t('bulk.exitSelect') : t('bulk.select')}
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                            title={t('common.delete') || 'Delete'}
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    </div>
                 )}
             </header>
+
+            {selectionMode && selectedIdsArray.length > 0 && (
+                <ListBulkActions
+                    selectionCount={selectedIdsArray.length}
+                    onMoveToStatus={handleBatchMove}
+                    onAddTag={handleBatchAddTag}
+                    onAddContext={handleBatchAddContext}
+                    onRemoveContext={handleBatchRemoveContext}
+                    onDelete={handleBatchDelete}
+                    t={t}
+                />
+            )}
 
             {filteredTasks.length === 0 && query && (
                 <div className="text-sm text-muted-foreground">
@@ -97,10 +195,61 @@ export function SearchView({ savedSearchId, onDelete }: SearchViewProps) {
                         key={task.id}
                         task={task}
                         project={task.projectId ? projectMap[task.projectId] : undefined}
+                        selectionMode={selectionMode}
+                        isMultiSelected={multiSelectedIds.has(task.id)}
+                        onToggleSelect={() => toggleMultiSelect(task.id)}
                     />
                 ))}
             </div>
             </div>
+            <PromptModal
+                isOpen={tagPromptOpen}
+                title={t('bulk.addTag')}
+                description={t('bulk.addTag')}
+                placeholder="#tag"
+                defaultValue=""
+                confirmLabel={t('common.save')}
+                cancelLabel={t('common.cancel')}
+                onCancel={() => setTagPromptOpen(false)}
+                onConfirm={async (value) => {
+                    const input = value.trim();
+                    if (!input) return;
+                    const tag = input.startsWith('#') ? input : `#${input}`;
+                    await batchUpdateTasks(tagPromptIds.map((id) => {
+                        const task = tasksById.get(id);
+                        const existingTags = task?.tags || [];
+                        const nextTags = Array.from(new Set([...existingTags, tag]));
+                        return { id, updates: { tags: nextTags } };
+                    }));
+                    setTagPromptOpen(false);
+                    exitSelectionMode();
+                }}
+            />
+            <PromptModal
+                isOpen={contextPromptOpen}
+                title={contextPromptMode === 'add' ? t('bulk.addContext') : t('bulk.removeContext')}
+                description={contextPromptMode === 'add' ? t('bulk.addContext') : t('bulk.removeContext')}
+                placeholder="@context"
+                defaultValue=""
+                confirmLabel={t('common.save')}
+                cancelLabel={t('common.cancel')}
+                onCancel={() => setContextPromptOpen(false)}
+                onConfirm={async (value) => {
+                    const input = value.trim();
+                    if (!input) return;
+                    const ctx = input.startsWith('@') ? input : `@${input}`;
+                    await batchUpdateTasks(contextPromptIds.map((id) => {
+                        const task = tasksById.get(id);
+                        const existing = task?.contexts || [];
+                        const nextContexts = contextPromptMode === 'add'
+                            ? Array.from(new Set([...existing, ctx]))
+                            : existing.filter((token) => token !== ctx);
+                        return { id, updates: { contexts: nextContexts } };
+                    }));
+                    setContextPromptOpen(false);
+                    exitSelectionMode();
+                }}
+            />
         </ErrorBoundary>
     );
 }

@@ -4,6 +4,8 @@ type ListBulkActionsProps = {
     selectionCount: number;
     onMoveToStatus: (status: TaskStatus) => void;
     onAddTag: () => void;
+    onAddContext: () => void;
+    onRemoveContext: () => void;
     onDelete: () => void;
     isDeleting?: boolean;
     t: (key: string) => string;
@@ -15,6 +17,8 @@ export function ListBulkActions({
     selectionCount,
     onMoveToStatus,
     onAddTag,
+    onAddContext,
+    onRemoveContext,
     onDelete,
     isDeleting = false,
     t,
@@ -44,6 +48,20 @@ export function ListBulkActions({
                 aria-label={t('bulk.addTag')}
             >
                 {t('bulk.addTag')}
+            </button>
+            <button
+                onClick={onAddContext}
+                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors"
+                aria-label={t('bulk.addContext')}
+            >
+                {t('bulk.addContext')}
+            </button>
+            <button
+                onClick={onRemoveContext}
+                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors"
+                aria-label={t('bulk.removeContext')}
+            >
+                {t('bulk.removeContext')}
             </button>
             <button
                 onClick={onDelete}

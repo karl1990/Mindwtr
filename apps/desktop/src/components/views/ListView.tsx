@@ -99,6 +99,9 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [tagPromptOpen, setTagPromptOpen] = useState(false);
     const [tagPromptIds, setTagPromptIds] = useState<string[]>([]);
+    const [contextPromptOpen, setContextPromptOpen] = useState(false);
+    const [contextPromptMode, setContextPromptMode] = useState<'add' | 'remove'>('add');
+    const [contextPromptIds, setContextPromptIds] = useState<string[]>([]);
     const lastFilterKeyRef = useRef<string>('');
     const addInputRef = useRef<HTMLInputElement>(null);
     const listScrollRef = useRef<HTMLDivElement>(null);
@@ -485,6 +488,20 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         setTagPromptOpen(true);
     }, [batchUpdateTasks, selectedIdsArray, tasksById, t, exitSelectionMode]);
 
+    const handleBatchAddContext = useCallback(() => {
+        if (selectedIdsArray.length === 0) return;
+        setContextPromptIds(selectedIdsArray);
+        setContextPromptMode('add');
+        setContextPromptOpen(true);
+    }, [selectedIdsArray]);
+
+    const handleBatchRemoveContext = useCallback(() => {
+        if (selectedIdsArray.length === 0) return;
+        setContextPromptIds(selectedIdsArray);
+        setContextPromptMode('remove');
+        setContextPromptOpen(true);
+    }, [selectedIdsArray]);
+
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newTaskTitle.trim()) {
@@ -650,6 +667,8 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                             selectionCount={selectedIdsArray.length}
                             onMoveToStatus={handleBatchMove}
                             onAddTag={handleBatchAddTag}
+                            onAddContext={handleBatchAddContext}
+                            onRemoveContext={handleBatchRemoveContext}
                             onDelete={handleBatchDelete}
                             isDeleting={isBatchDeleting}
                             t={t}
@@ -892,6 +911,31 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                     return { id, updates: { tags: nextTags } };
                 }));
                 setTagPromptOpen(false);
+                exitSelectionMode();
+            }}
+        />
+        <PromptModal
+            isOpen={contextPromptOpen}
+            title={contextPromptMode === 'add' ? t('bulk.addContext') : t('bulk.removeContext')}
+            description={contextPromptMode === 'add' ? t('bulk.addContext') : t('bulk.removeContext')}
+            placeholder="@context"
+            defaultValue=""
+            confirmLabel={t('common.save')}
+            cancelLabel={t('common.cancel')}
+            onCancel={() => setContextPromptOpen(false)}
+            onConfirm={async (value) => {
+                const input = value.trim();
+                if (!input) return;
+                const ctx = input.startsWith('@') ? input : `@${input}`;
+                await batchUpdateTasks(contextPromptIds.map((id) => {
+                    const task = tasksById.get(id);
+                    const existing = task?.contexts || [];
+                    const nextContexts = contextPromptMode === 'add'
+                        ? Array.from(new Set([...existing, ctx]))
+                        : existing.filter((token) => token !== ctx);
+                    return { id, updates: { contexts: nextContexts } };
+                }));
+                setContextPromptOpen(false);
                 exitSelectionMode();
             }}
         />
