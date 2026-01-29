@@ -37,6 +37,12 @@
           "path": "$DATA/mindwtr/**"
         },
         {
+          "path": "$DATA/attachments"
+        },
+        {
+          "path": "$DATA/attachments/**"
+        },
+        {
           "path": "$APPDATA"
         },
         {
