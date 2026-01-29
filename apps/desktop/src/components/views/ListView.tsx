@@ -84,6 +84,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const { registerTaskListScope } = useKeybindings();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
     const isCompact = settings?.appearance?.density === 'compact';
+    const densityMode = isCompact ? 'compact' : 'comfortable';
     const resolvedAreaFilter = useMemo(
         () => resolveAreaFilter(settings?.filters?.areaId, areas),
         [settings?.filters?.areaId, areas],
@@ -656,24 +657,32 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             <div className="flex h-full flex-col">
                 <div className="space-y-6">
                     <ListHeader
-                title={title}
-                showNextCount={isNextView}
-                nextCount={nextCount}
-                taskCount={filteredTasks.length}
-                hasFilters={hasFilters}
-                filterSummaryLabel={filterSummaryLabel}
-                filterSummarySuffix={filterSummarySuffix}
-                sortBy={sortBy}
-                onChangeSortBy={(value) => updateSettings({ taskSortBy: value })}
-                selectionMode={selectionMode}
-                onToggleSelection={() => {
-                    if (selectionMode) exitSelectionMode();
-                    else setSelectionMode(true);
-                }}
-                showListDetails={showListDetails}
-                onToggleDetails={() => setListOptions({ showDetails: !showListDetails })}
-                t={t}
-            />
+                        title={title}
+                        showNextCount={isNextView}
+                        nextCount={nextCount}
+                        taskCount={filteredTasks.length}
+                        hasFilters={hasFilters}
+                        filterSummaryLabel={filterSummaryLabel}
+                        filterSummarySuffix={filterSummarySuffix}
+                        sortBy={sortBy}
+                        onChangeSortBy={(value) => updateSettings({ taskSortBy: value })}
+                        selectionMode={selectionMode}
+                        onToggleSelection={() => {
+                            if (selectionMode) exitSelectionMode();
+                            else setSelectionMode(true);
+                        }}
+                        showListDetails={showListDetails}
+                        onToggleDetails={() => setListOptions({ showDetails: !showListDetails })}
+                        densityMode={densityMode}
+                        onToggleDensity={() => {
+                            void updateSettings({
+                                appearance: {
+                                    density: densityMode === 'compact' ? 'comfortable' : 'compact',
+                                },
+                            });
+                        }}
+                        t={t}
+                    />
 
                     {selectionMode && selectedIdsArray.length > 0 && (
                         <ListBulkActions

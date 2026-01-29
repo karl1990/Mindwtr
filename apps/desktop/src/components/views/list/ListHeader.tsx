@@ -1,4 +1,4 @@
-import { List } from 'lucide-react';
+import { ChevronsUpDown, List } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { TaskSortBy } from '@mindwtr/core';
 
@@ -16,6 +16,8 @@ type ListHeaderProps = {
     onToggleSelection: () => void;
     showListDetails: boolean;
     onToggleDetails: () => void;
+    densityMode: 'comfortable' | 'compact';
+    onToggleDensity: () => void;
     t: (key: string) => string;
 };
 
@@ -33,8 +35,24 @@ export function ListHeader({
     onToggleSelection,
     showListDetails,
     onToggleDetails,
+    densityMode,
+    onToggleDensity,
     t,
 }: ListHeaderProps) {
+    const densityTitle = (() => {
+        const value = t('list.density');
+        return value === 'list.density' ? 'Density' : value;
+    })();
+    const densityLabel = densityMode === 'compact'
+        ? (() => {
+            const value = t('list.densityCompact');
+            return value === 'list.densityCompact' ? 'Compact' : value;
+        })()
+        : (() => {
+            const value = t('list.densityComfortable');
+            return value === 'list.densityComfortable' ? 'Comfortable' : value;
+        })();
+
     return (
         <header className="flex items-center justify-between">
             <h2 className="text-3xl font-bold tracking-tight">
@@ -87,6 +105,21 @@ export function ListHeader({
                 >
                     <List className="w-3.5 h-3.5" />
                     {showListDetails ? (t('list.details') || 'Details') : (t('list.compact') || 'Compact')}
+                </button>
+                <button
+                    type="button"
+                    onClick={onToggleDensity}
+                    aria-pressed={densityMode === 'compact'}
+                    className={cn(
+                        "text-xs px-3 py-1 rounded-md border transition-colors inline-flex items-center gap-1.5",
+                        densityMode === 'compact'
+                            ? "bg-primary/10 text-primary border-primary"
+                            : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    )}
+                    title={`${densityTitle}: ${densityLabel}`}
+                >
+                    <ChevronsUpDown className="w-3.5 h-3.5" />
+                    {densityTitle}: {densityLabel}
                 </button>
             </div>
         </header>

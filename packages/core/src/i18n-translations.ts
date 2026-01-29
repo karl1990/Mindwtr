@@ -103,6 +103,9 @@ const en: Record<string, string> = {
         'list.details': 'Details',
         'list.detailsOff': 'Details off',
         'list.compact': 'Compact',
+        'list.density': 'Density',
+        'list.densityComfortable': 'Comfortable',
+        'list.densityCompact': 'Compact',
         'reference.empty': 'No reference items yet.',
 
         // Status Labels
@@ -1031,6 +1034,9 @@ const zh: Record<string, string> = {
         'list.details': '详情',
         'list.detailsOff': '详情关闭',
         'list.compact': '紧凑',
+        'list.density': '密度',
+        'list.densityComfortable': '舒适',
+        'list.densityCompact': '紧凑',
         'reference.empty': '暂无参考条目。',
 
         // Status Labels
