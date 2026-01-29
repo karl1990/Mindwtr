@@ -45,7 +45,7 @@ async function loadNotifications(): Promise<NotificationsApi | null> {
   if (Notifications) return Notifications;
 
   // Skip notifications in Expo Go (not supported in newer SDKs)
-  if (!Constants.appOwnership || Constants.appOwnership === 'expo') {
+  if (Constants.appOwnership === 'expo') {
     return null;
   }
 
@@ -386,8 +386,8 @@ export async function startMobileNotifications() {
     return;
   }
 
-  const granted = await ensurePermission(api);
-  if (!granted) {
+  const permission = await ensurePermission(api);
+  if (!permission.granted) {
     storeSubscription?.();
     storeSubscription = null;
     responseSubscription?.remove();
