@@ -198,6 +198,9 @@ export interface AppData {
             priorities?: boolean;
             timeEstimates?: boolean;
         };
+        appearance?: {
+            density?: 'comfortable' | 'compact';
+        };
         theme?: 'light' | 'dark' | 'system';
         language?: 'en' | 'zh' | 'es' | 'hi' | 'ar' | 'de' | 'ru' | 'ja' | 'fr' | 'pt' | 'ko' | 'it' | 'tr' | 'system';
         weekStart?: 'monday' | 'sunday';

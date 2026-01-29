@@ -2,6 +2,7 @@ import type { FormEvent, RefObject } from 'react';
 import type { Area, Project } from '@mindwtr/core';
 import { Mic, Plus } from 'lucide-react';
 import { TaskInput } from '../../Task/TaskInput';
+import { cn } from '../../../lib/utils';
 
 type ListQuickAddProps = {
     t: (key: string) => string;
@@ -15,6 +16,7 @@ type ListQuickAddProps = {
     areas: Area[];
     contexts: string[];
     onResetCopilot: () => void;
+    dense?: boolean;
 };
 
 export function ListQuickAdd({
@@ -29,6 +31,7 @@ export function ListQuickAdd({
     areas,
     contexts,
     onResetCopilot,
+    dense = false,
 }: ListQuickAddProps) {
     return (
         <form onSubmit={onSubmit} className="relative">
@@ -50,7 +53,10 @@ export function ListQuickAdd({
                     }
                 }}
                 placeholder={`${t('nav.addTask')}... ${t('quickAdd.example')}`}
-                className="w-full bg-card border border-border rounded-lg py-3 pl-4 pr-20 shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className={cn(
+                    "w-full bg-card border border-border rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all",
+                    dense ? "py-2 pl-3 pr-16 text-sm" : "py-3 pl-4 pr-20"
+                )}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <button

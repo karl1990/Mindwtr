@@ -40,6 +40,7 @@ interface TaskItemDisplayProps {
     };
     readOnly: boolean;
     compactMetaEnabled?: boolean;
+    dense?: boolean;
     t: (key: string) => string;
 }
 
@@ -88,6 +89,7 @@ export function TaskItemDisplay({
     focusToggle,
     readOnly,
     compactMetaEnabled = true,
+    dense = false,
     t,
     onOpenProject,
 }: TaskItemDisplayProps) {
@@ -215,19 +217,27 @@ export function TaskItemDisplay({
                     >
                         <div
                             className={cn(
-                                "text-base font-medium truncate group-hover/content:text-primary transition-colors",
+                                "font-medium truncate group-hover/content:text-primary transition-colors",
+                                dense ? "text-sm" : "text-base",
                                 task.status === 'done' && "line-through text-muted-foreground"
                             )}
                         >
                             {task.title}
                         </div>
                         {task.description && (
-                            <p className={cn("text-sm text-muted-foreground mt-1", isRtl && "text-right")} dir={resolvedDirection}>
+                            <p
+                                className={cn(
+                                    "text-muted-foreground mt-1",
+                                    dense ? "text-xs" : "text-sm",
+                                    isRtl && "text-right"
+                                )}
+                                dir={resolvedDirection}
+                            >
                                 {stripMarkdown(task.description)}
                             </p>
                         )}
                         {showCompactMeta && (
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <div className={cn("flex flex-wrap items-center gap-2 text-xs text-muted-foreground", dense ? "mt-0.5" : "mt-1")}>
                                 {renderProjectBadge()}
                                 {!project && area && (
                                     <MetadataBadge

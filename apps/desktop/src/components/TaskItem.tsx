@@ -195,6 +195,7 @@ export const TaskItem = memo(function TaskItem({
     const [isViewOpen, setIsViewOpen] = useState(false);
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
+    const isCompact = settings?.appearance?.density === 'compact';
     const isHighlighted = highlightTaskId === task.id;
     const recurrenceRule = getRecurrenceRuleValue(task.recurrence);
     const recurrenceStrategy = getRecurrenceStrategyValue(task.recurrence);
@@ -757,20 +758,24 @@ export const TaskItem = memo(function TaskItem({
                     startEditing();
                 }}
                 className={cn(
-                    "group bg-card border border-border rounded-lg p-4 hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 border-l-4",
+                    "group bg-card border border-border rounded-lg hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 border-l-4",
+                    isCompact ? "p-2" : "p-4",
                     isSelected && "ring-2 ring-primary/40",
                     isHighlighted && "ring-2 ring-primary/70 border-primary/40"
                 )}
                 style={{ borderLeftColor: getStatusColor(task.status).border }}
             >
-                <div className="flex items-start gap-3">
+                <div className={cn("flex items-start", isCompact ? "gap-2" : "gap-3")}>
                     {selectionMode && (
                         <input
                             type="checkbox"
                             aria-label={selectAriaLabel}
                             checked={isMultiSelected}
                             onChange={() => onToggleSelect?.()}
-                            className="mt-1.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                            className={cn(
+                                "h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer",
+                                isCompact ? "mt-1" : "mt-1.5"
+                            )}
                         />
                     )}
 
@@ -888,6 +893,7 @@ export const TaskItem = memo(function TaskItem({
                             focusToggle={focusToggle}
                             readOnly={effectiveReadOnly}
                             compactMetaEnabled={compactMetaEnabled}
+                            dense={isCompact}
                             t={t}
                         />
                     )}

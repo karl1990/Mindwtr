@@ -22,6 +22,7 @@ import { checkBudget } from '../../config/performanceBudgets';
 import { useListViewOptimizations } from '../../hooks/useListViewOptimizations';
 import { reportError } from '../../lib/report-error';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter, resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
+import { cn } from '../../lib/utils';
 
 
 interface ListViewProps {
@@ -82,6 +83,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const { t } = useLanguage();
     const { registerTaskListScope } = useKeybindings();
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
+    const isCompact = settings?.appearance?.density === 'compact';
     const resolvedAreaFilter = useMemo(
         () => resolveAreaFilter(settings?.filters?.areaId, areas),
         [settings?.filters?.areaId, areas],
@@ -311,7 +313,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
     const rowVirtualizer = useVirtualizer({
         count: shouldVirtualize ? filteredTasks.length : 0,
         getScrollElement: () => listScrollRef.current,
-        estimateSize: () => VIRTUAL_ROW_ESTIMATE,
+        estimateSize: () => (isCompact ? 90 : VIRTUAL_ROW_ESTIMATE),
         overscan: Math.max(2, Math.ceil(VIRTUAL_OVERSCAN / VIRTUAL_ROW_ESTIMATE)),
         getItemKey: (index) => filteredTasks[index]?.id ?? index,
     });
@@ -794,6 +796,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                     areas={areas}
                     contexts={allContexts}
                     t={t}
+                    dense={isCompact}
                     onCreateProject={async (title) => {
                         const created = await addProject(title, '#94a3b8');
                         return created?.id ?? null;
@@ -863,7 +866,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                         transform: `translateY(${virtualRow.start}px)`,
                                     }}
                                 >
-                                    <div className="pb-3">
+                                    <div className={cn(isCompact ? "pb-2" : "pb-3")}>
                                         <TaskItem
                                             key={task.id}
                                             task={task}
@@ -883,7 +886,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                         })}
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className={cn(isCompact ? "space-y-2" : "space-y-3")}>
                         {filteredTasks.map((task, index) => (
                             <TaskItem
                                 key={task.id}

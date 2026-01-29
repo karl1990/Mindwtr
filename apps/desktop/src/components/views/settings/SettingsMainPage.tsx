@@ -2,9 +2,14 @@ import { Check, Monitor } from 'lucide-react';
 import type { Language } from '../../../contexts/language-context';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
+type DensityMode = 'comfortable' | 'compact';
 
 type Labels = {
     appearance: string;
+    density: string;
+    densityDesc: string;
+    densityComfortable: string;
+    densityCompact: string;
     system: string;
     light: string;
     dark: string;
@@ -34,6 +39,8 @@ type SettingsMainPageProps = {
     t: Labels;
     themeMode: ThemeMode;
     onThemeChange: (mode: ThemeMode) => void;
+    densityMode: DensityMode;
+    onDensityChange: (mode: DensityMode) => void;
     language: Language;
     onLanguageChange: (lang: Language) => void;
     keybindingStyle: 'vim' | 'emacs';
@@ -55,6 +62,8 @@ export function SettingsMainPage({
     t,
     themeMode,
     onThemeChange,
+    densityMode,
+    onDensityChange,
     language,
     onLanguageChange,
     keybindingStyle,
@@ -94,6 +103,23 @@ export function SettingsMainPage({
                             <option value="eink">{t.eink}</option>
                             <option value="nord">{t.nord}</option>
                             <option value="sepia">{t.sepia}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="p-4 flex items-center justify-between gap-6">
+                    <div className="min-w-0">
+                        <div className="text-sm font-medium">{t.density}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{t.densityDesc}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <select
+                            value={densityMode}
+                            onChange={(e) => onDensityChange(e.target.value as DensityMode)}
+                            className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                            <option value="comfortable">{t.densityComfortable}</option>
+                            <option value="compact">{t.densityCompact}</option>
                         </select>
                     </div>
                 </div>

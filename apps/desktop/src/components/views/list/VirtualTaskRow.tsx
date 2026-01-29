@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import type { Project, Task } from '@mindwtr/core';
 import { TaskItem } from '../../TaskItem';
+import { cn } from '../../../lib/utils';
 
 type VirtualTaskRowProps = {
     task: Task;
@@ -16,6 +17,7 @@ type VirtualTaskRowProps = {
     showQuickDone: boolean;
     readOnly: boolean;
     compactMetaEnabled?: boolean;
+    dense?: boolean;
 };
 
 export const VirtualTaskRow = React.memo(function VirtualTaskRow({
@@ -32,6 +34,7 @@ export const VirtualTaskRow = React.memo(function VirtualTaskRow({
     showQuickDone,
     readOnly,
     compactMetaEnabled = true,
+    dense = false,
 }: VirtualTaskRowProps) {
     const rowRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,7 +50,7 @@ export const VirtualTaskRow = React.memo(function VirtualTaskRow({
 
     return (
         <div ref={rowRef} style={{ position: 'absolute', top, left: 0, right: 0 }}>
-            <div className="pb-3">
+            <div className={cn(dense ? "pb-2" : "pb-3")}>
                 <TaskItem
                     key={task.id}
                     task={task}

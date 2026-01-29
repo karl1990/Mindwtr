@@ -33,6 +33,7 @@ import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
+type DensityMode = 'comfortable' | 'compact';
 type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'calendar' | 'ai' | 'about';
 type LinuxDistroInfo = { id?: string; id_like?: string[] };
 
@@ -116,6 +117,7 @@ export function SettingsView() {
     const windowDecorationsEnabled = settings?.window?.decorations !== false;
     const closeBehavior = settings?.window?.closeBehavior ?? 'ask';
     const trayVisible = settings?.window?.showTray !== false;
+    const densityMode = (settings?.appearance?.density === 'compact' ? 'compact' : 'comfortable') as DensityMode;
     const [saved, setSaved] = useState(false);
     const [appVersion, setAppVersion] = useState('0.1.0');
     const [logPath, setLogPath] = useState('');
@@ -378,6 +380,17 @@ export function SettingsView() {
         localStorage.setItem(THEME_STORAGE_KEY, mode);
         setThemeMode(mode);
         showSaved();
+    };
+
+    const saveDensityPreference = (mode: DensityMode) => {
+        updateSettings({
+            appearance: {
+                ...(settings?.appearance ?? {}),
+                density: mode,
+            },
+        })
+            .then(showSaved)
+            .catch((error) => reportError('Failed to update density', error));
     };
 
     const saveLanguagePreference = (lang: Language) => {
@@ -810,6 +823,8 @@ export function SettingsView() {
                     t={t}
                     themeMode={themeMode}
                     onThemeChange={saveThemePreference}
+                    densityMode={densityMode}
+                    onDensityChange={saveDensityPreference}
                     language={language}
                     onLanguageChange={saveLanguagePreference}
                     keybindingStyle={keybindingStyle}
