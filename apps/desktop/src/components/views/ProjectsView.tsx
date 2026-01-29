@@ -165,6 +165,11 @@ export function ProjectsView() {
             areaById: new Map(sorted.map((area) => [area.id, area])),
         };
     }, [areas]);
+    const areaFilterLabel = useMemo(() => {
+        if (selectedArea === ALL_AREAS) return null;
+        if (selectedArea === NO_AREA) return t('projects.noArea');
+        return areaById.get(selectedArea)?.name || t('projects.noArea');
+    }, [selectedArea, areaById, ALL_AREAS, NO_AREA, t]);
 
     const areaSensors = useSensors(
         useSensor(PointerSensor, {
@@ -744,6 +749,7 @@ export function ProjectsView() {
                 <div className="flex h-full gap-6">
                     <ProjectsSidebar
                         t={t}
+                        areaFilterLabel={areaFilterLabel ?? undefined}
                         selectedTag={selectedTag}
                         allTagsId={ALL_TAGS}
                         noTagsId={NO_TAGS}

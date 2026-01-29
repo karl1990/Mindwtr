@@ -17,6 +17,7 @@ type TasksByProject = Record<string, Task[]>;
 
 interface ProjectsSidebarProps {
     t: (key: string) => string;
+    areaFilterLabel?: string;
     selectedTag: string;
     allTagsId: string;
     noTagsId: string;
@@ -48,6 +49,7 @@ interface ProjectsSidebarProps {
 
 export function ProjectsSidebar({
     t,
+    areaFilterLabel,
     selectedTag,
     allTagsId,
     noTagsId,
@@ -124,7 +126,14 @@ export function ProjectsSidebar({
     return (
         <div className="w-64 flex-shrink-0 flex flex-col gap-4 border-r border-border pr-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold tracking-tight">{t('projects.title')}</h2>
+                <div className="flex items-center gap-2 min-w-0">
+                    <h2 className="text-xl font-bold tracking-tight">{t('projects.title')}</h2>
+                    {areaFilterLabel && (
+                        <span className="text-[10px] uppercase tracking-wide bg-muted/60 text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                            {t('projects.areaLabel')}: {areaFilterLabel}
+                        </span>
+                    )}
+                </div>
                 <button
                     onClick={onStartCreate}
                     className="p-1 hover:bg-accent rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
