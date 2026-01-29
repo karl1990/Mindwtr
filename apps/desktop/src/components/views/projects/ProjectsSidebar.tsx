@@ -411,14 +411,24 @@ export function ProjectsSidebar({
 
                 {groupedActiveProjects.length === 0 && groupedDeferredProjects.length === 0 && !isCreating && (
                     <div className="text-sm text-muted-foreground text-center py-8 space-y-3">
-                        <p className="text-base font-medium text-foreground">{t('projects.noProjects')}</p>
+                        <p className="text-base font-medium text-foreground">
+                            {areaFilterLabel
+                                ? (t('projects.noProjectsInArea') === 'projects.noProjectsInArea'
+                                    ? 'No projects in this area.'
+                                    : t('projects.noProjectsInArea'))
+                                : t('projects.noProjects')}
+                        </p>
                         <p>
-                            {(() => {
-                                const hint = t('projects.emptyHint');
-                                return hint === 'projects.emptyHint'
-                                    ? 'Create your first project to start organizing work.'
-                                    : hint;
-                            })()}
+                            {areaFilterLabel
+                                ? (t('projects.emptyHintFiltered') === 'projects.emptyHintFiltered'
+                                    ? 'Try switching the Area filter or create a project in this area.'
+                                    : t('projects.emptyHintFiltered'))
+                                : (() => {
+                                    const hint = t('projects.emptyHint');
+                                    return hint === 'projects.emptyHint'
+                                        ? 'Create your first project to start organizing work.'
+                                        : hint;
+                                })()}
                         </p>
                         <button
                             type="button"
