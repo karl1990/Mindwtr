@@ -117,8 +117,10 @@ export const TaskItem = memo(function TaskItem({
         }),
         shallow
     );
-    const { setSelectedProjectId } = useUiStore((state) => ({
+    const { setSelectedProjectId, editingTaskId, setEditingTaskId } = useUiStore((state) => ({
         setSelectedProjectId: (value: string | null) => state.setProjectView({ selectedProjectId: value }),
+        editingTaskId: state.editingTaskId,
+        setEditingTaskId: state.setEditingTaskId,
     }));
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
@@ -378,7 +380,8 @@ export const TaskItem = memo(function TaskItem({
         resetEditState();
         setIsViewOpen(false);
         setIsEditing(true);
-    }, [effectiveReadOnly, resetEditState]);
+        setEditingTaskId(task.id);
+    }, [effectiveReadOnly, resetEditState, setEditingTaskId, task.id]);
 
     const DEFAULT_PROJECT_COLOR = '#94a3b8';
     const handleCreateProject = useCallback(async (title: string) => {
@@ -612,6 +615,9 @@ export const TaskItem = memo(function TaskItem({
     useEffect(() => {
         if (effectiveReadOnly && isEditing) {
             setIsEditing(false);
+            if (editingTaskId === task.id) {
+                setEditingTaskId(null);
+            }
             return;
         }
         if (!isEditing) {
@@ -619,7 +625,14 @@ export const TaskItem = memo(function TaskItem({
             return;
         }
         wasEditingRef.current = true;
-    }, [effectiveReadOnly, isEditing]);
+    }, [effectiveReadOnly, isEditing, editingTaskId, setEditingTaskId, task.id]);
+
+    useEffect(() => {
+        if (!isEditing) return;
+        if (editingTaskId !== task.id) {
+            setIsEditing(false);
+        }
+    }, [editingTaskId, isEditing, task.id]);
 
     useEffect(() => {
         if (isEditing) {
@@ -693,6 +706,9 @@ export const TaskItem = memo(function TaskItem({
             attachments: editAttachments.length > 0 ? editAttachments : undefined,
         });
         setIsEditing(false);
+        if (editingTaskId === task.id) {
+            setEditingTaskId(null);
+        }
     };
 
     const project = propProject || (task.projectId ? projectById.get(task.projectId) : undefined);
@@ -864,6 +880,9 @@ export const TaskItem = memo(function TaskItem({
                                     }
                                     resetEditState();
                                     setIsEditing(false);
+                                    if (editingTaskId === task.id) {
+                                        setEditingTaskId(null);
+                                    }
                                 }}
                                 onSubmit={handleSubmit}
                             />

@@ -20,6 +20,8 @@ interface UiState {
         showDetails: boolean;
     };
     setListOptions: (partial: Partial<UiState['listOptions']>) => void;
+    editingTaskId: string | null;
+    setEditingTaskId: (value: string | null) => void;
     boardFilters: {
         selectedProjectIds: string[];
         open: boolean;
@@ -66,6 +68,8 @@ export const useUiStore = create<UiState>((set) => ({
     },
     setListOptions: (partial) =>
         set((state) => ({ listOptions: { ...state.listOptions, ...partial } })),
+    editingTaskId: null,
+    setEditingTaskId: (value) => set({ editingTaskId: value }),
     boardFilters: {
         selectedProjectIds: [],
         open: false,
