@@ -1,9 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { useCallback, useEffect, useState } from 'react';
 import { LanguageProvider } from './language-context';
 import { KeybindingProvider } from './keybinding-context';
 import { useKeybindings } from './keybinding-context';
+import { useUiStore } from '../store/ui-store';
 
 const DummyList = () => {
     const { registerTaskListScope } = useKeybindings();
@@ -47,6 +48,10 @@ const DummyList = () => {
 };
 
 describe('KeybindingProvider (vim)', () => {
+    beforeEach(() => {
+        useUiStore.setState({ editingTaskId: null });
+    });
+
     it('moves selection with j/k', async () => {
         render(
             <LanguageProvider>
