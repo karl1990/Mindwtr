@@ -71,7 +71,7 @@ export function AttachmentModals({
             {textAttachment ? (
                 <TextAttachmentModal
                     attachment={textAttachment}
-                    textContent={textContent}
+                    textContent={textContent ?? ''}
                     textLoading={textLoading}
                     textError={textError}
                     onClose={onCloseText}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import { useCallback, useEffect, useState } from 'react';
 import { LanguageProvider } from './language-context';
 import { KeybindingProvider } from './keybinding-context';
@@ -62,9 +62,14 @@ describe('KeybindingProvider (vim)', () => {
         expect(first?.className).toMatch(/ring-2/);
         expect(second?.className).not.toMatch(/ring-2/);
 
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await waitFor(() => {
+            expect(document.querySelector('[data-task-id="1"]')?.className).toMatch(/ring-2/);
+        });
+
         fireEvent.keyDown(window, { key: 'j' });
 
-        expect(second?.className).toMatch(/ring-2/);
+        await waitFor(() => {
+            expect(document.querySelector('[data-task-id="2"]')?.className).toMatch(/ring-2/);
+        });
     });
 });

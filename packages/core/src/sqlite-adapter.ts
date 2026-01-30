@@ -331,8 +331,10 @@ export class SqliteAdapter {
                 logWarn('FTS rebuild lock unavailable, retrying', {
                     scope: 'sqlite',
                     category: 'fts',
-                    attempt: attempt + 1,
-                    delayMs,
+                    context: {
+                        attempt: attempt + 1,
+                        delayMs,
+                    },
                 });
                 await sleep(delayMs);
                 lockOwner = await this.acquireFtsLock();
@@ -341,7 +343,9 @@ export class SqliteAdapter {
                 logWarn('FTS rebuild skipped: lock unavailable after retries', {
                     scope: 'sqlite',
                     category: 'fts',
-                    attempts: maxAttempts,
+                    context: {
+                        attempts: maxAttempts,
+                    },
                 });
                 return;
             }

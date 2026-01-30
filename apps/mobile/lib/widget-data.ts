@@ -55,11 +55,13 @@ export function buildWidgetPayload(data: AppData, language: Language): TasksWidg
     const inboxCount = activeTasks.filter((task) => task.status === 'inbox').length;
 
     return {
-        headerTitle: showFocused ? tr['agenda.todaysFocus'] : tr['agenda.nextActions'],
-        inboxLabel: tr['nav.inbox'],
+        headerTitle: showFocused
+            ? (tr['agenda.todaysFocus'] ?? 'Today')
+            : (tr['agenda.nextActions'] ?? 'Next actions'),
+        inboxLabel: tr['nav.inbox'] ?? 'Inbox',
         inboxCount,
         items,
-        emptyMessage: tr['agenda.noTasks'],
-        captureLabel: tr['widget.capture'],
+        emptyMessage: tr['agenda.noTasks'] ?? 'No tasks',
+        captureLabel: tr['widget.capture'] ?? 'Capture',
     };
 }
