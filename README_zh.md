@@ -36,7 +36,7 @@
     <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
          align="center"
          alt="Google Play"
-         style="height: 50px"
+         style="height: 50px; width: 160px; object-fit: cover; object-position: center;"
          height="50" />
   </a>
   <a href="https://aur.archlinux.org/packages/mindwtr-bin" target="_blank">
