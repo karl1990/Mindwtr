@@ -548,7 +548,12 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
 
           <View style={[styles.taskDisplay, { maxHeight: taskDisplayMaxHeight }]}>
             {processingStep === 'refine' ? (
-              <View style={styles.refineContainer}>
+              <ScrollView
+                style={styles.refineScroll}
+                contentContainerStyle={styles.refineContainer}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
                 <Text style={[styles.refineLabel, { color: tc.secondaryText }]}>{t('taskEdit.titleLabel')}</Text>
                 <TextInput
                   ref={titleInputRef}
@@ -603,7 +608,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                         </TouchableOpacity>
                       )}
                     </View>
-                    <ScrollView style={{ maxHeight: 200 }}>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                       <TouchableOpacity
                         style={[styles.projectChip, { backgroundColor: '#10B981' }]}
                         onPress={() => selectProjectEarly(null)}
@@ -632,7 +637,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                     </ScrollView>
                   </View>
                 )}
-              </View>
+              </ScrollView>
             ) : (
               <>
                 <Text style={[styles.taskTitle, titleDirectionStyle, { color: tc.text }]}>
@@ -1228,6 +1233,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 0,
     flexShrink: 1,
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,
@@ -1359,6 +1365,10 @@ const styles = StyleSheet.create({
   },
   refineContainer: {
     gap: 8,
+    paddingBottom: 8,
+  },
+  refineScroll: {
+    maxHeight: '100%',
   },
   projectRefineSection: {
     marginTop: 12,
