@@ -143,15 +143,35 @@ jobs:
       - name: Setup Microsoft Store CLI
         uses: microsoft/setup-msstore-cli@v1
 
-      - name: Publish to Microsoft Store
+      - name: Validate Microsoft Store secrets
         if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
         shell: pwsh
         run: |
-          msstore publish mindwtr_${{ steps.version.outputs.version }}_x64.msix `
-            --tenant-id ${{ secrets.MS_TENANT_ID }} `
-            --seller-id ${{ secrets.MS_SELLER_ID }} `
-            --client-id ${{ secrets.MS_CLIENT_ID }} `
-            --client-secret ${{ secrets.MS_CLIENT_SECRET }}
+          $required = @('MS_TENANT_ID','MS_SELLER_ID','MS_CLIENT_ID','MS_CLIENT_SECRET')
+          foreach ($name in $required) {
+            if (-not $env:$name) {
+              Write-Error "$name is missing. Please set it in repository secrets."
+            }
+          }
+
+      - name: Publish to Microsoft Store
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
+        shell: pwsh
+        env:
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_SELLER_ID: ${{ secrets.MS_SELLER_ID }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+        run: |
+          $msix = "mindwtr_${{ steps.version.outputs.version }}_x64.msix"
+          $args = @(
+            "publish", $msix,
+            "--tenant-id", $env:MS_TENANT_ID,
+            "--seller-id", $env:MS_SELLER_ID,
+            "--client-id", $env:MS_CLIENT_ID,
+            "--client-secret", $env:MS_CLIENT_SECRET
+          )
+          & msstore @args
 
       - name: Collect Windows artifacts
         shell: pwsh
