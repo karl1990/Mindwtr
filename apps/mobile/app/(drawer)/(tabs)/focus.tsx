@@ -10,12 +10,49 @@ import { useLanguage } from '../../../contexts/language-context';
 import { TaskEditModal } from '@/components/task-edit-modal';
 
 export default function FocusScreen() {
-  const { tasks, updateTask, deleteTask } = useTaskStore();
+  const { tasks, projects, updateTask, deleteTask } = useTaskStore();
   const { isDark } = useTheme();
   const { t } = useLanguage();
   const tc = useThemeColors();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const sequentialProjectIds = useMemo(() => {
+    return new Set(projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id));
+  }, [projects]);
+
+  const sequentialFirstTaskIds = useMemo(() => {
+    if (sequentialProjectIds.size === 0) return new Set<string>();
+    const tasksByProject = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      if (task.deletedAt) return;
+      if (task.status === 'done' || task.status === 'reference') return;
+      if (!task.projectId) return;
+      if (!sequentialProjectIds.has(task.projectId)) return;
+      const list = tasksByProject.get(task.projectId) ?? [];
+      list.push(task);
+      tasksByProject.set(task.projectId, list);
+    });
+
+    const firstIds = new Set<string>();
+    tasksByProject.forEach((projectTasks) => {
+      const hasOrder = projectTasks.some((task) => Number.isFinite(task.orderNum));
+      let firstId: string | null = null;
+      let bestKey = Number.POSITIVE_INFINITY;
+      projectTasks.forEach((task) => {
+        const key = hasOrder
+          ? (Number.isFinite(task.orderNum) ? (task.orderNum as number) : Number.POSITIVE_INFINITY)
+          : (safeParseDate(task.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY);
+        if (!firstId || key < bestKey) {
+          firstId = task.id;
+          bestKey = key;
+        }
+      });
+      if (firstId) firstIds.add(firstId);
+    });
+
+    return firstIds;
+  }, [tasks, sequentialProjectIds]);
 
   const { schedule, nextActions } = useMemo(() => {
     const now = new Date();
@@ -25,10 +62,16 @@ export default function FocusScreen() {
       const start = safeParseDate(task.startTime);
       return Boolean(start && start > endOfToday);
     };
+    const isSequentialBlocked = (task: Task) => {
+      if (!task.projectId) return false;
+      if (!sequentialProjectIds.has(task.projectId)) return false;
+      return !sequentialFirstTaskIds.has(task.id);
+    };
 
     const scheduleItems = tasks.filter((task) => {
       if (task.deletedAt) return false;
       if (task.status === 'done' || task.status === 'reference') return false;
+      if (isSequentialBlocked(task)) return false;
       const due = safeParseDueDate(task.dueDate);
       const start = safeParseDate(task.startTime);
       const startReady = !start || start <= endOfToday;
@@ -43,11 +86,12 @@ export default function FocusScreen() {
       if (task.deletedAt) return false;
       if (task.status !== 'next') return false;
       if (isPlannedForFuture(task)) return false;
+      if (isSequentialBlocked(task)) return false;
       return !scheduleIds.has(task.id);
     });
 
     return { schedule: scheduleItems, nextActions: nextItems };
-  }, [tasks]);
+  }, [tasks, sequentialProjectIds, sequentialFirstTaskIds]);
 
   const sections = useMemo(() => ([
     { title: t('focus.schedule') ?? 'Today', data: schedule, type: 'schedule' as const },
