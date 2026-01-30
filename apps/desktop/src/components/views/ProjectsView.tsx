@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { TaskItem } from '../TaskItem';
 import { shallow, useTaskStore, Attachment, Task, type Project, type Section, generateUUID, parseQuickAdd, validateAttachmentForUpload } from '@mindwtr/core';
 import { ChevronDown, ChevronRight, FileText, Folder, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DndContext, PointerSensor, useDroppable, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -38,6 +37,21 @@ const getSectionContainerId = (sectionId?: string | null) =>
     sectionId ? `${SECTION_CONTAINER_PREFIX}${sectionId}` : NO_SECTION_CONTAINER;
 const getSectionIdFromContainer = (containerId: string) =>
     containerId === NO_SECTION_CONTAINER ? null : containerId.replace(SECTION_CONTAINER_PREFIX, '');
+
+type SectionDropZoneProps = {
+    id: string;
+    className?: string;
+    children: ReactNode;
+};
+
+const SectionDropZone = ({ id, className, children }: SectionDropZoneProps) => {
+    const { setNodeRef, isOver } = useDroppable({ id });
+    return (
+        <div ref={setNodeRef} className={cn(className, isOver && 'ring-2 ring-primary/40')}>
+            {children}
+        </div>
+    );
+};
 
 export function ProjectsView() {
     const perf = usePerformanceMonitor('ProjectsView');
@@ -98,10 +112,13 @@ export function ProjectsView() {
     const getDerivedState = useTaskStore((state) => state.getDerivedState);
     const { allContexts } = getDerivedState();
     const { t } = useLanguage();
-    const { selectedProjectId, setSelectedProjectId } = useUiStore((state) => ({
-        selectedProjectId: state.projectView.selectedProjectId,
-        setSelectedProjectId: (value: string | null) => state.setProjectView({ selectedProjectId: value }),
-    }));
+    const { selectedProjectId, setSelectedProjectId } = useUiStore(
+        (state) => ({
+            selectedProjectId: state.projectView.selectedProjectId,
+            setSelectedProjectId: (value: string | null) => state.setProjectView({ selectedProjectId: value }),
+        }),
+        shallow
+    );
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
     const [notesExpanded, setNotesExpanded] = useState(false);
@@ -527,15 +544,152 @@ export function ProjectsView() {
             </div>
         </SortableContext>
     );
-
-    const SectionDropZone = ({ id, className, children }: { id: string; className?: string; children: ReactNode }) => {
-        const { setNodeRef, isOver } = useDroppable({ id });
+    const renderProjectSections = (renderTasks: (list: Task[]) => ReactNode) => {
+        if (projectSections.length === 0) {
+            return (
+                <SectionDropZone id={NO_SECTION_CONTAINER} className="min-h-[120px]">
+                    {orderedProjectTasks.length > 0 ? (
+                        renderTasks(orderedProjectTasks)
+                    ) : (
+                        <div className="text-center text-muted-foreground py-12">
+                            {t('projects.noActiveTasks')}
+                        </div>
+                    )}
+                </SectionDropZone>
+            );
+        }
         return (
-            <div ref={setNodeRef} className={cn(className, isOver && 'ring-2 ring-primary/40')}>
-                {children}
+            <div className="space-y-4">
+                {sectionTaskGroups.sections.map((group) => {
+                    const isCollapsed = group.section.isCollapsed;
+                    const taskCount = group.tasks.length;
+                    const hasNotes = Boolean(group.section.description?.trim());
+                    const notesOpen = sectionNotesOpen[group.section.id] ?? false;
+                    return (
+                        <SectionDropZone
+                            key={group.section.id}
+                            id={getSectionContainerId(group.section.id)}
+                            className="border border-border rounded-lg bg-card/40"
+                        >
+                            <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleSection(group.section)}
+                                    className="flex items-center gap-2 text-sm font-semibold"
+                                >
+                                    {isCollapsed ? (
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <span>{group.section.title}</span>
+                                    <span className="text-xs text-muted-foreground">{taskCount}</span>
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenSectionTaskPrompt(group.section.id)}
+                                        className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                                        aria-label={t('projects.addTask')}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleSectionNotes(group.section.id)}
+                                        className={cn(
+                                            'p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground',
+                                            (hasNotes || notesOpen) && 'text-primary'
+                                        )}
+                                        aria-label={t('projects.sectionNotes')}
+                                    >
+                                        <FileText className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRenameSection(group.section)}
+                                        className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                                        aria-label={t('common.edit')}
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteSection(group.section)}
+                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                        aria-label={t('common.delete')}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                            {notesOpen && (
+                                <div className="px-3 py-2 border-b border-border/60">
+                                    <textarea
+                                        className="w-full min-h-[90px] p-2 text-xs bg-transparent border border-border rounded resize-y focus:outline-none focus:bg-accent/5"
+                                        placeholder={t('projects.sectionNotesPlaceholder')}
+                                        defaultValue={group.section.description || ''}
+                                        onBlur={(event) => {
+                                            const nextValue = event.target.value.trimEnd();
+                                            updateSection(group.section.id, { description: nextValue || undefined });
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            {!isCollapsed && (
+                                <div className="p-3">
+                                    {taskCount > 0 ? (
+                                        renderTasks(group.tasks)
+                                    ) : (
+                                        <div className="text-xs text-muted-foreground py-2">
+                                            {t('projects.noActiveTasks')}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </SectionDropZone>
+                    );
+                })}
+                <SectionDropZone
+                    id={NO_SECTION_CONTAINER}
+                    className="border border-dashed border-border rounded-lg bg-card/20"
+                >
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                            <span>{t('projects.noSection')}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {sectionTaskGroups.unsectioned.length}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="p-3">
+                        {sectionTaskGroups.unsectioned.length > 0 ? (
+                            renderTasks(sectionTaskGroups.unsectioned)
+                        ) : (
+                            <div className="text-xs text-muted-foreground py-2">
+                                {t('projects.noActiveTasks')}
+                            </div>
+                        )}
+                    </div>
+                </SectionDropZone>
+                {sectionTaskGroups.sections.length === 0 && sectionTaskGroups.unsectioned.length === 0 && (
+                    <div className="text-center text-muted-foreground py-12">
+                        {t('projects.noActiveTasks')}
+                    </div>
+                )}
             </div>
         );
     };
+    const tasksContent = (
+        <DndContext
+            sensors={taskSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleTaskDragEnd}
+        >
+            {renderProjectSections(renderSortableTasks)}
+        </DndContext>
+    );
+
     const visibleAttachments = (selectedProject?.attachments || []).filter((a) => !a.deletedAt);
     const projectProgress = useMemo(() => {
         if (!selectedProjectId) return null;
@@ -869,143 +1023,7 @@ export function ProjectsView() {
                                                 {t('projects.addSection')}
                                             </button>
                                         </div>
-                                        <DndContext
-                                            sensors={taskSensors}
-                                            collisionDetection={closestCenter}
-                                            onDragEnd={handleTaskDragEnd}
-                                        >
-                                            {projectSections.length === 0 ? (
-                                                <SectionDropZone id={NO_SECTION_CONTAINER} className="min-h-[120px]">
-                                                    {orderedProjectTasks.length > 0 ? (
-                                                        renderSortableTasks(orderedProjectTasks)
-                                                    ) : (
-                                                        <div className="text-center text-muted-foreground py-12">
-                                                            {t('projects.noActiveTasks')}
-                                                        </div>
-                                                    )}
-                                                </SectionDropZone>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    {sectionTaskGroups.sections.map((group) => {
-                                                        const isCollapsed = group.section.isCollapsed;
-                                                        const taskCount = group.tasks.length;
-                                                        const hasNotes = Boolean(group.section.description?.trim());
-                                                        const notesOpen = sectionNotesOpen[group.section.id] ?? false;
-                                                        return (
-                                                            <SectionDropZone
-                                                                key={group.section.id}
-                                                                id={getSectionContainerId(group.section.id)}
-                                                                className="border border-border rounded-lg bg-card/40"
-                                                            >
-                                                                <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleToggleSection(group.section)}
-                                                                        className="flex items-center gap-2 text-sm font-semibold"
-                                                                    >
-                                                                        {isCollapsed ? (
-                                                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                                                        ) : (
-                                                                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                                                        )}
-                                                                        <span>{group.section.title}</span>
-                                                                        <span className="text-xs text-muted-foreground">{taskCount}</span>
-                                                                    </button>
-                                                                    <div className="flex items-center gap-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleOpenSectionTaskPrompt(group.section.id)}
-                                                                        className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground"
-                                                                        aria-label={t('projects.addTask')}
-                                                                    >
-                                                                        <Plus className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleToggleSectionNotes(group.section.id)}
-                                                                        className={cn(
-                                                                            'p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground',
-                                                                            (hasNotes || notesOpen) && 'text-primary'
-                                                                        )}
-                                                                        aria-label={t('projects.sectionNotes')}
-                                                                    >
-                                                                        <FileText className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleRenameSection(group.section)}
-                                                                        className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground"
-                                                                        aria-label={t('common.edit')}
-                                                                    >
-                                                                        <Pencil className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleDeleteSection(group.section)}
-                                                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                                                                        aria-label={t('common.delete')}
-                                                                    >
-                                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            {notesOpen && (
-                                                                <div className="px-3 py-2 border-b border-border/60">
-                                                                    <textarea
-                                                                        className="w-full min-h-[90px] p-2 text-xs bg-transparent border border-border rounded resize-y focus:outline-none focus:bg-accent/5"
-                                                                        placeholder={t('projects.sectionNotesPlaceholder')}
-                                                                        defaultValue={group.section.description || ''}
-                                                                        onBlur={(event) => {
-                                                                            const nextValue = event.target.value.trimEnd();
-                                                                            updateSection(group.section.id, { description: nextValue || undefined });
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {!isCollapsed && (
-                                                                <div className="p-3">
-                                                                    {taskCount > 0 ? (
-                                                                        renderSortableTasks(group.tasks)
-                                                                    ) : (
-                                                                        <div className="text-xs text-muted-foreground py-2">
-                                                                            {t('projects.noActiveTasks')}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </SectionDropZone>
-                                                    );
-                                                })}
-                                                <SectionDropZone
-                                                    id={NO_SECTION_CONTAINER}
-                                                    className="border border-dashed border-border rounded-lg bg-card/20"
-                                                >
-                                                    <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
-                                                        <div className="flex items-center gap-2 text-sm font-semibold">
-                                                            <span>{t('projects.noSection')}</span>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {sectionTaskGroups.unsectioned.length}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="p-3">
-                                                        {sectionTaskGroups.unsectioned.length > 0 ? (
-                                                            renderSortableTasks(sectionTaskGroups.unsectioned)
-                                                        ) : (
-                                                            <div className="text-xs text-muted-foreground py-2">
-                                                                {t('projects.noActiveTasks')}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </SectionDropZone>
-                                                {sectionTaskGroups.sections.length === 0 && sectionTaskGroups.unsectioned.length === 0 && (
-                                                    <div className="text-center text-muted-foreground py-12">
-                                                        {t('projects.noActiveTasks')}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </DndContext>
+                                        {tasksContent}
                                 </div>
                                 </div>
                             </>

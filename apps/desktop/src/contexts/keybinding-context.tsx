@@ -106,6 +106,8 @@ export function KeybindingProvider({
     const toggleFocusMode = useUiStore((state) => state.toggleFocusMode);
     const listOptions = useUiStore((state) => state.listOptions);
     const setListOptions = useUiStore((state) => state.setListOptions);
+    const editingTaskId = useUiStore((state) => state.editingTaskId);
+    const editingTaskIdRef = useRef<string | null>(editingTaskId);
 
     const initialStyle: KeybindingStyle =
         settings.keybindingStyle === 'vim' || settings.keybindingStyle === 'emacs'
@@ -137,6 +139,10 @@ export function KeybindingProvider({
             setStyleState((prev) => (prev === nextStyle ? prev : nextStyle));
         }
     }, [isTest, settings.keybindingStyle]);
+
+    useEffect(() => {
+        editingTaskIdRef.current = editingTaskId;
+    }, [editingTaskId]);
 
     const setStyle = useCallback((next: KeybindingStyle) => {
         setStyleState(next);
@@ -190,6 +196,7 @@ export function KeybindingProvider({
                 }
                 return;
             }
+            if (editingTaskIdRef.current) return;
             if (isEditableTarget(e.target)) return;
 
             const scope = scopeRef.current;
@@ -285,6 +292,7 @@ export function KeybindingProvider({
                 }
                 return;
             }
+            if (editingTaskIdRef.current) return;
             if (isEditableTarget(e.target)) return;
             const scope = scopeRef.current;
 
@@ -344,6 +352,7 @@ export function KeybindingProvider({
                 setIsHelpOpen(false);
                 return;
             }
+            if (editingTaskIdRef.current) return;
             if (!e.metaKey && !e.ctrlKey && !e.altKey && !isEditableTarget(e.target)) {
                 if (e.key === 'ArrowDown') {
                     if (moveSidebarFocus(e.target, 'next')) {

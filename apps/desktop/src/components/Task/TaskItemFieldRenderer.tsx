@@ -222,16 +222,16 @@ export function TaskItemFieldRenderer({
                         <div className={cn("text-xs bg-muted/30 border border-border rounded px-2 py-2", isRtl && "text-right")} dir={resolvedDirection}>
                             <Markdown markdown={editDescription || ''} />
                         </div>
-                        ) : (
-                            <textarea
-                                aria-label={t('task.aria.description')}
-                                value={editDescription}
-                                onChange={(e) => setEditDescription(e.target.value)}
-                                className={cn("text-xs bg-muted/50 border border-border rounded px-2 py-1 min-h-[60px] resize-y", isRtl && "text-right")}
-                                placeholder={t('taskEdit.descriptionPlaceholder')}
-                                dir={resolvedDirection}
-                            />
-                        )}
+                    ) : (
+                        <textarea
+                            aria-label={t('task.aria.description')}
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            className={cn("text-xs bg-muted/50 border border-border rounded px-2 py-1 min-h-[60px] resize-y", isRtl && "text-right")}
+                            placeholder={t('taskEdit.descriptionPlaceholder')}
+                            dir={resolvedDirection}
+                        />
+                    )}
                     </div>
             );
         case 'textDirection':

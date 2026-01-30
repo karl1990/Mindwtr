@@ -128,17 +128,24 @@ export function SortableProjectTaskRow({
 
     return (
         <div ref={setNodeRef} style={style} className="flex items-start gap-2">
-            <button
-                type="button"
-                {...attributes}
-                {...listeners}
-                className="mt-3 h-7 w-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
-                title="Drag"
-            >
-                <GripVertical className="w-3.5 h-3.5" />
-            </button>
             <div className="flex-1 min-w-0">
-                <TaskItem task={task} project={project} enableDoubleClickEdit />
+                <TaskItem
+                    task={task}
+                    project={project}
+                    enableDoubleClickEdit
+                    dragHandle={(
+                        <button
+                            type="button"
+                            {...attributes}
+                            {...listeners}
+                            onClick={(event) => event.stopPropagation()}
+                            className="h-7 w-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
+                            title="Drag"
+                        >
+                            <GripVertical className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                />
             </div>
         </div>
     );

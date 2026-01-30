@@ -117,13 +117,18 @@ export const TaskItem = memo(function TaskItem({
         }),
         shallow
     );
-    const { setSelectedProjectId, editingTaskId, setEditingTaskId } = useUiStore((state) => ({
+    const {
+        setSelectedProjectId,
+        editingTaskId,
+        setEditingTaskId,
+    } = useUiStore((state) => ({
         setSelectedProjectId: (value: string | null) => state.setProjectView({ selectedProjectId: value }),
         editingTaskId: state.editingTaskId,
         setEditingTaskId: state.setEditingTaskId,
     }));
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
+    const [autoFocusTitle, setAutoFocusTitle] = useState(false);
     const {
         editAttachments,
         attachmentError,
@@ -193,7 +198,10 @@ export const TaskItem = memo(function TaskItem({
         showDescriptionPreview,
         setShowDescriptionPreview,
         resetEditState: resetLocalEditState,
-    } = useTaskItemEditState({ task, resetAttachmentState });
+    } = useTaskItemEditState({
+        task,
+        resetAttachmentState,
+    });
     const editTextDirectionRef = useRef<Task['textDirection']>(editTextDirection);
     useEffect(() => {
         editTextDirectionRef.current = editTextDirection;
@@ -376,12 +384,13 @@ export const TaskItem = memo(function TaskItem({
         resetAiState();
     }, [resetLocalEditState, resetAiState, setShowCustomRecurrence]);
     const startEditing = useCallback(() => {
-        if (effectiveReadOnly) return;
+        if (effectiveReadOnly || isEditing) return;
         resetEditState();
         setIsViewOpen(false);
+        setAutoFocusTitle(true);
         setIsEditing(true);
         setEditingTaskId(task.id);
-    }, [effectiveReadOnly, resetEditState, setEditingTaskId, task.id]);
+    }, [effectiveReadOnly, isEditing, resetEditState, setEditingTaskId, task.id]);
 
     const DEFAULT_PROJECT_COLOR = '#94a3b8';
     const handleCreateProject = useCallback(async (title: string) => {
@@ -635,6 +644,21 @@ export const TaskItem = memo(function TaskItem({
     }, [editingTaskId, isEditing, task.id]);
 
     useEffect(() => {
+        if (isEditing) return;
+        if (editingTaskId === task.id && !effectiveReadOnly) {
+            setIsViewOpen(false);
+            setIsEditing(true);
+        }
+    }, [editingTaskId, effectiveReadOnly, isEditing, task.id]);
+
+    useEffect(() => {
+        if (!isEditing) return;
+        if (!autoFocusTitle) return;
+        const raf = requestAnimationFrame(() => setAutoFocusTitle(false));
+        return () => cancelAnimationFrame(raf);
+    }, [autoFocusTitle, isEditing]);
+
+    useEffect(() => {
         if (isEditing) {
             setIsViewOpen(false);
         }
@@ -762,6 +786,7 @@ export const TaskItem = memo(function TaskItem({
         editReviewAt,
         task,
     ]);
+
     const selectAriaLabel = (() => {
         const label = t('task.select');
         return label === 'task.select' ? 'Select task' : label;
@@ -773,7 +798,7 @@ export const TaskItem = memo(function TaskItem({
                 data-task-id={task.id}
                 onClickCapture={onSelect ? () => onSelect?.() : undefined}
                 onDoubleClick={(event) => {
-                    if (!enableDoubleClickEdit || selectionMode || effectiveReadOnly) return;
+                    if (!enableDoubleClickEdit || selectionMode || effectiveReadOnly || isEditing) return;
                     event.stopPropagation();
                     startEditing();
                 }}
@@ -805,6 +830,7 @@ export const TaskItem = memo(function TaskItem({
                                 t={t}
                                 editTitle={editTitle}
                                 setEditTitle={setEditTitle}
+                                autoFocusTitle={autoFocusTitle}
                                 resetCopilotDraft={resetCopilotDraft}
                                 aiEnabled={aiEnabled}
                                 isAIWorking={isAIWorking}

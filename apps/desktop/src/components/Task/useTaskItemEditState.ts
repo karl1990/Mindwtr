@@ -68,14 +68,20 @@ export function useTaskItemEditState({
     const [editContexts, setEditContexts] = useState(task.contexts?.join(', ') || '');
     const [editTags, setEditTags] = useState(task.tags?.join(', ') || '');
     const [editDescription, setEditDescription] = useState(task.description || '');
-    const [editTextDirection, setEditTextDirection] = useState<Task['textDirection']>(task.textDirection ?? 'auto');
+    const [editTextDirection, setEditTextDirection] = useState<Task['textDirection']>(
+        task.textDirection ?? 'auto'
+    );
     const [showDescriptionPreview, setShowDescriptionPreview] = useState(false);
     const [editLocation, setEditLocation] = useState(task.location || '');
-    const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule | ''>(getRecurrenceRuleValue(task.recurrence));
+    const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule | ''>(
+        getRecurrenceRuleValue(task.recurrence),
+    );
     const [editRecurrenceStrategy, setEditRecurrenceStrategy] = useState<RecurrenceStrategy>(
         getRecurrenceStrategyValue(task.recurrence),
     );
-    const [editRecurrenceRRule, setEditRecurrenceRRule] = useState<string>(getRecurrenceRRuleValue(task.recurrence));
+    const [editRecurrenceRRule, setEditRecurrenceRRule] = useState<string>(
+        getRecurrenceRRuleValue(task.recurrence),
+    );
     const [editTimeEstimate, setEditTimeEstimate] = useState<TimeEstimate | ''>(task.timeEstimate || '');
     const [editPriority, setEditPriority] = useState<TaskPriority | ''>(task.priority || '');
     const [editReviewAt, setEditReviewAt] = useState(toDateTimeLocalValue(task.reviewAt));

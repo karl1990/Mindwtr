@@ -10,6 +10,7 @@ interface TaskItemEditorProps {
     t: (key: string) => string;
     editTitle: string;
     setEditTitle: (value: string) => void;
+    autoFocusTitle?: boolean;
     resetCopilotDraft: () => void;
     aiEnabled: boolean;
     isAIWorking: boolean;
@@ -71,6 +72,7 @@ export function TaskItemEditor({
     t,
     editTitle,
     setEditTitle,
+    autoFocusTitle = false,
     resetCopilotDraft,
     aiEnabled,
     isAIWorking,
@@ -203,7 +205,7 @@ export function TaskItemEditor({
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
                 <div className="flex items-start gap-2">
                     <TaskInput
-                        autoFocus
+                        autoFocus={autoFocusTitle}
                         value={editTitle}
                         onChange={(value) => {
                             setEditTitle(value);
