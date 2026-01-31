@@ -122,24 +122,6 @@ export function QuickCaptureSheet({
     setShowPriorityPicker(false);
   }, [prioritiesEnabled]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const speech = settings.ai?.speechToText;
-    if (!speech?.enabled || speech.provider !== 'whisper') return;
-    const model = speech.model ?? 'whisper-tiny';
-    const modelPath = speech.offlineModelPath;
-    const resolved = resolveWhisperModel(model, modelPath);
-    if (!resolved.exists) return;
-    let cancelled = false;
-    void preloadWhisperContext({ model, modelPath: resolved.path }).catch((error) => {
-      if (cancelled) return;
-      logCaptureWarn('Failed to preload whisper model', error);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [resolveWhisperModel, settings.ai?.speechToText, visible]);
-
   const ensureAudioDirectory = useCallback(async () => {
     const candidates: Directory[] = [];
     try {
@@ -280,6 +262,24 @@ export function QuickCaptureSheet({
     },
     [stripFileScheme, updateSpeechSettings]
   );
+
+  useEffect(() => {
+    if (!visible) return;
+    const speech = settings.ai?.speechToText;
+    if (!speech?.enabled || speech.provider !== 'whisper') return;
+    const model = speech.model ?? 'whisper-tiny';
+    const modelPath = speech.offlineModelPath;
+    const resolved = resolveWhisperModel(model, modelPath);
+    if (!resolved.exists) return;
+    let cancelled = false;
+    void preloadWhisperContext({ model, modelPath: resolved.path }).catch((error) => {
+      if (cancelled) return;
+      logCaptureWarn('Failed to preload whisper model', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolveWhisperModel, settings.ai?.speechToText, visible]);
 
   const buildTaskProps = useCallback(async (fallbackTitle: string, extraProps?: Partial<Task>) => {
     const trimmed = value.trim();

@@ -53,7 +53,7 @@ const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 type WhisperContextLike = {
   transcribe: (uri: string, options?: Record<string, unknown>) => { promise: Promise<unknown> };
-  transcribeData: (
+  transcribeData?: (
     data: ArrayBuffer,
     options?: Record<string, unknown>
   ) => { stop: () => Promise<void>; promise: Promise<unknown> };
@@ -484,11 +484,17 @@ const normalizeFilePath = (value: string) => {
   return { path: value, uri: value };
 };
 
+const getPathInfoSize = (info: unknown) => {
+  if (!info || typeof info !== 'object') return 0;
+  const size = (info as { size?: unknown }).size;
+  return typeof size === 'number' ? size : 0;
+};
+
 const checkFile = (uri: string) => {
   try {
     const info = Paths.info(uri);
     if (info?.exists && !info.isDirectory) {
-      const size = typeof info.size === 'number' ? info.size : 0;
+      const size = getPathInfoSize(info);
       return { exists: true, size };
     }
   } catch {
@@ -514,7 +520,7 @@ const checkPath = (uri?: string) => {
       return {
         exists: true,
         isDirectory: Boolean(info.isDirectory),
-        size: typeof info.size === 'number' ? info.size : 0,
+        size: getPathInfoSize(info),
       };
     }
   } catch {

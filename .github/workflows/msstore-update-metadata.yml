@@ -2,11 +2,6 @@ name: Microsoft Store - Update Metadata
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - metadata/metadata.json
 
 permissions:
   contents: read

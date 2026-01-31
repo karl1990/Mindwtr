@@ -26,7 +26,7 @@
     "@react-navigation/native": "^7.1.8",
     "expo": "~54.0.30",
     "expo-asset": "~12.0.12",
-    "expo-audio": "~1.0.13",
+    "expo-audio": "~1.1.1",
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
@@ -94,6 +94,15 @@
         "expo-linking",
         "expo-router"
       ]
+    },
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-fs",
+          "@fugood/react-native-audio-pcm-stream",
+          "whisper.rn"
+        ]
+      }
     }
   },
   "private": true
