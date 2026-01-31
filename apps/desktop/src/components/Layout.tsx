@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Inbox, CheckSquare, Archive, Layers, Tag, CheckCircle2, HelpCircle, Folder, Settings, Target, Search, ChevronsLeft, ChevronsRight, Trash2, PauseCircle, Book } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTaskStore, safeParseDate, safeFormatDate } from '@mindwtr/core';
@@ -37,6 +37,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
             : lastSyncStatus === 'success'
                 ? t('settings.lastSyncSuccess')
                 : '';
+    const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
     const dismissLabel = t('common.dismiss');
     const dismissText = dismissLabel && dismissLabel !== 'common.dismiss' ? dismissLabel : 'Dismiss';
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
@@ -121,6 +122,17 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
         updateSettings({ filters: { ...(settings?.filters ?? {}), areaId: resolvedAreaFilter } })
             .catch((error) => reportError('Failed to update area filter', error));
     }, [areas.length, resolvedAreaFilter, settings?.filters?.areaId, updateSettings]);
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const handleAreaFilterChange = (value: string) => {
         updateSettings({ filters: { ...(settings?.filters ?? {}), areaId: value } })
@@ -271,6 +283,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                         <div className="px-2 text-[10px] text-muted-foreground">
                             {t('settings.lastSync')}: {lastSyncDisplay}
                             {lastSyncStatusLabel && ` • ${lastSyncStatusLabel}`}
+                            {!isOnline && ` • ${t('common.offline') || 'Offline'}`}
                         </div>
                     )}
                     <button

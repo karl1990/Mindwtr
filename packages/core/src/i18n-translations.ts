@@ -803,6 +803,7 @@ const en: Record<string, string> = {
         'common.more': 'More',
         'common.less': 'Less',
         'common.loading': 'Loading...',
+        'common.offline': 'Offline',
         'audio.loading': 'Loading audio...',
 
         // Bulk Actions
@@ -1727,6 +1728,7 @@ const zh: Record<string, string> = {
         'common.more': '更多',
         'common.less': '收起',
         'common.loading': '加载中...',
+        'common.offline': '离线',
         'audio.loading': '正在加载音频...',
 
         // Bulk Actions
