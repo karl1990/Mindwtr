@@ -1,0 +1,62 @@
+name: Microsoft Store - Update Metadata
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - metadata/metadata.json
+
+permissions:
+  contents: read
+
+env:
+  MS_TENANT_ID: ${{ secrets.MS_TENANT_ID || secrets.AZURE_AD_TENANT_ID }}
+  MS_SELLER_ID: ${{ secrets.MS_SELLER_ID || secrets.SELLER_ID }}
+  MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID || secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+  MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET || secrets.AZURE_AD_APPLICATION_SECRET }}
+  MS_STORE_APP_ID: ${{ secrets.MS_STORE_APP_ID }}
+
+jobs:
+  update-metadata:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Microsoft Store CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Validate Microsoft Store secrets
+        shell: pwsh
+        run: |
+          $required = @('MS_TENANT_ID','MS_SELLER_ID','MS_CLIENT_ID','MS_CLIENT_SECRET','MS_STORE_APP_ID')
+          foreach ($name in $required) {
+            if (-not (Get-Item -Path "env:$name" -ErrorAction SilentlyContinue)) {
+              Write-Error "$name is missing. Please set it in repository secrets."
+            }
+          }
+
+      - name: Reconfigure store credentials
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId $env:MS_TENANT_ID `
+            --sellerId $env:MS_SELLER_ID `
+            --clientId $env:MS_CLIENT_ID `
+            --clientSecret $env:MS_CLIENT_SECRET
+
+      - name: Update store metadata
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "metadata/metadata.json")) {
+            Write-Error "metadata/metadata.json not found. Run the base metadata workflow first."
+          }
+          $metadata = Get-Content -Raw "metadata/metadata.json"
+          msstore submission updateMetadata $env:MS_STORE_APP_ID $metadata
+
+      - name: Publish metadata update
+        shell: pwsh
+        run: |
+          msstore submission publish $env:MS_STORE_APP_ID
