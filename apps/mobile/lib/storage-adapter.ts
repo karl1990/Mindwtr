@@ -1,4 +1,4 @@
-import { AppData, SqliteAdapter, type SqliteClient, StorageAdapter } from '@mindwtr/core';
+import { AppData, SqliteAdapter, searchAll, type SqliteClient, StorageAdapter } from '@mindwtr/core';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -23,7 +23,12 @@ const formatError = (error: unknown) => (error instanceof Error ? error.message 
 const buildStorageExtra = (message?: string, error?: unknown): Record<string, string> | undefined => {
     const extra: Record<string, string> = {};
     if (message) extra.message = message;
-    if (error) extra.error = formatError(error);
+    if (error) {
+        extra.error = formatError(error);
+        if (error instanceof Error && error.stack) {
+            extra.stack = error.stack;
+        }
+    }
     return Object.keys(extra).length ? extra : undefined;
 };
 
@@ -98,7 +103,9 @@ const createLegacyClient = (db: any): SqliteClient => {
 };
 
 const createSqliteClient = async (): Promise<SqliteClient> => {
-    const SQLite = await import('expo-sqlite');
+    // Use require to avoid async bundle loading in dev client.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const SQLite = require('expo-sqlite');
     const openDatabaseAsync = (SQLite as any).openDatabaseAsync as ((name: string) => Promise<any>) | undefined;
     if (openDatabaseAsync) {
         try {
@@ -165,7 +172,9 @@ const initSqliteState = async (): Promise<SqliteState> => {
         if (__DEV__) {
             logStorageWarn('[Storage] SQLite schema init failed, retrying with legacy API', error);
         }
-        const SQLite = await import('expo-sqlite');
+        // Use require to avoid async bundle loading in dev client.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const SQLite = require('expo-sqlite');
         const legacyDb = (SQLite as any).openDatabase(SQLITE_DB_NAME);
         client = createLegacyClient(legacyDb);
         adapter = new SqliteAdapter(client);
@@ -371,7 +380,6 @@ const createStorage = (): StorageAdapter => {
                 logStorageWarn('[Storage] SQLite search failed, falling back to in-memory search', error);
             }
             const data = await mobileStorage.getData();
-            const { searchAll } = await import('@mindwtr/core');
             return searchAll(data.tasks, data.projects, query);
         },
     };

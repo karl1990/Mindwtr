@@ -1,7 +1,8 @@
-import { File } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import type { AudioCaptureMode, AudioFieldStrategy } from '@mindwtr/core';
-import { logWarn } from './app-log';
+import { logInfo, logWarn } from './app-log';
 
 type SpeechProvider = 'openai' | 'gemini' | 'whisper';
 
@@ -30,6 +31,11 @@ export type SpeechToTextConfig = {
   timeZone?: string;
 };
 
+export type WhisperRealtimeHandle = {
+  stop: () => Promise<void>;
+  result: Promise<SpeechToTextResult>;
+};
+
 type FetchOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -42,7 +48,46 @@ const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
-let whisperContextCache: { modelPath: string; context: { transcribe: (uri: string, options?: Record<string, unknown>) => { promise: Promise<unknown> } } } | null = null;
+type WhisperContextLike = {
+  transcribe: (uri: string, options?: Record<string, unknown>) => { promise: Promise<unknown> };
+  transcribeRealtime: (options?: Record<string, unknown>) => Promise<{
+    stop: () => Promise<void>;
+    subscribe: (callback: (event: { isCapturing?: boolean; data?: unknown; error?: string }) => void) => void;
+  }>;
+};
+
+let whisperContextCache: { modelPath: string; context: WhisperContextLike } | null = null;
+let whisperNativeLogEnabled = false;
+type WhisperModule = typeof import('whisper.rn');
+let whisperModuleCache: WhisperModule | null = null;
+
+const getWhisperModule = () => {
+  if (whisperModuleCache) return whisperModuleCache;
+  try {
+    // Use require to avoid async bundle loading in dev client.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('whisper.rn/src/index') as WhisperModule;
+    whisperModuleCache = mod;
+    return mod;
+  } catch (error) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('whisper.rn') as WhisperModule;
+      whisperModuleCache = mod;
+      return mod;
+    } catch (fallbackError) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require('whisper.rn/index') as WhisperModule;
+        whisperModuleCache = mod;
+        return mod;
+      } catch (finalError) {
+        const message = finalError instanceof Error ? finalError.message : String(finalError);
+        throw new Error(`Whisper module unavailable: ${message}`);
+      }
+    }
+  }
+};
 
 const bytesToBase64 = (bytes: Uint8Array) => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -65,8 +110,14 @@ const bytesToBase64 = (bytes: Uint8Array) => {
   return out;
 };
 
-const parseJsonResponse = (text: string): SpeechToTextResult => {
+const parseJsonResponse = (text: unknown): SpeechToTextResult => {
+  if (typeof text !== 'string') {
+    throw new Error('Speech parser returned non-text response.');
+  }
   const cleaned = text.replace(/```json|```/gi, '').trim();
+  if (!cleaned) {
+    throw new Error('Speech parser returned empty response.');
+  }
   return JSON.parse(cleaned) as SpeechToTextResult;
 };
 
@@ -397,37 +448,509 @@ const requestGemini = async (audioUri: string, config: SpeechToTextConfig, promp
   return parseJsonResponse(text);
 };
 
-const getWhisperContext = async (modelPath: string) => {
-  if (whisperContextCache?.modelPath === modelPath) {
+const MIN_WHISPER_MODEL_BYTES = 5 * 1024 * 1024;
+const WHISPER_REALTIME_AUDIO_SEC = 120;
+const WHISPER_REALTIME_SLICE_SEC = 30;
+const WHISPER_MODEL_DIR_NAME = 'whisper-models';
+const WHISPER_MODEL_KEEP_FILE = '.keep';
+const WHISPER_MODEL_FILES: Record<string, string> = {
+  'whisper-tiny': 'ggml-tiny.bin',
+  'whisper-tiny.en': 'ggml-tiny.en.bin',
+  'whisper-base': 'ggml-base.bin',
+  'whisper-base.en': 'ggml-base.en.bin',
+};
+
+type WhisperModelResolved = {
+  path: string;
+  uri: string;
+  exists: boolean;
+  size: number;
+};
+
+const normalizeFilePath = (value: string) => {
+  if (value.startsWith('file://')) {
+    return { path: value.replace(/^file:\/\//, ''), uri: value };
+  }
+  if (value.startsWith('file:/')) {
+    const stripped = value.replace(/^file:\//, '/');
+    return { path: stripped, uri: `file://${stripped}` };
+  }
+  if (value.startsWith('/')) {
+    return { path: value, uri: `file://${value}` };
+  }
+  return { path: value, uri: value };
+};
+
+const checkFile = (uri: string) => {
+  try {
+    const info = Paths.info(uri);
+    if (info?.exists && !info.isDirectory) {
+      const size = typeof info.size === 'number' ? info.size : 0;
+      return { exists: true, size };
+    }
+  } catch {
+    // Fall back to File metadata when Paths.info cannot handle the uri.
+  }
+  try {
+    const file = new File(uri);
+    if (file.exists) {
+      const size = typeof file.size === 'number' ? file.size : 0;
+      return { exists: true, size };
+    }
+  } catch {
+    // Ignore and report missing below.
+  }
+  return { exists: false, size: 0 };
+};
+
+const checkPath = (uri?: string) => {
+  if (!uri) return { exists: false, isDirectory: false, size: 0 };
+  try {
+    const info = Paths.info(uri);
+    if (info?.exists) {
+      return {
+        exists: true,
+        isDirectory: Boolean(info.isDirectory),
+        size: typeof info.size === 'number' ? info.size : 0,
+      };
+    }
+  } catch {
+  }
+  try {
+    const dir = new Directory(uri);
+    if (dir.exists) {
+      return { exists: true, isDirectory: true, size: 0 };
+    }
+  } catch {
+  }
+  try {
+    const file = new File(uri);
+    if (file.exists) {
+      return { exists: true, isDirectory: false, size: typeof file.size === 'number' ? file.size : 0 };
+    }
+  } catch {
+  }
+  return { exists: false, isDirectory: false, size: 0 };
+};
+
+const listDirectorySample = (uri?: string) => {
+  if (!uri) return '';
+  try {
+    const dir = new Directory(uri);
+    if (!dir.exists) return '';
+    const entries = dir.list();
+    if (!entries.length) return '';
+    return entries
+      .slice(0, 8)
+      .map((entry) => {
+        try {
+          return Paths.basename(entry.uri) ?? '';
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean)
+      .join(', ');
+  } catch {
+    return '';
+  }
+};
+
+const buildWhisperDiagnostics = (modelId?: string, modelPath?: string, resolved?: WhisperModelResolved) => {
+  const docUri = Paths.document?.uri ?? '';
+  const cacheUri = Paths.cache?.uri ?? '';
+  const normalizedDoc = docUri ? normalizeFilePath(docUri).uri : '';
+  const normalizedCache = cacheUri ? normalizeFilePath(cacheUri).uri : '';
+  const docInfo = checkPath(normalizedDoc);
+  const cacheInfo = checkPath(normalizedCache);
+  const whisperDirUri = normalizedDoc
+    ? `${normalizedDoc.endsWith('/') ? normalizedDoc : `${normalizedDoc}/`}${WHISPER_MODEL_DIR_NAME}`
+    : '';
+  const whisperDirInfo = checkPath(whisperDirUri);
+  const resolvedInfo = resolved ? checkFile(resolved.uri) : { exists: false, size: 0 };
+  const documentSample = listDirectorySample(normalizedDoc);
+  const cacheSample = listDirectorySample(normalizedCache);
+  const whisperDirSample = listDirectorySample(whisperDirUri);
+  return {
+    modelId: modelId ?? '',
+    modelPath: modelPath ?? '',
+    resolvedUri: resolved?.uri ?? '',
+    resolvedExists: String(Boolean(resolvedInfo.exists)),
+    resolvedSize: String(resolvedInfo.size ?? 0),
+    documentUri: normalizedDoc,
+    documentExists: String(Boolean(docInfo.exists)),
+    documentIsDir: String(Boolean(docInfo.isDirectory)),
+    documentSample,
+    cacheUri: normalizedCache,
+    cacheExists: String(Boolean(cacheInfo.exists)),
+    cacheIsDir: String(Boolean(cacheInfo.isDirectory)),
+    cacheSample,
+    whisperDirUri,
+    whisperDirExists: String(Boolean(whisperDirInfo.exists)),
+    whisperDirIsDir: String(Boolean(whisperDirInfo.isDirectory)),
+    whisperDirSample,
+  };
+};
+
+const ensureWhisperModelDirectory = (): string | null => {
+  const roots: Directory[] = [];
+  try {
+    roots.push(Paths.cache);
+  } catch {
+  }
+  try {
+    roots.push(Paths.document);
+  } catch {
+  }
+  for (const root of roots) {
+    try {
+      const dir = new Directory(root, WHISPER_MODEL_DIR_NAME);
+      dir.create({ intermediates: true, idempotent: true });
+      try {
+        const keepFile = new File(dir, WHISPER_MODEL_KEEP_FILE);
+        if (!keepFile.exists) {
+          keepFile.create({ intermediates: true, overwrite: true });
+        }
+      } catch {
+        // Ignore keep file errors; directory is the important part.
+      }
+      return dir.uri;
+    } catch {
+    }
+  }
+  return null;
+};
+
+const buildWhisperModelCandidates = (
+  modelId: string | undefined,
+  modelPath?: string,
+  includeRoot: boolean = true,
+  includeCache: boolean = true
+): string[] => {
+  const candidates: string[] = [];
+  if (modelPath) {
+    const normalized = normalizeFilePath(modelPath);
+    candidates.push(normalized.uri);
+    if (normalized.uri !== modelPath) {
+      candidates.push(modelPath);
+    }
+  }
+  const fileName = modelId ? WHISPER_MODEL_FILES[modelId] : undefined;
+  if (fileName) {
+    const appendCandidates = (base?: string | null) => {
+      if (!base) return;
+      const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+      candidates.push(`${normalizedBase}${WHISPER_MODEL_DIR_NAME}/${fileName}`);
+      if (includeRoot) {
+        candidates.push(`${normalizedBase}${fileName}`);
+      }
+    };
+    if (includeCache) {
+      appendCandidates(Paths.cache?.uri ?? null);
+    }
+    appendCandidates(Paths.document?.uri ?? null);
+  }
+  return candidates;
+};
+
+export const resolveWhisperModelPathForConfig = (
+  modelId: string | undefined,
+  modelPath?: string
+): WhisperModelResolved => {
+  const fileName = modelId ? WHISPER_MODEL_FILES[modelId] : undefined;
+  const candidates = buildWhisperModelCandidates(modelId, modelPath, true, true);
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const normalized = normalizeFilePath(candidate);
+    const info = checkFile(normalized.uri);
+    if (info.exists) {
+      return { path: normalized.path, uri: normalized.uri, exists: true, size: info.size };
+    }
+  }
+
+  const fallback = modelPath ? normalizeFilePath(modelPath) : normalizeFilePath(fileName ?? '');
+  return { path: fallback.path, uri: fallback.uri, exists: false, size: 0 };
+};
+
+export const ensureWhisperModelPathForConfig = (
+  modelId: string | undefined,
+  modelPath?: string
+): WhisperModelResolved => {
+  const resolved = resolveWhisperModelPathForConfig(modelId, modelPath);
+  const fileName = modelId ? WHISPER_MODEL_FILES[modelId] : undefined;
+  if (!fileName) return resolved;
+
+  const preferredDir = ensureWhisperModelDirectory();
+  const preferredUri = preferredDir
+    ? `${preferredDir.endsWith('/') ? preferredDir : `${preferredDir}/`}${fileName}`
+    : null;
+
+  if (preferredUri) {
+    const preferredNormalized = normalizeFilePath(preferredUri);
+    const preferredInfo = checkFile(preferredNormalized.uri);
+    if (preferredInfo.exists) {
+      return {
+        path: preferredNormalized.path,
+        uri: preferredNormalized.uri,
+        exists: true,
+        size: preferredInfo.size,
+      };
+    }
+    if (resolved.exists) {
+      try {
+        const source = new File(resolved.uri);
+        const destination = new File(preferredNormalized.uri);
+        if (!destination.exists) {
+          source.copy(destination);
+        }
+        const destInfo = checkFile(preferredNormalized.uri);
+        if (destInfo.exists) {
+          return {
+            path: preferredNormalized.path,
+            uri: preferredNormalized.uri,
+            exists: true,
+            size: destInfo.size,
+          };
+        }
+      } catch {
+        // Ignore copy errors and fall back to resolved below.
+      }
+    }
+  }
+
+  if (resolved.exists) return resolved;
+
+  const candidates = buildWhisperModelCandidates(modelId, modelPath, true, true);
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const normalized = normalizeFilePath(candidate);
+    const info = checkFile(normalized.uri);
+    if (!info.exists) continue;
+    return { path: normalized.path, uri: normalized.uri, exists: true, size: info.size };
+  }
+
+  void logWarn('Whisper model missing', {
+    scope: 'speech',
+    extra: buildWhisperDiagnostics(modelId, modelPath, resolved),
+  });
+
+  return resolved;
+};
+
+const enableWhisperNativeLogging = async (): Promise<void> => {
+  if (whisperNativeLogEnabled) return;
+  if (!__DEV__) {
+    // Avoid enabling JNI log callbacks in release builds.
+    whisperNativeLogEnabled = true;
+    return;
+  }
+  try {
+    const whisper = getWhisperModule();
+    if (typeof whisper.toggleNativeLog === 'function') {
+      await whisper.toggleNativeLog(true);
+    }
+    if (typeof whisper.addNativeLogListener === 'function') {
+      whisper.addNativeLogListener((level: string, text: string) => {
+        void logWarn('Whisper native', {
+          scope: 'speech',
+          extra: { level, text },
+        });
+      });
+    }
+    whisperNativeLogEnabled = true;
+  } catch (error) {
+    void logWarn('Failed to enable Whisper native logs', {
+      scope: 'speech',
+      extra: { error: error instanceof Error ? error.message : String(error) },
+    });
+  }
+};
+
+const getWhisperContext = async (modelPath: string, modelId?: string) => {
+  await enableWhisperNativeLogging();
+  const resolved = ensureWhisperModelPathForConfig(modelId, modelPath);
+  if (!resolved.exists) {
+    throw new Error(`Offline model not found at ${resolved.path}`);
+  }
+  if (resolved.size > 0 && resolved.size < MIN_WHISPER_MODEL_BYTES) {
+    throw new Error(`Offline model file is too small (${resolved.size} bytes)`);
+  }
+  if (whisperContextCache?.modelPath === resolved.path) {
     return whisperContextCache.context;
   }
-  const { initWhisper } = await import('whisper.rn');
-  const context = await initWhisper({ filePath: modelPath });
-  whisperContextCache = { modelPath, context };
-  return context;
+  const { initWhisper } = getWhisperModule();
+  const initOptions: { filePath: string; useGpu?: boolean; useFlashAttn?: boolean } = {
+    filePath: resolved.path,
+    useFlashAttn: false,
+  };
+  if (Platform.OS === 'android') {
+    initOptions.useGpu = false;
+  }
+  try {
+    const context = await initWhisper(initOptions);
+    whisperContextCache = { modelPath: resolved.path, context };
+    return context;
+  } catch (error) {
+    const withScheme = resolved.uri;
+    if (withScheme !== resolved.path) {
+      try {
+        const context = await initWhisper({ ...initOptions, filePath: withScheme });
+        whisperContextCache = { modelPath: withScheme, context };
+        return context;
+      } catch (retryError) {
+        const message = retryError instanceof Error ? retryError.message : String(retryError);
+        throw new Error(`Whisper init failed (${message}) at ${resolved.path} (${resolved.size} bytes)`);
+      }
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Whisper init failed (${message}) at ${resolved.path} (${resolved.size} bytes)`);
+  }
+};
+
+const extractWhisperText = (result: unknown): string => {
+  const direct = (result as { result?: unknown })?.result;
+  if (typeof direct === 'string') return direct;
+  if (direct && typeof (direct as { text?: unknown }).text === 'string') {
+    return (direct as { text: string }).text;
+  }
+  if (typeof (result as { text?: unknown }).text === 'string') {
+    return (result as { text: string }).text;
+  }
+  if (typeof (result as { transcript?: unknown }).transcript === 'string') {
+    return (result as { transcript: string }).transcript;
+  }
+  const segments = (result as { segments?: Array<{ text?: string }> }).segments;
+  if (Array.isArray(segments)) {
+    const joined = segments.map((segment) => segment?.text ?? '').join(' ').trim();
+    if (joined) return joined;
+  }
+  return '';
+};
+
+export const startWhisperRealtimeCapture = async (
+  audioOutputPath: string,
+  config: SpeechToTextConfig
+): Promise<WhisperRealtimeHandle> => {
+  if (IS_EXPO_GO) {
+    throw new Error('On-device Whisper requires a dev build or production build (not Expo Go).');
+  }
+  const resolved = ensureWhisperModelPathForConfig(config.model, config.modelPath);
+  if (!resolved.exists) {
+    throw new Error(`Offline model not found at ${resolved.path}`);
+  }
+  const context = await getWhisperContext(resolved.path, config.model);
+  const language = resolveLanguage(config.language);
+  const effectiveLanguage = config.model?.endsWith('.en') && language === 'auto' ? 'en' : language;
+  const options: Record<string, unknown> = {
+    audioOutputPath,
+    realtimeAudioSec: WHISPER_REALTIME_AUDIO_SEC,
+    realtimeAudioSliceSec: WHISPER_REALTIME_SLICE_SEC,
+  };
+  if (effectiveLanguage !== 'auto') {
+    options.language = effectiveLanguage;
+  }
+
+  void logInfo('Whisper transcription started', {
+    scope: 'speech',
+    extra: {
+      uri: audioOutputPath,
+      modelPath: resolved.path,
+      language: effectiveLanguage,
+    },
+  });
+
+  const realtime = await context.transcribeRealtime(options);
+  let completed = false;
+  const result = new Promise<SpeechToTextResult>((resolve, reject) => {
+    realtime.subscribe((event) => {
+      if (completed) return;
+      if (event.error) {
+        completed = true;
+        reject(new Error(event.error));
+        return;
+      }
+      if (event.isCapturing === false) {
+        completed = true;
+        const text = extractWhisperText(event.data ?? {}).trim();
+        if (!text) {
+          void logWarn('Whisper returned empty transcript', {
+            scope: 'speech',
+            extra: {
+              uri: audioOutputPath,
+              modelPath: resolved.path,
+              language: effectiveLanguage,
+            },
+          });
+        } else {
+          void logInfo('Whisper transcription completed', {
+            scope: 'speech',
+            extra: {
+              length: String(text.length),
+              language: effectiveLanguage,
+            },
+          });
+        }
+        resolve({ transcript: text });
+      }
+    });
+  });
+
+  return { stop: realtime.stop, result };
 };
 
 const transcribeWhisper = async (audioUri: string, config: SpeechToTextConfig) => {
   if (IS_EXPO_GO) {
     throw new Error('On-device Whisper requires a dev build or production build (not Expo Go).');
   }
-  if (!config.modelPath) {
-    throw new Error('Offline model path missing');
+  const resolved = ensureWhisperModelPathForConfig(config.model, config.modelPath);
+  if (!resolved.exists) {
+    throw new Error(`Offline model not found at ${resolved.path}`);
   }
-  const context = await getWhisperContext(config.modelPath);
+  const context = await getWhisperContext(resolved.path, config.model);
   const language = resolveLanguage(config.language);
+  const effectiveLanguage = config.model?.endsWith('.en') && language === 'auto' ? 'en' : language;
   const options: Record<string, unknown> = {};
-  if (language !== 'auto') {
-    options.language = language;
+  if (effectiveLanguage !== 'auto') {
+    options.language = effectiveLanguage;
   }
+  void logInfo('Whisper transcription started', {
+    scope: 'speech',
+    extra: {
+      uri: audioUri,
+      modelPath: resolved.path,
+      language: effectiveLanguage,
+    },
+  });
   const { promise } = context.transcribe(audioUri, options);
   const result = await promise;
-  const text = typeof (result as { result?: unknown }).result === 'string'
-    ? (result as { result: string }).result
-    : typeof (result as { text?: unknown }).text === 'string'
-      ? (result as { text: string }).text
-      : '';
-  return text.trim();
+  let text = extractWhisperText(result).trim();
+  if (!text && audioUri.startsWith('file://')) {
+    const stripped = audioUri.replace(/^file:\/\//, '');
+    if (stripped !== audioUri) {
+      const retry = await context.transcribe(stripped, options).promise;
+      text = extractWhisperText(retry).trim();
+    }
+  }
+  if (!text) {
+    void logWarn('Whisper returned empty transcript', {
+      scope: 'speech',
+      extra: {
+        uri: audioUri,
+        modelPath: resolved.path,
+        language: effectiveLanguage,
+      },
+    });
+  } else {
+    void logInfo('Whisper transcription completed', {
+      scope: 'speech',
+      extra: {
+        length: String(text.length),
+        language: effectiveLanguage,
+      },
+    });
+  }
+  return text;
 };
 
 export async function processAudioCapture(

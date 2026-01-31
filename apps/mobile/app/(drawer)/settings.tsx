@@ -490,14 +490,16 @@ export default function SettingsPage() {
     const getWhisperDirectories = () => {
         const candidates: Directory[] = [];
         try {
-            candidates.push(new Directory(Paths.document, 'whisper-models'));
-        } catch (error) {
-            logSettingsWarn('Whisper document directory unavailable', error);
-        }
-        try {
             candidates.push(new Directory(Paths.cache, 'whisper-models'));
         } catch (error) {
             logSettingsWarn('Whisper cache directory unavailable', error);
+        }
+        if (!candidates.length) {
+            try {
+                candidates.push(new Directory(Paths.document, 'whisper-models'));
+            } catch (error) {
+                logSettingsWarn('Whisper document directory unavailable', error);
+            }
         }
         return candidates;
     };
@@ -507,13 +509,42 @@ export default function SettingsPage() {
         return candidates.length ? candidates[0] : null;
     };
 
+    const normalizeWhisperPath = (uri: string) => {
+        if (uri.startsWith('file://')) return uri;
+        if (uri.startsWith('file:/')) {
+            const stripped = uri.replace(/^file:\//, '/');
+            return `file://${stripped}`;
+        }
+        if (uri.startsWith('/')) {
+            return `file://${uri}`;
+        }
+        return uri;
+    };
+
     const safePathInfo = (uri: string) => {
+        const normalized = normalizeWhisperPath(uri);
         try {
-            return Paths.info(uri);
+            const info = Paths.info(normalized);
+            if (info) return info;
         } catch (error) {
             logSettingsWarn('Whisper path info failed', error);
-            return null;
         }
+        try {
+            const file = new File(normalized);
+            if (file.exists) {
+                const size = typeof file.size === 'number' ? file.size : 0;
+                return { exists: true, isDirectory: false, size };
+            }
+        } catch {
+        }
+        try {
+            const dir = new Directory(normalized);
+            if (dir.exists) {
+                return { exists: true, isDirectory: true, size: 0 };
+            }
+        } catch {
+        }
+        return null;
     };
 
     const resolveWhisperModelPath = (modelId: string) => {
@@ -521,7 +552,39 @@ export default function SettingsPage() {
         if (!model) return undefined;
         const base = getWhisperDirectory();
         if (!base) return undefined;
-        return new File(base, model.fileName).uri;
+        const baseUri = base.uri.endsWith('/') ? base.uri : `${base.uri}/`;
+        return new File(`${baseUri}${model.fileName}`).uri;
+    };
+
+    const findExistingWhisperModelPath = (modelId: string) => {
+        const model = WHISPER_MODELS.find((entry) => entry.id === modelId);
+        if (!model) return undefined;
+        const fileName = model.fileName;
+        const candidates: string[] = [];
+        const appendCandidates = (base?: string | null) => {
+            if (!base) return;
+            const normalized = base.endsWith('/') ? base : `${base}/`;
+            candidates.push(`${normalized}whisper-models/${fileName}`);
+            candidates.push(`${normalized}${fileName}`);
+        };
+        appendCandidates(Paths.cache?.uri ?? null);
+        appendCandidates(Paths.document?.uri ?? null);
+        for (const candidate of candidates) {
+            try {
+                const info = safePathInfo(candidate);
+                if (info?.exists && !info.isDirectory) {
+                    return candidate;
+                }
+            } catch {
+            }
+        }
+        return undefined;
+    };
+
+    const isWhisperModelFilePath = (uri?: string) => {
+        if (!uri) return false;
+        const baseName = Paths.basename(uri);
+        return Boolean(baseName && baseName.endsWith('.bin'));
     };
 
     const isWhisperTargetPath = (uri: string, fileName: string) => {
@@ -534,6 +597,31 @@ export default function SettingsPage() {
         updateSpeechSettings({ model: modelId, offlineModelPath: resolveWhisperModelPath(modelId) });
     };
 
+    useEffect(() => {
+        if (speechProvider !== 'whisper') return;
+        const storedPath = speechSettings.offlineModelPath;
+        if (!storedPath) return;
+        const info = safePathInfo(storedPath);
+        if (info?.exists && info.isDirectory) {
+            const resolved = resolveWhisperModelPath(speechModel);
+            updateSpeechSettings({ offlineModelPath: resolved });
+            return;
+        }
+        if (!info?.exists || info.isDirectory) {
+            const existing = findExistingWhisperModelPath(speechModel);
+            if (existing && existing !== storedPath) {
+                updateSpeechSettings({ offlineModelPath: existing });
+                return;
+            }
+        }
+        if (!isWhisperModelFilePath(storedPath)) {
+            const resolved = resolveWhisperModelPath(speechModel);
+            if (resolved && resolved !== storedPath) {
+                updateSpeechSettings({ offlineModelPath: resolved });
+            }
+        }
+    }, [speechProvider, speechSettings.offlineModelPath, speechModel]);
+
     const selectedWhisperModel = WHISPER_MODELS.find((model) => model.id === speechModel) ?? WHISPER_MODELS[0];
     const whisperModelPath = speechProvider === 'whisper'
         ? (speechSettings.offlineModelPath ?? resolveWhisperModelPath(speechModel))
@@ -544,7 +632,7 @@ export default function SettingsPage() {
         const info = safePathInfo(whisperModelPath);
         if (info?.exists && info.isDirectory === false) {
             try {
-                const file = new File(whisperModelPath);
+                const file = new File(normalizeWhisperPath(whisperModelPath));
                 whisperDownloaded = (file.size ?? 0) > 0;
                 if (whisperDownloaded && file.size) {
                     whisperSizeLabel = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
@@ -586,7 +674,8 @@ export default function SettingsPage() {
             for (const directory of directories) {
                 try {
                     directory.create({ intermediates: true, idempotent: true });
-                    const targetFile = new File(directory, fileName);
+                    const dirUri = directory.uri.endsWith('/') ? directory.uri : `${directory.uri}/`;
+                    const targetFile = new File(`${dirUri}${fileName}`);
                     try {
                         const entries = directory.list();
                         const conflict = entries.find((entry) => Paths.basename(entry.uri) === fileName);
@@ -668,10 +757,10 @@ export default function SettingsPage() {
                 const basename = Paths.basename(whisperModelPath);
                 if (basename && basename.endsWith('.bin') && info?.exists) {
                     if (info.isDirectory) {
-                        const dir = new Directory(whisperModelPath);
+                        const dir = new Directory(normalizeWhisperPath(whisperModelPath));
                         dir.delete();
                     } else {
-                        const file = new File(whisperModelPath);
+                        const file = new File(normalizeWhisperPath(whisperModelPath));
                         file.delete();
                     }
                 }

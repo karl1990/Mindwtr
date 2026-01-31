@@ -34,6 +34,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
+import { Paths } from 'expo-file-system';
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from './markdown-text';
@@ -729,6 +730,17 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         setAudioStatus(null);
     }, []);
 
+    const normalizeAudioUri = useCallback((uri: string) => {
+        if (!uri) return '';
+        if (uri.startsWith('file://') || uri.startsWith('content://')) return uri;
+        if (uri.startsWith('file:/')) {
+            const stripped = uri.replace(/^file:\//, '/');
+            return `file://${stripped}`;
+        }
+        if (uri.startsWith('/')) return `file://${uri}`;
+        return uri;
+    }, []);
+
     const openAudioAttachment = useCallback(async (attachment: Attachment) => {
         setAudioAttachment(attachment);
         setAudioModalVisible(true);
@@ -740,8 +752,36 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 shouldDuckAndroid: true,
                 allowsRecordingIOS: false,
             });
+            const normalizedUri = normalizeAudioUri(attachment.uri);
+            if (normalizedUri) {
+                try {
+                    const info = Paths.info(normalizedUri);
+                    if (info?.exists === false) {
+                        logTaskWarn('Audio attachment missing', new Error(`uri:${normalizedUri}`));
+                        Alert.alert(t('attachments.title'), t('attachments.missing'));
+                        setAudioModalVisible(false);
+                        setAudioAttachment(null);
+                        return;
+                    }
+                    if (info?.isDirectory) {
+                        logTaskWarn('Audio attachment path is directory', new Error(`uri:${normalizedUri}`));
+                        Alert.alert(t('attachments.title'), t('attachments.missing'));
+                        setAudioModalVisible(false);
+                        setAudioAttachment(null);
+                        return;
+                    }
+                } catch (error) {
+                    logTaskWarn('Audio attachment info failed', error);
+                }
+            } else {
+                logTaskWarn('Audio attachment uri missing', new Error('empty-uri'));
+                Alert.alert(t('attachments.title'), t('attachments.missing'));
+                setAudioModalVisible(false);
+                setAudioAttachment(null);
+                return;
+            }
             const { sound, status } = await Audio.Sound.createAsync(
-                { uri: attachment.uri },
+                { uri: normalizedUri },
                 { shouldPlay: true },
                 (nextStatus) => setAudioStatus(nextStatus)
             );

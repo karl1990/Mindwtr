@@ -10,8 +10,9 @@ import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadAIKey } from '../lib/ai-config';
-import { processAudioCapture, type SpeechToTextResult } from '../lib/speech-to-text';
-import { logError, logWarn } from '../lib/app-log';
+import { processAudioCapture, ensureWhisperModelPathForConfig, startWhisperRealtimeCapture, type SpeechToTextResult } from '../lib/speech-to-text';
+import { persistAttachmentLocally } from '../lib/attachment-sync';
+import { logError, logInfo, logWarn } from '../lib/app-log';
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
@@ -19,7 +20,12 @@ const formatError = (error: unknown) => (error instanceof Error ? error.message 
 const buildCaptureExtra = (message?: string, error?: unknown): Record<string, string> | undefined => {
   const extra: Record<string, string> = {};
   if (message) extra.message = message;
-  if (error) extra.error = formatError(error);
+  if (error) {
+    extra.error = formatError(error);
+    if (error instanceof Error && error.stack) {
+      extra.stack = error.stack;
+    }
+  }
   return Object.keys(extra).length ? extra : undefined;
 };
 const logCaptureWarn = (message: string, error?: unknown) => {
@@ -29,6 +35,10 @@ const logCaptureError = (message: string, error?: unknown) => {
   const err = error instanceof Error ? error : new Error(message);
   void logError(err, { scope: 'capture', extra: buildCaptureExtra(message, error) });
 };
+
+type RecordingState =
+  | { kind: 'expo'; recording: Audio.Recording }
+  | { kind: 'whisper'; stop: () => Promise<void>; result: Promise<SpeechToTextResult>; file: File };
 
 export function QuickCaptureSheet({
   visible,
@@ -43,12 +53,27 @@ export function QuickCaptureSheet({
   initialValue?: string;
   autoRecord?: boolean;
 }) {
-  const { addTask, addProject, updateTask, projects, settings, tasks, areas } = useTaskStore();
+  const { addTask, addProject, updateTask, updateSettings, projects, settings, tasks, areas } = useTaskStore();
   const { t } = useLanguage();
   const tc = useThemeColors();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const prioritiesEnabled = settings?.features?.priorities === true;
+
+  const updateSpeechSettings = useCallback(
+    (next: Partial<NonNullable<NonNullable<typeof settings.ai>['speechToText']>>) => {
+      updateSettings({
+        ai: {
+          ...(settings.ai ?? {}),
+          speechToText: {
+            ...(settings.ai?.speechToText ?? {}),
+            ...next,
+          },
+        },
+      }).catch((error) => logCaptureWarn('Failed to update speech settings', error));
+    },
+    [settings.ai, updateSettings]
+  );
 
   const [value, setValue] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
@@ -62,7 +87,7 @@ export function QuickCaptureSheet({
   const [priority, setPriority] = useState<TaskPriority | null>(null);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [addAnother, setAddAnother] = useState(false);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recording, setRecording] = useState<RecordingState | null>(null);
   const [recordingBusy, setRecordingBusy] = useState(false);
 
   const filteredProjects = useMemo(() => {
@@ -142,6 +167,99 @@ export function QuickCaptureSheet({
         return 'audio/mp4';
     }
   };
+
+  const stripFileScheme = useCallback((uri: string) => {
+    if (uri.startsWith('file://')) return uri.slice(7);
+    if (uri.startsWith('file:/')) return uri.replace(/^file:\//, '/');
+    return uri;
+  }, []);
+
+  const isUnsafeDeleteTarget = useCallback((uri: string) => {
+    if (!uri) return true;
+    const normalized = stripFileScheme(uri).replace(/\/+$/, '');
+    const docBase = stripFileScheme(Paths.document?.uri ?? '').replace(/\/+$/, '');
+    const cacheBase = stripFileScheme(Paths.cache?.uri ?? '').replace(/\/+$/, '');
+    if (!normalized) return true;
+    if (normalized === '/' || normalized === docBase || normalized === cacheBase) return true;
+    return false;
+  }, [stripFileScheme]);
+
+  const safeDeleteFile = useCallback((file: File, reason: string) => {
+    try {
+      const uri = file.uri ?? '';
+      if (isUnsafeDeleteTarget(uri)) {
+        logCaptureWarn('Refusing to delete unsafe file target', new Error(`${reason}:${uri}`));
+        return;
+      }
+      const info = Paths.info(uri);
+      if (info?.exists && info.isDirectory) {
+        logCaptureWarn('Refusing to delete directory target', new Error(`${reason}:${uri}`));
+        return;
+      }
+      file.delete();
+    } catch (error) {
+      logCaptureWarn('Audio cleanup failed', error);
+    }
+  }, [isUnsafeDeleteTarget]);
+
+  const buildWhisperDiagnostics = useCallback(
+    (modelId: string, modelPath?: string, resolvedPath?: string, resolvedExists?: boolean) => {
+      const docUri = Paths.document?.uri ?? '';
+      const cacheUri = Paths.cache?.uri ?? '';
+      let documentExists = false;
+      let cacheExists = false;
+      let whisperDirExists = false;
+      const normalizedDoc = docUri ? stripFileScheme(docUri) : '';
+      const normalizedCache = cacheUri ? stripFileScheme(cacheUri) : '';
+      const whisperDirUri = normalizedDoc ? `${normalizedDoc}/whisper-models` : '';
+      try {
+        if (normalizedDoc) {
+          documentExists = new Directory(`file://${normalizedDoc}`).exists;
+        }
+      } catch {
+      }
+      try {
+        if (normalizedCache) {
+          cacheExists = new Directory(`file://${normalizedCache}`).exists;
+        }
+      } catch {
+      }
+      try {
+        if (whisperDirUri) {
+          whisperDirExists = new Directory(`file://${whisperDirUri}`).exists;
+        }
+      } catch {
+      }
+      return {
+        modelId,
+        modelPath: modelPath ?? '',
+        resolvedPath: resolvedPath ?? '',
+        resolvedExists: String(Boolean(resolvedExists)),
+        documentUri: normalizedDoc,
+        documentExists: String(documentExists),
+        cacheUri: normalizedCache,
+        cacheExists: String(cacheExists),
+        whisperDirUri,
+        whisperDirExists: String(whisperDirExists),
+      };
+    },
+    [stripFileScheme]
+  );
+
+  const resolveWhisperModel = useCallback(
+    (modelId: string, storedPath?: string) => {
+      const resolved = ensureWhisperModelPathForConfig(modelId, storedPath);
+      if (resolved.exists) {
+        const currentPath = storedPath ? stripFileScheme(storedPath) : '';
+        const resolvedPath = stripFileScheme(resolved.uri);
+        if (!currentPath || currentPath !== resolvedPath) {
+          updateSpeechSettings({ model: modelId, offlineModelPath: resolved.uri });
+        }
+      }
+      return resolved;
+    },
+    [stripFileScheme, updateSpeechSettings]
+  );
 
   const buildTaskProps = useCallback(async (fallbackTitle: string, extraProps?: Partial<Task>) => {
     const trimmed = value.trim();
@@ -321,17 +439,95 @@ export function QuickCaptureSheet({
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
       });
+      const speech = settings.ai?.speechToText;
+      const provider = speech?.provider ?? 'gemini';
+      const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
+      const modelPath = provider === 'whisper' ? speech?.offlineModelPath : undefined;
+      const whisperResolved = provider === 'whisper'
+        ? resolveWhisperModel(model, modelPath)
+        : null;
+      const whisperModelReady = provider === 'whisper' ? Boolean(whisperResolved?.exists) : false;
+      const resolvedModelPath = provider === 'whisper'
+        ? (whisperResolved?.exists ? whisperResolved.path : modelPath)
+        : undefined;
+      const useWhisperRealtime = speech?.enabled && provider === 'whisper' && whisperModelReady;
+
+      if (useWhisperRealtime) {
+        try {
+          const now = new Date();
+          const timestamp = safeFormatDate(now, 'yyyyMMdd-HHmmss');
+          const directory = await ensureAudioDirectory();
+          const fileName = `mindwtr-audio-${timestamp}.wav`;
+          const buildOutputFile = (base?: Directory | null) => {
+            if (!base?.uri) return null;
+            const baseUri = base.uri.endsWith('/') ? base.uri : `${base.uri}/`;
+            return new File(`${baseUri}${fileName}`);
+          };
+          let outputFile: File | null = buildOutputFile(directory);
+          if (!outputFile) {
+            try {
+              outputFile = buildOutputFile(Paths.cache);
+            } catch (error) {
+              logCaptureWarn('Whisper cache directory unavailable', error);
+            }
+          }
+          if (!outputFile) {
+            try {
+              outputFile = buildOutputFile(Paths.document);
+            } catch (error) {
+              logCaptureWarn('Whisper document directory unavailable', error);
+            }
+          }
+          if (!outputFile) {
+            throw new Error('Whisper audio output path unavailable');
+          }
+          const outputPath = stripFileScheme(outputFile.uri);
+          const handle = await startWhisperRealtimeCapture(outputPath, {
+            provider,
+            model,
+            modelPath: resolvedModelPath,
+            language: speech?.language,
+            mode: speech?.mode ?? 'smart_parse',
+            fieldStrategy: speech?.fieldStrategy ?? 'smart',
+          });
+          void logInfo('Speech-to-text starting', {
+            scope: 'speech',
+            extra: {
+              provider,
+              model,
+              mode: speech?.mode ?? 'smart_parse',
+              fieldStrategy: speech?.fieldStrategy ?? 'smart',
+              language: speech?.language ?? 'auto',
+              hasModelPath: String(Boolean(resolvedModelPath)),
+            },
+          });
+          setRecording({ kind: 'whisper', stop: handle.stop, result: handle.result, file: outputFile });
+          return;
+        } catch (error) {
+          logCaptureWarn('Whisper realtime start failed, falling back to audio recording', error);
+        }
+      }
+
       const { recording: nextRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
-      setRecording(nextRecording);
+      setRecording({ kind: 'expo', recording: nextRecording });
     } catch (error) {
       logCaptureError('Failed to start recording', error);
       Alert.alert(t('quickAdd.audioErrorTitle'), t('quickAdd.audioErrorBody'));
     } finally {
       setRecordingBusy(false);
     }
-  }, [recording, recordingBusy, t]);
+  }, [
+    ensureAudioDirectory,
+    recording,
+    recordingBusy,
+    buildWhisperDiagnostics,
+    resolveWhisperModel,
+    settings.ai?.speechToText,
+    stripFileScheme,
+    t,
+  ]);
 
   const stopRecording = useCallback(async ({ saveTask }: { saveTask: boolean }) => {
     if (recordingBusy) return;
@@ -340,15 +536,144 @@ export function QuickCaptureSheet({
     setRecordingBusy(true);
     setRecording(null);
     try {
+      if (currentRecording.kind === 'whisper') {
+        try {
+          await currentRecording.stop();
+        } catch (error) {
+          logCaptureWarn('Failed to stop whisper recording', error);
+        }
+        if (!saveTask) {
+          void currentRecording.result.catch((error) => logCaptureWarn('Speech-to-text failed', error));
+          try {
+            safeDeleteFile(currentRecording.file, 'whisper_cancel');
+          } catch (error) {
+            logCaptureWarn('Audio cleanup failed', error);
+          }
+          return;
+        }
+
+        const finalFile = currentRecording.file;
+        let fileInfo: { exists?: boolean; size?: number } | null = null;
+        try {
+          fileInfo = finalFile.info();
+        } catch (error) {
+          logCaptureWarn('Audio info lookup failed', error);
+        }
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+        const speech = settings.ai?.speechToText;
+        const provider = speech?.provider ?? 'gemini';
+        const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
+        const apiKey = provider === 'whisper' ? '' : await loadAIKey(provider).catch(() => '');
+        const modelPath = provider === 'whisper' ? speech?.offlineModelPath : undefined;
+        const whisperResolved = provider === 'whisper'
+          ? resolveWhisperModel(model, modelPath)
+          : null;
+        const whisperModelReady = provider === 'whisper' ? Boolean(whisperResolved?.exists) : false;
+        const resolvedModelPath = provider === 'whisper'
+          ? (whisperResolved?.exists ? whisperResolved.path : modelPath)
+          : undefined;
+
+        const speechReady = speech?.enabled
+          ? provider === 'whisper'
+            ? whisperModelReady
+            : Boolean(apiKey)
+          : false;
+        const saveAudioAttachments = settings.gtd?.saveAudioAttachments !== false || !speechReady;
+        void logInfo('Audio attachment decision', {
+          scope: 'capture',
+          extra: {
+            provider,
+            speechReady: String(Boolean(speechReady)),
+            saveAudioAttachments: String(Boolean(saveAudioAttachments)),
+            settingSaveAudio: String(settings.gtd?.saveAudioAttachments ?? 'unset'),
+          },
+        });
+
+        let attachment: Attachment | null = saveAudioAttachments ? {
+          id: generateUUID(),
+          kind: 'file',
+          title: displayTitle,
+          uri: finalFile.uri,
+          mimeType: getMimeType('.wav'),
+          size: fileInfo?.exists && fileInfo.size ? fileInfo.size : undefined,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          localStatus: 'available',
+        } : null;
+        if (attachment) {
+          try {
+            const beforeUri = attachment.uri;
+            attachment = await persistAttachmentLocally(attachment);
+            void logInfo('Audio attachment persisted', {
+              scope: 'capture',
+              extra: {
+                from: beforeUri,
+                to: attachment.uri,
+                size: String(attachment.size ?? ''),
+              },
+            });
+          } catch (error) {
+            logCaptureWarn('Failed to persist audio attachment', error);
+          }
+        }
+
+        const taskId = generateUUID();
+        const attachments = [...(initialProps?.attachments ?? [])];
+        if (attachment) attachments.push(attachment);
+        const { title, props } = await buildTaskProps(displayTitle, {
+          id: taskId,
+          attachments,
+        });
+        if (!title.trim()) return;
+
+        await addTask(title, props);
+        handleClose();
+
+        if (!speechReady) {
+          const diag = provider === 'whisper'
+            ? buildWhisperDiagnostics(model, modelPath, resolvedModelPath, whisperModelReady)
+            : undefined;
+          void logInfo('Speech-to-text skipped: not ready', {
+            scope: 'speech',
+            extra: {
+              provider,
+              enabled: String(Boolean(speech?.enabled)),
+              hasModelPath: String(Boolean(resolvedModelPath)),
+              hasModelFile: String(whisperModelReady),
+              hasApiKey: String(Boolean(apiKey)),
+              mode: speech?.mode ?? 'smart_parse',
+              ...(diag ?? {}),
+            },
+          });
+        }
+
+        if (speechReady) {
+          currentRecording.result
+            .then((result) => applySpeechResult(taskId, result))
+            .catch((error) => logCaptureWarn('Speech-to-text failed', error))
+            .finally(() => {
+              if (!saveAudioAttachments) {
+                safeDeleteFile(finalFile, 'whisper_cleanup');
+              }
+            });
+        } else if (!saveAudioAttachments) {
+          safeDeleteFile(finalFile, 'whisper_skip_cleanup');
+        }
+        return;
+      }
+
+      const expoRecording = currentRecording.recording;
       try {
-        await currentRecording.stopAndUnloadAsync();
+        await expoRecording.stopAndUnloadAsync();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!message.includes('already been unloaded')) {
           throw error;
         }
       }
-      const uri = currentRecording.getURI();
+      const uri = expoRecording.getURI();
       if (!uri) {
         throw new Error('Recording URI missing');
       }
@@ -368,10 +693,10 @@ export function QuickCaptureSheet({
           sourceFile.move(destinationFile);
           finalFile = destinationFile;
         } catch (error) {
-          logCaptureWarn('Move recording failed, falling back to copy', error);
-          try {
-            sourceFile.copy(destinationFile);
-            sourceFile.delete();
+            logCaptureWarn('Move recording failed, falling back to copy', error);
+            try {
+              sourceFile.copy(destinationFile);
+            safeDeleteFile(sourceFile, 'recording_copy_cleanup');
             finalFile = destinationFile;
           } catch (copyError) {
             logCaptureWarn('Copy recording failed, using original file', copyError);
@@ -393,15 +718,32 @@ export function QuickCaptureSheet({
       const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
       const apiKey = provider === 'whisper' ? '' : await loadAIKey(provider).catch(() => '');
       const modelPath = provider === 'whisper' ? speech?.offlineModelPath : undefined;
+      const whisperResolved = provider === 'whisper'
+        ? resolveWhisperModel(model, modelPath)
+        : null;
+      const whisperModelReady = provider === 'whisper' ? Boolean(whisperResolved?.exists) : false;
+      const resolvedModelPath = provider === 'whisper'
+        ? (whisperResolved?.exists ? whisperResolved.path : modelPath)
+        : undefined;
+
       const speechReady = speech?.enabled
         ? provider === 'whisper'
-          ? Boolean(modelPath)
+          ? whisperModelReady
           : Boolean(apiKey)
         : false;
       const saveAudioAttachments = settings.gtd?.saveAudioAttachments !== false || !speechReady;
+      void logInfo('Audio attachment decision', {
+        scope: 'capture',
+        extra: {
+          provider,
+          speechReady: String(Boolean(speechReady)),
+          saveAudioAttachments: String(Boolean(saveAudioAttachments)),
+          settingSaveAudio: String(settings.gtd?.saveAudioAttachments ?? 'unset'),
+        },
+      });
 
       const audioUri = finalFile.uri;
-      const attachment: Attachment | null = saveAudioAttachments ? {
+      let attachment: Attachment | null = saveAudioAttachments ? {
         id: generateUUID(),
         kind: 'file',
         title: displayTitle,
@@ -412,6 +754,22 @@ export function QuickCaptureSheet({
         updatedAt: nowIso,
         localStatus: 'available',
       } : null;
+      if (attachment) {
+        try {
+          const beforeUri = attachment.uri;
+          attachment = await persistAttachmentLocally(attachment);
+          void logInfo('Audio attachment persisted', {
+            scope: 'capture',
+            extra: {
+              from: beforeUri,
+              to: attachment.uri,
+              size: String(attachment.size ?? ''),
+            },
+          });
+        } catch (error) {
+          logCaptureWarn('Failed to persist audio attachment', error);
+        }
+      }
 
       const taskId = generateUUID();
       const attachments = [...(initialProps?.attachments ?? [])];
@@ -425,39 +783,60 @@ export function QuickCaptureSheet({
       await addTask(title, props);
       handleClose();
 
-      if (speechReady) {
-          const timeZone = typeof Intl === 'object' && typeof Intl.DateTimeFormat === 'function'
-            ? Intl.DateTimeFormat().resolvedOptions().timeZone
-            : undefined;
-          void processAudioCapture(audioUri, {
+      if (!speechReady) {
+        const diag = provider === 'whisper'
+          ? buildWhisperDiagnostics(model, modelPath, resolvedModelPath, whisperModelReady)
+          : undefined;
+        void logInfo('Speech-to-text skipped: not ready', {
+          scope: 'speech',
+          extra: {
             provider,
-            apiKey,
+            enabled: String(Boolean(speech?.enabled)),
+            hasModelPath: String(Boolean(resolvedModelPath)),
+            hasModelFile: String(whisperModelReady),
+            hasApiKey: String(Boolean(apiKey)),
+            mode: speech?.mode ?? 'smart_parse',
+            ...(diag ?? {}),
+          },
+        });
+      }
+
+      if (speechReady) {
+        const timeZone = typeof Intl === 'object' && typeof Intl.DateTimeFormat === 'function'
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : undefined;
+        void logInfo('Speech-to-text starting', {
+          scope: 'speech',
+          extra: {
+            provider,
             model,
-            modelPath,
-            language: speech?.language,
             mode: speech?.mode ?? 'smart_parse',
             fieldStrategy: speech?.fieldStrategy ?? 'smart',
-            parseModel: provider === 'openai' && settings.ai?.provider === 'openai' ? settings.ai?.model : undefined,
-            now: new Date(),
-            timeZone,
-          })
-            .then((result) => applySpeechResult(taskId, result))
-            .catch((error) => logCaptureWarn('Speech-to-text failed', error))
-            .finally(() => {
-              if (!saveAudioAttachments) {
-                try {
-                  finalFile.delete();
-                } catch (error) {
-                  logCaptureWarn('Audio cleanup failed', error);
-                }
-              }
-            });
+            language: speech?.language ?? 'auto',
+            hasModelPath: String(Boolean(resolvedModelPath)),
+          },
+        });
+        void processAudioCapture(audioUri, {
+          provider,
+          apiKey,
+          model,
+          modelPath: resolvedModelPath,
+          language: speech?.language,
+          mode: speech?.mode ?? 'smart_parse',
+          fieldStrategy: speech?.fieldStrategy ?? 'smart',
+          parseModel: provider === 'openai' && settings.ai?.provider === 'openai' ? settings.ai?.model : undefined,
+          now: new Date(),
+          timeZone,
+        })
+          .then((result) => applySpeechResult(taskId, result))
+          .catch((error) => logCaptureWarn('Speech-to-text failed', error))
+          .finally(() => {
+            if (!saveAudioAttachments) {
+              safeDeleteFile(finalFile, 'expo_cleanup');
+            }
+          });
       } else if (!saveAudioAttachments) {
-        try {
-          finalFile.delete();
-        } catch (error) {
-          logCaptureWarn('Audio cleanup failed', error);
-        }
+        safeDeleteFile(finalFile, 'expo_skip_cleanup');
       }
     } catch (error) {
       logCaptureError('Failed to save recording', error);
@@ -474,6 +853,7 @@ export function QuickCaptureSheet({
     initialProps?.attachments,
     recording,
     recordingBusy,
+    resolveWhisperModel,
     settings.ai?.model,
     settings.ai?.provider,
     settings.ai?.speechToText,

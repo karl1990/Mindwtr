@@ -543,7 +543,8 @@ export class SqliteAdapter {
 
     async searchAll(query: string): Promise<SearchResults> {
         await this.ensureSchema();
-        const cleaned = query
+        const safeQuery = typeof query === 'string' ? query : '';
+        const cleaned = safeQuery
             .replace(/[^\p{L}\p{N}#@]+/gu, ' ')
             .trim();
         if (!cleaned) {
