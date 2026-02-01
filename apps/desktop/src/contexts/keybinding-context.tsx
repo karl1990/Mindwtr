@@ -172,10 +172,27 @@ export function KeybindingProvider({
     const vimGoMap = useMemo<Record<string, string>>(() => ({
         i: 'inbox',
         n: 'next',
+        f: 'agenda',
+        p: 'projects',
+        c: 'contexts',
+        r: 'review',
+        e: 'reference',
+        w: 'waiting',
+        s: 'someday',
+        l: 'calendar',
+        b: 'board',
+        d: 'done',
+        a: 'archived',
+    }), []);
+
+    const emacsAltMap = useMemo<Record<string, string>>(() => ({
+        i: 'inbox',
+        n: 'next',
         a: 'agenda',
         p: 'projects',
         c: 'contexts',
         r: 'review',
+        e: 'reference',
         w: 'waiting',
         s: 'someday',
         l: 'calendar',
@@ -183,8 +200,6 @@ export function KeybindingProvider({
         d: 'done',
         A: 'archived',
     }), []);
-
-    const emacsAltMap = vimGoMap;
 
     useEffect(() => {
         const handleVim = (e: KeyboardEvent) => {
