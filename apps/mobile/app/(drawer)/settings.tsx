@@ -1546,6 +1546,7 @@ export default function SettingsPage() {
                                                 ]}
                                                 onPress={() => {
                                                     setLanguage(lang.id);
+                                                    updateSettings({ language: lang.id }).catch(logSettingsError);
                                                     setLanguagePickerOpen(false);
                                                 }}
                                             >

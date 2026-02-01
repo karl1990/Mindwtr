@@ -12,7 +12,7 @@ import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quic
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
-import { setStorageAdapter, useTaskStore, flushPendingSave } from '@mindwtr/core';
+import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
 import { performMobileSync } from '../lib/sync-service';
@@ -40,10 +40,11 @@ void SplashScreen.preventAutoHideAsync().catch(() => {});
 function RootLayoutContent() {
   const router = useRouter();
   const { isDark, isReady: themeReady } = useTheme();
-  const { isReady: languageReady } = useLanguage();
+  const { language, setLanguage, isReady: languageReady } = useLanguage();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const [storageWarningShown, setStorageWarningShown] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const settingsLanguage = useTaskStore((state) => state.settings?.language);
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,6 +140,12 @@ function RootLayoutContent() {
       }
     };
   }, [requestSync]);
+
+  useEffect(() => {
+    if (!settingsLanguage || !isSupportedLanguage(settingsLanguage)) return;
+    if (settingsLanguage === language) return;
+    void setLanguage(settingsLanguage);
+  }, [language, settingsLanguage, setLanguage]);
 
   useEffect(() => {
     if (!hasShareIntent) return;

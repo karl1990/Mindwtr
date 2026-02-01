@@ -426,7 +426,9 @@ export function SettingsView() {
 
     const saveLanguagePreference = (lang: Language) => {
         setLanguage(lang);
-        showSaved();
+        updateSettings({ language: lang })
+            .then(showSaved)
+            .catch((error) => reportError('Failed to update language', error));
     };
 
     const handleWindowDecorationsChange = useCallback((enabled: boolean) => {

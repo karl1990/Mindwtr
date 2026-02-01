@@ -12,7 +12,7 @@ import { ArchiveView } from './components/views/ArchiveView';
 import { TrashView } from './components/views/TrashView';
 import { AgendaView } from './components/views/AgendaView';
 import { SearchView } from './components/views/SearchView';
-import { useTaskStore, flushPendingSave } from '@mindwtr/core';
+import { useTaskStore, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
 import { GlobalSearch } from './components/GlobalSearch';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLanguage } from './contexts/language-context';
@@ -37,10 +37,11 @@ function App() {
     const closeBehavior = useTaskStore((state) => state.settings?.window?.closeBehavior ?? 'ask');
     const showTray = useTaskStore((state) => state.settings?.window?.showTray);
     const settingsTheme = useTaskStore((state) => state.settings?.theme);
+    const settingsLanguage = useTaskStore((state) => state.settings?.language);
     const updateSettings = useTaskStore((state) => state.updateSettings);
     const showToast = useUiStore((state) => state.showToast);
     const isFlatpak = isFlatpakRuntime();
-    const { t } = useLanguage();
+    const { t, language, setLanguage } = useLanguage();
     const isActiveRef = useRef(true);
     const lastAutoSyncRef = useRef(0);
     const syncDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +65,12 @@ function App() {
             .then(({ setTheme }) => setTheme(nativeTheme))
             .catch((error) => void logError(error, { scope: 'theme', step: 'apply' }));
     }, [settingsTheme]);
+
+    useEffect(() => {
+        if (!settingsLanguage || !isSupportedLanguage(settingsLanguage)) return;
+        if (settingsLanguage === language) return;
+        setLanguage(settingsLanguage);
+    }, [settingsLanguage, language, setLanguage]);
 
     const translateOrFallback = useCallback((key: string, fallback: string) => {
         const value = t(key);
