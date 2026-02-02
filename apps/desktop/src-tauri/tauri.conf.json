@@ -36,8 +36,7 @@
       "app"
     ],
     "macOS": {
-      "signingIdentity": "Developer ID Application",
-      "notarize": false
+      "signingIdentity": "Developer ID Application"
     },
     "icon": [
       "icons/32x32.png",
