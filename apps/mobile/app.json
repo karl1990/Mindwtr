@@ -13,7 +13,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "tech.dongdongbh.mindwtr",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Mindwtr uses the microphone to capture voice notes."
+        "NSMicrophoneUsageDescription": "Mindwtr uses the microphone to capture voice notes.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
