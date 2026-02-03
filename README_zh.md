@@ -115,7 +115,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 
 ### 跨平台
 - 🖥️ **桌面端** - Tauri v2（macOS、Linux、Windows）
-- 📱 **移动端** - React Native/Expo（~iOS~、Android）
+- 📱 **移动端** - React Native/Expo（iOS 通过 TestFlight、Android）
 - 📲 **Android 小部件** - 桌面焦点/下一步小组件
 - ⌨️ **键盘快捷键** - Vim 与 Emacs 预设
 - 🎨 **主题** - 明/暗模式
@@ -225,7 +225,11 @@ brew install --cask mindwtr
 其他方式：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
 **iOS：**
-iOS 构建需要 Apple Developer 账号（$99/年），目前仅提供模拟器构建。如果你希望获得 iOS 构建，请考虑 [赞助开发者](https://github.com/sponsors/dongdongbh) 或 [在 Ko-fi 支持](https://ko-fi.com/D1D01T20WK)，以资助 Apple Developer 账号。
+已上线 TestFlight：[加入测试版](https://testflight.apple.com/join/7SMJCTSR)。
+
+不过，维护 iOS 版上架 App Store 需要支付较高的年费（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我自费承担。
+
+为了让 Mindwtr 能持续发展和维护，非常感谢你的支持！如果你觉得这款应用有价值，欢迎通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持项目。
 
 ### Docker（PWA + 云同步）
 

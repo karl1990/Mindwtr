@@ -115,7 +115,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 ### Cross-Platform
 - 🖥️ **Desktop** - Tauri v2 (macOS, Linux, Windows)
-- 📱 **Mobile** - React Native/Expo (~iOS~, Android)
+- 📱 **Mobile** - React Native/Expo (iOS via TestFlight, Android)
 - 📲 **Android Widget** - Home screen focus/next widget
 - ⌨️ **Keyboard Shortcuts** - Vim and Emacs presets
 - 🎨 **Themes** - Light/Dark
@@ -225,7 +225,11 @@ brew install --cask mindwtr
 Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases).
 
 **iOS:**
-iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only. If you want iOS builds, please consider [sponsoring the developer](https://github.com/sponsors/dongdongbh) or [supporting on Ko-fi](https://ko-fi.com/D1D01T20WK) so we can fund the Apple Developer account.
+Available on TestFlight: [Join the beta](https://testflight.apple.com/join/7SMJCTSR).
+
+However, maintaining the iOS version on the App Store requires a substantial annual fee (see the [Apple Developer Program](https://developer.apple.com/support/enrollment/)), which I currently cover out of pocket.
+
+To ensure Mindwtr's continued existence and future development, your support is greatly appreciated! If you find value in the app, please consider supporting the project via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
 
 ### Docker (PWA + Cloud Sync)
 
