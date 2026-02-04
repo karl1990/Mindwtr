@@ -14,7 +14,7 @@
                 "credentialsSource": "remote"
             },
             "ios": {
-                "simulator": true
+              "autoIncrement": true
             },
             "distribution": "internal",
             "env": {
@@ -25,6 +25,9 @@
           "android": {
             "buildType": "app-bundle",
             "credentialsSource": "remote"
+          },
+          "ios": {                       
+            "autoIncrement": true
           }
         },
         "production-apk": {
