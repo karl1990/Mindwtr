@@ -117,6 +117,15 @@ sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.
 
 ### 3. Build APK
 
+## iOS Builds (EAS)
+
+To build and submit the iOS app via EAS:
+
+```bash
+eas build --profile preview --platform ios
+eas submit --platform ios
+```
+
 ## Android Environment
 
 > **IMPORTANT**: You must only use `ANDROID_HOME`. Do NOT set `ANDROID_SDK_ROOT` - it is deprecated and causes conflicts.
