@@ -1182,9 +1182,8 @@ export default function ProjectsScreen() {
         animationType="fade"
         onRequestClose={() => setShowAreaPicker(false)}
       >
-        <View style={styles.overlay}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setShowAreaPicker(false)} />
-          <View style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border, maxHeight: pickerCardMaxHeight }]}>
+        <Pressable style={styles.overlay} onPress={() => setShowAreaPicker(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border, maxHeight: pickerCardMaxHeight }]} onPress={(e) => e.stopPropagation()}>
             <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
             <TouchableOpacity
               style={[styles.pickerRow, { borderColor: tc.border }]}
@@ -1225,8 +1224,8 @@ export default function ProjectsScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
       <Modal
         visible={showAreaManager}
@@ -1237,15 +1236,14 @@ export default function ProjectsScreen() {
           setExpandedAreaColorId(null);
         }}
       >
-        <View style={styles.overlay}>
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={() => {
-              setShowAreaManager(false);
-              setExpandedAreaColorId(null);
-            }}
-          />
-          <View style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border, maxHeight: pickerCardMaxHeight }]}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => {
+            setShowAreaManager(false);
+            setExpandedAreaColorId(null);
+          }}
+        >
+          <Pressable style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border, maxHeight: pickerCardMaxHeight }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.areaManagerHeader}>
               <Text style={[styles.linkModalTitle, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
               <View style={styles.areaSortButtons}>
@@ -1368,8 +1366,8 @@ export default function ProjectsScreen() {
                 <Text style={[styles.linkModalButtonText, { color: tc.tint }]}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
       <Modal
         visible={showTagPicker}

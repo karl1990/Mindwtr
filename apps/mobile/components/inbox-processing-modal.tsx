@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView, TextInput, Platform, Alert, Share, ActivityIndicator, Dimensions, type TextStyle } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTaskStore, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, safeFormatDate, safeParseDate, resolveTextDirection, type Task, type AIProviderId } from '@mindwtr/core';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 
+import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { useLanguage } from '../contexts/language-context';
 import { useTheme } from '../contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -22,6 +23,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const { t } = useLanguage();
   const { isDark } = useTheme();
   const tc = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processingStep, setProcessingStep] = useState<'refine' | 'actionable' | 'twomin' | 'decide' | 'context' | 'project' | 'delegate'>('refine');
@@ -74,6 +76,11 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
     writingDirection: resolvedTitleDirection,
     textAlign: resolvedTitleDirection === 'rtl' ? 'right' : 'left',
   }), [resolvedTitleDirection]);
+  const headerStyle = [styles.processingHeader, {
+    borderBottomColor: tc.border,
+    paddingTop: Math.max(insets.top, 10),
+    paddingBottom: 10,
+  }];
 
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -475,7 +482,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
         onRequestClose={handleClose}
       >
         <View style={[styles.fullScreenContainer, { backgroundColor: tc.bg }]}>
-          <View style={[styles.processingHeader, { borderBottomColor: tc.border }]}>
+          <View style={headerStyle}>
             <TouchableOpacity onPress={handleClose}>
               <Text style={[styles.headerClose, { color: tc.text }]}>✕</Text>
             </TouchableOpacity>
@@ -525,7 +532,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
         onRequestClose={handleClose}
       >
         <View style={[styles.fullScreenContainer, { backgroundColor: tc.bg }]}>
-          <View style={[styles.processingHeader, { borderBottomColor: tc.border }]}>
+          <View style={headerStyle}>
             <TouchableOpacity onPress={handleClose}>
               <Text style={[styles.headerClose, { color: tc.text }]}>✕</Text>
             </TouchableOpacity>
