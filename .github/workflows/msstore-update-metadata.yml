@@ -80,9 +80,9 @@ jobs:
         shell: pwsh
         if: steps.msstore_status.outputs.skip != 'true'
         run: |
-          "MSSTORE_SKIP_PUBLISH=false" | Out-File -FilePath $env:GITHUB_ENV -Append
           if (-not (Test-Path "metadata/metadata.json")) {
-            Write-Error "metadata/metadata.json not found. Run the base metadata workflow first."
+            Write-Warning "metadata/metadata.json not found. Run the base metadata workflow first."
+            exit 0
           }
           $metadataRaw = Get-Content -Raw "metadata/metadata.json"
           $metadata = $metadataRaw | ConvertFrom-Json
@@ -92,7 +92,6 @@ jobs:
             }
           }
           $packagesJson = $null
-          $currentPackages = $null
           $submissionGetOutput = & msstore submission get $env:MS_STORE_APP_ID 2>&1
           if ($LASTEXITCODE -eq 0) {
             $submissionText = ($submissionGetOutput | Out-String)
@@ -131,23 +130,11 @@ jobs:
                 }
               }
             }
-            if ($packagesJson) {
-              $packagesJson = ($packagesJson -replace "`r?`n", "").Trim()
-              try {
-                $currentPackages = $packagesJson | ConvertFrom-Json
-                if ($currentPackages) {
-                  Write-Host "Using ApplicationPackages from current submission: $($currentPackages.Count)"
-                  $packageIds = $currentPackages | ForEach-Object { $_.Id } | Where-Object { $_ }
-                  if ($packageIds) {
-                    Write-Host "Package IDs: $($packageIds -join ', ')"
-                  }
-                }
-              } catch {
-                Write-Warning "Failed to parse ApplicationPackages JSON: $_"
-              }
-            } else {
-              Write-Warning "Could not locate ApplicationPackages array in submission output."
-            }
+          if ($packagesJson) {
+            $packagesJson = ($packagesJson -replace "`r?`n", "").Trim()
+          } else {
+            Write-Warning "Could not locate ApplicationPackages array in submission output."
+          }
           } else {
             Write-Warning "Failed to fetch current submission packages: $submissionGetOutput"
           }
@@ -168,9 +155,6 @@ jobs:
           if ($metadata.HardwarePreferences) {
             $metadata.HardwarePreferences = & $ensureArray $metadata.HardwarePreferences
           }
-          if ($metadata.GamingOptions) {
-            $metadata.GamingOptions = & $ensureArray $metadata.GamingOptions
-          }
           if ($metadata.Listings) {
             foreach ($listingProp in $metadata.Listings.PSObject.Properties) {
               $listing = $listingProp.Value
@@ -188,13 +172,6 @@ jobs:
           if ($packagesJson) {
             $metadataJson = $metadataJson.Replace('"ApplicationPackages":"__PACKAGES__"', '"ApplicationPackages":' + $packagesJson)
           }
-          Write-Host "Metadata keys: $($metadata.PSObject.Properties.Name -join ', ')"
-          if ($metadata.Listings) {
-            Write-Host "Listings locales: $($metadata.Listings.PSObject.Properties.Name -join ', ')"
-          }
-          Write-Host "Metadata JSON preview (first 1500 chars):"
-          Write-Host $metadataJson.Substring(0, [Math]::Min(1500, $metadataJson.Length))
-          Write-Host "Metadata JSON size: $($metadataJson.Length) chars"
           $maxRetries = 3
           $delaySeconds = 30
           $success = $false
@@ -206,7 +183,6 @@ jobs:
             $psi.ArgumentList.Add('updateMetadata')
             $psi.ArgumentList.Add($env:MS_STORE_APP_ID)
             $psi.ArgumentList.Add($metadataJson)
-            $psi.ArgumentList.Add('--verbose')
             $psi.RedirectStandardOutput = $true
             $psi.RedirectStandardError = $true
             $psi.UseShellExecute = $false
@@ -222,16 +198,6 @@ jobs:
               $stderr = $stderrTask.GetAwaiter().GetResult()
               $updateOutput = ($stdout + $stderr).Trim()
               $exitCode = $process.ExitCode
-            }
-            if ($updateOutput) {
-              $logPath = Join-Path $env:RUNNER_TEMP "msstore-update-metadata-$attempt.log"
-              [System.IO.File]::WriteAllText($logPath, $updateOutput)
-              Write-Host "msstore log saved to $logPath"
-              if ($updateOutput.Length -gt 4000) {
-                Write-Host $updateOutput.Substring($updateOutput.Length - 4000)
-              } else {
-                Write-Host $updateOutput
-              }
             }
             if ($exitCode -eq 0) {
               $success = $true
@@ -252,30 +218,5 @@ jobs:
             break
           }
           if (-not $success) {
-            if ($updateOutput -match '504' -or $updateOutput -match 'Gateway' -or $updateOutput -match 'timeout' -or $updateOutput -match 'timed out' -or $updateOutput -match 'Error while creating submission' -or $updateOutput -match '<!DOCTYPE html') {
-              Write-Warning "Partner Center timeout. Checking for pending submission..."
-              $statusAfter = msstore submission status $env:MS_STORE_APP_ID 2>&1
-              Write-Host $statusAfter
-              if ($statusAfter -match 'Could not find a Pending Submission') {
-                Write-Warning "No pending submission found; skipping Microsoft Store publish."
-                "MSSTORE_SKIP_PUBLISH=true" | Out-File -FilePath $env:GITHUB_ENV -Append
-                exit 0
-              }
-              Write-Warning "Pending submission detected; continuing to publish."
-              exit 0
-            }
             throw "Metadata update failed after $maxRetries attempts: $updateOutput"
-          }
-
-      - name: Publish metadata update
-        shell: pwsh
-        if: steps.msstore_status.outputs.skip != 'true' && env.MSSTORE_SKIP_PUBLISH != 'true'
-        run: |
-          $publishOutput = msstore submission publish $env:MS_STORE_APP_ID 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            if ($publishOutput -match 'InvalidState' -or $publishOutput -match 'certification' -or $publishOutput -match 'Pending Submission') {
-              Write-Warning "Store submission is in certification. Skipping metadata publish."
-              exit 0
-            }
-            throw "Metadata publish failed: $publishOutput"
           }
