@@ -286,15 +286,33 @@ jobs:
           Write-Host "Metadata JSON preview (first 1500 chars):"
           Write-Host $metadataJson.Substring(0, [Math]::Min(1500, $metadataJson.Length))
           Write-Host "Metadata JSON size: $($metadataJson.Length) chars"
-          Write-Host "Updating metadata..."
-          $updateOutput = & msstore submission updateMetadata $env:MS_STORE_APP_ID $metadataJson --verbose 2>&1
-          if ($updateOutput) { Write-Host $updateOutput }
-          if ($LASTEXITCODE -ne 0) {
+          $maxRetries = 3
+          $delaySeconds = 30
+          $success = $false
+          for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+            Write-Host "Updating metadata (attempt $attempt of $maxRetries)..."
+            $updateOutput = & msstore submission updateMetadata $env:MS_STORE_APP_ID $metadataJson --verbose 2>&1
+            if ($updateOutput) { Write-Host $updateOutput }
+            if ($LASTEXITCODE -eq 0) {
+              $success = $true
+              break
+            }
             if ($updateOutput -match 'InvalidState' -or $updateOutput -match 'certification' -or $updateOutput -match 'Pending Submission') {
               Write-Warning "Store submission is in certification. Skipping metadata update."
               exit 0
             }
-            throw "Metadata update failed: $updateOutput"
+            if ($updateOutput -match '504' -or $updateOutput -match 'Gateway' -or $updateOutput -match 'timeout' -or $updateOutput -match 'timed out') {
+              if ($attempt -lt $maxRetries) {
+                Write-Warning "Store API timeout. Retrying in $delaySeconds seconds..."
+                Start-Sleep -Seconds $delaySeconds
+                $delaySeconds = [Math]::Min($delaySeconds * 2, 180)
+                continue
+              }
+            }
+            break
+          }
+          if (-not $success) {
+            throw "Metadata update failed after $maxRetries attempts: $updateOutput"
           }
 
       - name: Publish to Microsoft Store
