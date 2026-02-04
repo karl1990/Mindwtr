@@ -70,11 +70,13 @@ jobs:
             echo "Failed to create Google Play edit" >&2
             exit 1
           fi
-          TRACKS_JSON=$(curl -s \
+          TRACKS_FILE=$(mktemp)
+          TRACKS_CODE=$(curl -sS -o "$TRACKS_FILE" -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE/edits/$EDIT_ID/tracks")
-          if [ -z "$TRACKS_JSON" ]; then
-            echo "Failed to fetch Google Play tracks (empty response)" >&2
+          TRACKS_JSON=$(cat "$TRACKS_FILE")
+          if [ "$TRACKS_CODE" != "200" ]; then
+            echo "Failed to fetch Google Play tracks (HTTP $TRACKS_CODE): $TRACKS_JSON" >&2
             exit 1
           fi
           if echo "$TRACKS_JSON" | jq -e '.error' >/dev/null; then
