@@ -16,7 +16,7 @@
         "NSMicrophoneUsageDescription": "Mindwtr uses the microphone to capture voice notes.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
