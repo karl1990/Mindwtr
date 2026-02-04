@@ -46,6 +46,12 @@ Mindwtr supports three sync backends:
 - **WebDAV**: use a provider that supports WebDAV (e.g., Nextcloud, ownCloud, Fastmail, self-hosted).
 - **Dropbox/Google Drive**: no native WebDAV; on Android, use a bridge app to keep a local folder synced for file sync.
 
+## Sync Recommendations
+
+- **Best for multi-device:** WebDAV or Mindwtr Cloud (self-hosted). The app controls the sync cycle and merges per item.
+- **File Sync (Syncthing/Dropbox/etc.):** works, but **conflicts are file-level** because `data.json` is a single file.
+- **Best practices for File Sync:** avoid editing on two devices at the same time, and wait for sync to finish before opening the app on another device. If conflicts appear, keep the newest `data.json` and delete the `data.json.sync-conflict-*` copies.
+
 ### 1. File Sync
 
 Sync via a shared JSON file with any folder-based sync service:
