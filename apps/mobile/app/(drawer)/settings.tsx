@@ -480,7 +480,6 @@ export default function SettingsPage() {
             headerLeft: (props: HeaderBackButtonProps) => (
                 <HeaderBackButton
                     {...props}
-                    labelVisible={false}
                     onPress={handleHeaderBack}
                 />
             ),
