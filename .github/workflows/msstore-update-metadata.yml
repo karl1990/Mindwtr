@@ -119,9 +119,14 @@ jobs:
             }
           }
           $metadataJson = $metadata | ConvertTo-Json -Depth 100 -Compress
+          Write-Host "Metadata keys: $($metadata.PSObject.Properties.Name -join ', ')"
+          if ($metadata.Listings) {
+            Write-Host "Listings locales: $($metadata.Listings.PSObject.Properties.Name -join ', ')"
+          }
           Write-Host "Metadata JSON preview (first 1500 chars):"
           Write-Host $metadataJson.Substring(0, [Math]::Min(1500, $metadataJson.Length))
           Write-Host "Metadata JSON size: $($metadataJson.Length) chars"
+          Write-Host "Updating metadata..."
           $psi = [System.Diagnostics.ProcessStartInfo]::new()
           $psi.FileName = 'msstore'
           $psi.ArgumentList.Add('submission')
@@ -132,11 +137,28 @@ jobs:
           $psi.RedirectStandardError = $true
           $psi.UseShellExecute = $false
           $psi.ArgumentList.Add('--verbose')
-          $process = [System.Diagnostics.Process]::Start($psi)
-          $stdout = $process.StandardOutput.ReadToEnd()
-          $stderr = $process.StandardError.ReadToEnd()
+          $process = [System.Diagnostics.Process]::new()
+          $process.StartInfo = $psi
+          $stdoutBuilder = [System.Text.StringBuilder]::new()
+          $stderrBuilder = [System.Text.StringBuilder]::new()
+          $process.add_OutputDataReceived({
+            param($sender, $args)
+            if ($args.Data) { $stdoutBuilder.AppendLine($args.Data) | Out-Null }
+          })
+          $process.add_ErrorDataReceived({
+            param($sender, $args)
+            if ($args.Data) { $stderrBuilder.AppendLine($args.Data) | Out-Null }
+          })
+          $process.Start() | Out-Null
+          $process.BeginOutputReadLine()
+          $process.BeginErrorReadLine()
+          if (-not $process.WaitForExit(300000)) {
+            $process.Kill()
+            throw "Metadata update timed out after 5 minutes"
+          }
           $process.WaitForExit()
-          Write-Host "Updating metadata..."
+          $stdout = $stdoutBuilder.ToString()
+          $stderr = $stderrBuilder.ToString()
           if ($stdout) { Write-Host $stdout }
           if ($stderr) { Write-Host "STDERR: $stderr" }
           $updateOutput = ($stdout + $stderr).Trim()
