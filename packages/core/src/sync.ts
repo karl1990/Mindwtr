@@ -65,7 +65,15 @@ export const appendSyncHistory = (
     limit: number = 20
 ): SyncHistoryEntry[] => {
     const history = Array.isArray(settings?.lastSyncHistory) ? settings?.lastSyncHistory ?? [] : [];
-    const next = [entry, ...history].filter((item) => item && typeof item.at === 'string');
+    const items = [entry, ...history];
+    const next = items.filter((item) => item && typeof item.at === 'string');
+    const dropped = items.length - next.length;
+    if (dropped > 0) {
+        logWarn('Dropped invalid sync history entries', {
+            scope: 'sync',
+            context: { dropped },
+        });
+    }
     return next.slice(0, Math.max(1, limit));
 };
 
