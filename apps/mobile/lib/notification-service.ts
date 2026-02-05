@@ -1,6 +1,7 @@
 import { getNextScheduledAt, type Language, Task, type Project, useTaskStore, parseTimeOfDay, getTranslations, loadStoredLanguage, safeParseDate, hasTimeComponent } from '@mindwtr/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { logWarn } from './app-log';
 
 type NotificationsApi = typeof import('expo-notifications');
@@ -36,6 +37,7 @@ let storeSubscription: (() => void) | null = null;
 let rescheduleTimer: ReturnType<typeof setTimeout> | null = null;
 
 let Notifications: NotificationsApi | null = null;
+const ANDROID_NOTIFICATION_CHANNEL_ID = 'mindwtr-reminders';
 
 const logNotificationError = (message: string, error?: unknown) => {
   const extra = error ? { error: error instanceof Error ? error.message : String(error) } : undefined;
@@ -66,6 +68,15 @@ const scheduleNotification = async (
   request: { content: NotificationContentInput; trigger: unknown },
   context: string,
 ) => {
+  const trigger = (() => {
+    if (Platform.OS !== 'android') return request.trigger;
+    if (!request.trigger || typeof request.trigger !== 'object' || request.trigger instanceof Date) {
+      return request.trigger;
+    }
+    const triggerObject = request.trigger as Record<string, unknown>;
+    if ('channelId' in triggerObject) return request.trigger;
+    return { ...triggerObject, channelId: ANDROID_NOTIFICATION_CHANNEL_ID };
+  })();
   try {
     return await api.scheduleNotificationAsync({
       ...request,
@@ -73,6 +84,7 @@ const scheduleNotification = async (
         ...request.content,
         data: normalizeNotificationData(request.content.data),
       },
+      trigger,
     } as any);
   } catch (error) {
     logNotificationError(`Failed to schedule ${context}`, error);
@@ -191,9 +203,10 @@ async function rescheduleDailyDigest(api: NotificationsApi) {
         data: { kind: 'daily-digest', when: 'morning' },
       } as any,
       trigger: {
+        type: api.SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
-        repeats: true,
+        channelId: ANDROID_NOTIFICATION_CHANNEL_ID,
       } as any,
     }, 'daily digest (morning)');
     if (id) {
@@ -210,9 +223,10 @@ async function rescheduleDailyDigest(api: NotificationsApi) {
         data: { kind: 'daily-digest', when: 'evening' },
       } as any,
       trigger: {
+        type: api.SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
-        repeats: true,
+        channelId: ANDROID_NOTIFICATION_CHANNEL_ID,
       } as any,
     }, 'daily digest (evening)');
     if (id) {
@@ -255,10 +269,11 @@ async function rescheduleWeeklyReview(api: NotificationsApi) {
       data: { kind: 'weekly-review', weekday },
     } as any,
     trigger: {
+      type: api.SchedulableTriggerInputTypes.WEEKLY,
       weekday,
       hour,
       minute,
-      repeats: true,
+      channelId: ANDROID_NOTIFICATION_CHANNEL_ID,
     } as any,
   }, 'weekly review');
 }
@@ -468,6 +483,14 @@ export async function startMobileNotifications() {
     weeklyReviewConfigKey = null;
     started = false;
     return;
+  }
+
+  if (Platform.OS === 'android' && typeof api.setNotificationChannelAsync === 'function') {
+    await api.setNotificationChannelAsync(ANDROID_NOTIFICATION_CHANNEL_ID, {
+      name: 'Mindwtr Reminders',
+      importance: api.AndroidImportance?.DEFAULT ?? 5,
+      description: 'Task reminders and review digests',
+    }).catch((error) => logNotificationError('Failed to set notification channel', error));
   }
 
   await api.setNotificationCategoryAsync('task-reminder', [
