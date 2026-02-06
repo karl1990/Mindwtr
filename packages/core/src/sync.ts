@@ -383,6 +383,7 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
     const stats = createEmptyEntityStats(local.length, incoming.length);
     const merged: T[] = [];
+    let invalidDeletedAtWarnings = 0;
     const normalizeTimestamps = <Item extends { id?: string; updatedAt: string; createdAt?: string }>(item: Item): Item => {
         if (!('createdAt' in item) || !item.createdAt) return item;
         const createdTime = new Date(item.createdAt).getTime();
@@ -459,6 +460,14 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
             if (item.deletedAt) {
                 const deletedTimeRaw = new Date(item.deletedAt).getTime();
                 if (Number.isFinite(deletedTimeRaw)) return deletedTimeRaw;
+                invalidDeletedAtWarnings += 1;
+                if (invalidDeletedAtWarnings <= 5) {
+                    logWarn('Invalid deletedAt timestamp during merge; falling back to updatedAt', {
+                        scope: 'sync',
+                        category: 'sync',
+                        context: { id: item.id, deletedAt: item.deletedAt },
+                    });
+                }
             }
             const updatedTimeRaw = item.updatedAt ? new Date(item.updatedAt).getTime() : NaN;
             return Number.isFinite(updatedTimeRaw) ? updatedTimeRaw : 0;
@@ -472,8 +481,10 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
                     winner = incomingItem;
                 } else if (localOpTime > incomingOpTime) {
                     winner = localItem;
+                } else if (safeIncomingTime !== safeLocalTime) {
+                    winner = safeIncomingTime > safeLocalTime ? incomingItem : localItem;
                 } else {
-                    winner = localDeleted ? localItem : incomingItem;
+                    winner = incomingItem;
                 }
             } else if (revDiff !== 0) {
                 winner = revDiff > 0 ? localItem : incomingItem;
@@ -491,8 +502,10 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
                 winner = incomingItem;
             } else if (localOpTime > incomingOpTime) {
                 winner = localItem;
+            } else if (safeIncomingTime !== safeLocalTime) {
+                winner = safeIncomingTime > safeLocalTime ? incomingItem : localItem;
             } else {
-                winner = localDeleted ? localItem : incomingItem;
+                winner = incomingItem;
             }
         } else if (withinSkew && safeIncomingTime === safeLocalTime) {
             winner = incomingItem;
