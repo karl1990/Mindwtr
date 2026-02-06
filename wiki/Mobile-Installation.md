@@ -71,7 +71,7 @@ open ios/*.xcworkspace
 
 ## Data Location
 
-Mobile data is stored in the app's internal storage using AsyncStorage.
+Mobile data is stored in app-internal storage with SQLite as the primary store, plus JSON backup/sync data.
 
 ---
 

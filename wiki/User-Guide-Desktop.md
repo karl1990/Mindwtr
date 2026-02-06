@@ -298,6 +298,8 @@ Configure notifications in Settings:
 - Edit: title, status, contexts, tags, description, location
 - Set: due date, start date, review date, time estimate, recurrence
 - Manage checklist items
+- Description markdown supports unordered lists and task checkboxes (`- item`, `[ ] item`, `[x] item`)
+- Markdown checkbox lines can populate checklist items when you save
 - Assign to a project
 
 ### Task Properties
@@ -431,7 +433,7 @@ Access Settings from the sidebar.
 - Sidebar footer shows last sync time and online/offline status
 
 For WebDAV, configure:
-- Server URL (full path to sync file)
+- Server URL (folder URL; Mindwtr stores `data.json` inside)
 - Username and Password
 
 See [[Data and Sync]] for detailed setup.

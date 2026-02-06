@@ -195,7 +195,7 @@ Go to Settings → Appearance. Choose Light, Dark, or System.
 ### How do I sync with my phone?
 
 1. Configure a sync folder in Settings (point to Dropbox, Syncthing, etc.)
-2. On mobile, select the sync file in Settings → Data & Sync
+2. On mobile, select the sync folder in Settings → Data & Sync
 3. Both platforms auto-sync on data changes and when switching apps
 
 See [[Data and Sync]].
@@ -261,7 +261,7 @@ In the Inbox, swipe right on a task to mark it as Done. Other views may have dif
 ### How do I sync with desktop?
 
 1. Export backup to your sync folder (Google Drive, Syncthing, etc.)
-2. Select that file in Settings → Data & Sync
+2. Select that folder in Settings → Data & Sync
 3. The app auto-syncs on data changes and when going to background
 
 See [[Data and Sync]].
@@ -271,8 +271,11 @@ See [[Data and Sync]].
 Yes! Mindwtr sends push notifications for:
 - Due date reminders
 - Start time alerts
+- Daily digest prompts
+- Weekly review reminders
 
-You can snooze notifications directly from the notification.
+You can snooze notifications directly from the notification.  
+Tapping the notification body opens the **Review** screen.
 
 ---
 

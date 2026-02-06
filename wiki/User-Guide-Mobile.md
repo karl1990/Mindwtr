@@ -224,6 +224,9 @@ Checklist-first tasks default to View mode for faster checking.
 
 The editor starts minimal. Tap **More options** to reveal advanced fields; any field with existing content stays visible.
 
+Description markdown supports unordered lists and task checkboxes (`- item`, `[ ] item`, `[x] item`).
+Markdown checkbox lines can populate checklist items when you save.
+
 ### Attachments
 
 You can attach files or links to a task from the editor. Audio notes can be saved as attachments when **Save audio attachments** is enabled.
@@ -404,6 +407,8 @@ When a notification appears, you can snooze it directly:
 - Tap **Snooze** to be reminded later
 - Choose from preset intervals (5 min, 15 min, 1 hour, etc.)
 
+Tap the notification body to jump directly to the **Review** screen.
+
 ### Permissions
 
 Make sure notifications are enabled:
@@ -467,6 +472,7 @@ See [[Data and Sync]] for sync setup.
 **Other Options:**
 - **Sync** — Manually trigger sync
 - **Last sync status** — View when data was last synced
+- **Sync history** — Collapsed by default; tap to expand recent entries
 - **Export Backup** — Save data to a file
 - **Settings sync options** — Choose which preferences sync across devices (theme, language/date format, external calendar URLs, AI settings). API keys and local model paths are never synced.
 

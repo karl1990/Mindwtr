@@ -23,8 +23,8 @@ Mindwtr is a cross-platform GTD application with:
 │                     @mindwtr/core                        │
 │    Zustand Store · Types · i18n · Utils · Sync          │
 ├─────────────────────────────┬───────────────────────────┤
-│    Tauri FS (Rust)          │     AsyncStorage          │
-│    Local JSON file          │     App storage           │
+│    Tauri FS (Rust)          │   SQLite + JSON backup    │
+│    SQLite + JSON backup     │     App storage           │
 └──────────────┬──────────────┴───────────────────────────┘
                │
 ┌──────────────▼──────────────┐
@@ -243,7 +243,7 @@ The store uses injected storage adapters:
 // Desktop: Tauri file system
 setStorageAdapter(tauriStorage);
 
-// Mobile: AsyncStorage or FileSystem
+// Mobile: SQLite (with JSON backup fallback)
 setStorageAdapter(mobileStorage);
 ```
 

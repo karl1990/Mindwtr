@@ -167,7 +167,8 @@ After each sync, Mindwtr stores sync stats in settings:
 - **Clock skew**: max observed timestamp skew between devices
 - **Timestamp fixes**: when `updatedAt < createdAt`, timestamps are corrected during merge
 
-You can see these details in **Settings → Sync** (desktop and mobile). Large skew values usually indicate device clocks are out of sync.
+You can see these details in **Settings → Sync** (desktop and mobile). Large skew values usually indicate device clocks are out of sync.  
+On mobile, sync history entries are collapsed by default; tap to expand.
 
 ### Attachment Sync & Cleanup
 
@@ -205,7 +206,7 @@ Mindwtr will automatically sync on startup and when data changes.
 
 ## Mobile Sync Setup
 
-Mobile sync requires manually selecting a sync file due to Android/iOS storage restrictions.
+Mobile sync requires manually selecting a sync folder due to Android/iOS storage restrictions.
 
 ### 1. Export Your Data First
 
@@ -213,7 +214,7 @@ Mobile sync requires manually selecting a sync file due to Android/iOS storage r
 2. Tap **Export Backup**
 3. Save the file to your sync folder (e.g., Google Drive)
 
-### 2. Select Sync File
+### 2. Select Sync Folder
 
 1. In **Settings → Data & Sync**
 2. Tap **Select Folder**
@@ -249,7 +250,7 @@ This preserves Dropbox/Syncthing/WebDAV workflows while improving speed and data
 **Initial setup:**
 1. Set up desktop with sync folder
 2. Export backup, save to sync folder
-3. On mobile, select that file
+3. On mobile, select that folder
 
 **Daily use:**
 1. Make changes on Device A
