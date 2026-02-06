@@ -9,6 +9,7 @@ const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`([^`]+)`/g;
 const LINK_RE = /\[([^\]]+)\]\(([^)]+)\)/g;
 const INLINE_TOKEN_RE = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
+const TASK_LIST_RE = /^\s{0,3}(?:[-*+]\s+)?\[( |x|X)\]\s+(.+)$/;
 
 export type InlineToken =
     | { type: 'text'; text: string }
@@ -16,6 +17,11 @@ export type InlineToken =
     | { type: 'italic'; text: string }
     | { type: 'code'; text: string }
     | { type: 'link'; text: string; href: string };
+
+export type MarkdownChecklistItem = {
+    title: string;
+    isCompleted: boolean;
+};
 
 const sanitizeLinkHref = (href: string): string | null => {
     const trimmed = href.trim();
@@ -98,6 +104,7 @@ export function stripMarkdown(markdown: string): string {
     text = text.replace(LINK_RE, '$1');
 
     // Remove block-level markers.
+    text = text.replace(/^\s{0,3}(?:[-*+]\s+)?\[(?: |x|X)\]\s+/gm, '');
     text = text.replace(/^\s{0,3}>\s?/gm, '');
     text = text.replace(/^\s{0,3}#{1,6}\s+/gm, '');
     text = text.replace(/^\s{0,3}[-*+]\s+/gm, '');
@@ -114,4 +121,21 @@ export function stripMarkdown(markdown: string): string {
     text = text.replace(/[ \t]{2,}/g, ' ');
 
     return text.trim();
+}
+
+export function extractChecklistFromMarkdown(markdown: string): MarkdownChecklistItem[] {
+    if (!markdown) return [];
+    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    const items: MarkdownChecklistItem[] = [];
+    for (const line of lines) {
+        const match = TASK_LIST_RE.exec(line);
+        if (!match) continue;
+        const title = match[2]?.trim();
+        if (!title) continue;
+        items.push({
+            title,
+            isCompleted: match[1].toLowerCase() === 'x',
+        });
+    }
+    return items;
 }

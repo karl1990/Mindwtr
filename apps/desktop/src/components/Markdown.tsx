@@ -3,6 +3,9 @@ import React from 'react';
 import { parseInlineMarkdown } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 
+const TASK_LIST_RE = /^\s{0,3}(?:[-*+]\s+)?\[( |x|X)\]\s+(.+)$/;
+const BULLET_LIST_RE = /^\s{0,3}[-*+]\s+(.+)$/;
+
 function isSafeLink(href: string): boolean {
     try {
         const url = new URL(href);
@@ -92,17 +95,47 @@ export function Markdown({ markdown, className }: { markdown: string; className?
             continue;
         }
 
-        const listMatch = /^[-*]\s+(.+)$/.exec(line);
+        const taskListMatch = TASK_LIST_RE.exec(line);
+        if (taskListMatch) {
+            const items: { checked: boolean; text: string }[] = [];
+            const start = i;
+            while (i < lines.length) {
+                const m = TASK_LIST_RE.exec(lines[i]);
+                if (!m) break;
+                items.push({ checked: m[1].toLowerCase() === 'x', text: m[2] });
+                i += 1;
+            }
+            blocks.push(
+                <ul key={`task-ul-${start}`} className="space-y-1 pl-1">
+                    {items.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                            <input
+                                type="checkbox"
+                                checked={item.checked}
+                                readOnly
+                                disabled
+                                className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+                            />
+                            <span>{renderInline(item.text)}</span>
+                        </li>
+                    ))}
+                </ul>
+            );
+            continue;
+        }
+
+        const listMatch = BULLET_LIST_RE.exec(line);
         if (listMatch) {
             const items: string[] = [];
+            const start = i;
             while (i < lines.length) {
-                const m = /^[-*]\s+(.+)$/.exec(lines[i]);
+                const m = BULLET_LIST_RE.exec(lines[i]);
                 if (!m) break;
                 items.push(m[1]);
                 i += 1;
             }
             blocks.push(
-                <ul key={`ul-${i}`} className="list-disc pl-5 space-y-1">
+                <ul key={`ul-${start}`} className="list-disc pl-5 space-y-1">
                     {items.map((item, idx) => (
                         <li key={idx}>{renderInline(item)}</li>
                     ))}

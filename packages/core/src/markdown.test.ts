@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripMarkdown } from './markdown';
+import { extractChecklistFromMarkdown, stripMarkdown } from './markdown';
 
 describe('stripMarkdown', () => {
     it('removes common markdown markers', () => {
@@ -12,5 +12,25 @@ describe('stripMarkdown', () => {
         expect(output).not.toContain('`');
         expect(output).not.toContain('[');
     });
+
+    it('removes markdown checklist and list markers', () => {
+        const input = '- [x] Done item\n[ ] Todo item\n+ Plain bullet';
+        const output = stripMarkdown(input);
+        expect(output).toContain('Done item');
+        expect(output).toContain('Todo item');
+        expect(output).toContain('Plain bullet');
+        expect(output).not.toContain('[x]');
+        expect(output).not.toContain('[ ]');
+    });
 });
 
+describe('extractChecklistFromMarkdown', () => {
+    it('extracts markdown task list items', () => {
+        const input = '- [x] Done item\n[ ] Todo item\n+ [X] Another done\n- plain bullet';
+        expect(extractChecklistFromMarkdown(input)).toEqual([
+            { title: 'Done item', isCompleted: true },
+            { title: 'Todo item', isCompleted: false },
+            { title: 'Another done', isCompleted: true },
+        ]);
+    });
+});

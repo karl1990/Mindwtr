@@ -1015,7 +1015,7 @@ export default function SettingsPage() {
                 await AsyncStorage.multiSet([
                     [SYNC_BACKEND_KEY, 'webdav'],
                     [WEBDAV_URL_KEY, webdavUrl.trim()],
-                    [WEBDAV_USERNAME_KEY, webdavUsername],
+                    [WEBDAV_USERNAME_KEY, webdavUsername.trim()],
                     [WEBDAV_PASSWORD_KEY, webdavPassword],
                 ]);
             } else if (syncBackend === 'cloud') {
@@ -3038,7 +3038,6 @@ export default function SettingsPage() {
                                         { borderColor: tc.border, backgroundColor: syncBackend === 'webdav' ? tc.filterBg : 'transparent' },
                                     ]}
                                     onPress={() => {
-                                        AsyncStorage.setItem(SYNC_BACKEND_KEY, 'webdav').catch(logSettingsError);
                                         setSyncBackend('webdav');
                                     }}
                                 >
@@ -3220,6 +3219,8 @@ export default function SettingsPage() {
                                         onChangeText={setWebdavPassword}
                                         placeholder="••••••••"
                                         placeholderTextColor={tc.secondaryText}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
                                         secureTextEntry
                                         style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
                                     />
@@ -3246,7 +3247,7 @@ export default function SettingsPage() {
                                         AsyncStorage.multiSet([
                                             [SYNC_BACKEND_KEY, 'webdav'],
                                             [WEBDAV_URL_KEY, webdavUrl.trim()],
-                                            [WEBDAV_USERNAME_KEY, webdavUsername],
+                                            [WEBDAV_USERNAME_KEY, webdavUsername.trim()],
                                             [WEBDAV_PASSWORD_KEY, webdavPassword],
                                         ]).then(() => {
                                             Alert.alert(localize('Success', '成功'), t('settings.webdavSave'));

@@ -5,6 +5,9 @@ import * as Linking from 'expo-linking';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { parseInlineMarkdown } from '@mindwtr/core';
 
+const TASK_LIST_RE = /^\s{0,3}(?:[-*+]\s+)?\[( |x|X)\]\s+(.+)$/;
+const BULLET_LIST_RE = /^\s{0,3}[-*+]\s+(.+)$/;
+
 function isSafeLink(href: string): boolean {
   return /^https?:\/\//i.test(href) || /^mailto:/i.test(href);
 }
@@ -97,20 +100,48 @@ export function MarkdownText({
       continue;
     }
 
-    const listMatch = /^[-*]\s+(.+)$/.exec(line);
+    const taskListMatch = TASK_LIST_RE.exec(line);
+    if (taskListMatch) {
+      const items: { checked: boolean; text: string }[] = [];
+      const start = i;
+      while (i < lines.length) {
+        const m = TASK_LIST_RE.exec(lines[i]);
+        if (!m) break;
+        items.push({ checked: m[1].toLowerCase() === 'x', text: m[2] });
+        i += 1;
+      }
+      blocks.push(
+        <View key={`task-ul-${start}`} style={styles.list}>
+          {items.map((item, idx) => (
+            <View key={idx} style={styles.taskListRow}>
+              <Text style={[styles.taskListMarker, { color: tc.secondaryText }]}>
+                {item.checked ? '☑' : '☐'}
+              </Text>
+              <Text style={[styles.paragraph, styles.taskListText, { color: tc.text }, directionStyle]}>
+                {renderInline(item.text, tc, `task-li-${start}-${idx}`)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      );
+      continue;
+    }
+
+    const listMatch = BULLET_LIST_RE.exec(line);
     if (listMatch) {
       const items: string[] = [];
+      const start = i;
       while (i < lines.length) {
-        const m = /^[-*]\s+(.+)$/.exec(lines[i]);
+        const m = BULLET_LIST_RE.exec(lines[i]);
         if (!m) break;
         items.push(m[1]);
         i += 1;
       }
       blocks.push(
-        <View key={`ul-${i}`} style={styles.list}>
+        <View key={`ul-${start}`} style={styles.list}>
           {items.map((item, idx) => (
             <Text key={idx} style={[styles.paragraph, { color: tc.text }, directionStyle]}>
-              • {renderInline(item, tc, `li-${i}-${idx}`)}
+              • {renderInline(item, tc, `li-${start}-${idx}`)}
             </Text>
           ))}
         </View>
@@ -151,6 +182,18 @@ const styles = StyleSheet.create({
   list: {
     gap: 4,
     paddingLeft: 6,
+  },
+  taskListRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  taskListMarker: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  taskListText: {
+    flexShrink: 1,
   },
   bold: {
     fontWeight: '700',

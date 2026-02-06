@@ -31,6 +31,23 @@ const logSyncInfo = (message: string, extra?: Record<string, string>) => {
   void logInfo(message, { scope: 'sync', extra });
 };
 
+const formatSyncErrorMessage = (error: unknown, backend: SyncBackend): string => {
+  const raw = sanitizeLogMessage(String(error));
+  if (backend !== 'webdav') return raw;
+
+  const status = typeof error === 'object' && error !== null && 'status' in error
+    ? Number((error as { status?: unknown }).status)
+    : undefined;
+  const unauthorized = status === 401 || /\(401\)/.test(raw) || /\b401\b/.test(raw);
+  if (unauthorized) {
+    return 'WebDAV unauthorized (401). Check folder URL, username, and app password.';
+  }
+  if (raw.includes('WebDAV URL not configured')) {
+    return 'WebDAV folder URL is not configured. Save WebDAV settings first.';
+  }
+  return raw;
+};
+
 const externalCalendarProvider = {
   load: () => getExternalCalendars(),
   save: (calendars: AppData['settings']['externalCalendars'] | undefined) =>
@@ -350,7 +367,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       const now = new Date().toISOString();
       const logPath = await logSyncError(error, { backend, step, url: syncUrl });
       const logHint = logPath ? ` (log: ${logPath})` : '';
-      const safeMessage = sanitizeLogMessage(String(error));
+      const safeMessage = formatSyncErrorMessage(error, backend);
       const nextHistory = appendSyncHistory(useTaskStore.getState().settings, {
         at: now,
         status: 'error',

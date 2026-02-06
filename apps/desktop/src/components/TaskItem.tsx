@@ -13,6 +13,7 @@ import {
     PRESET_CONTEXTS,
     PRESET_TAGS,
     parseQuickAdd,
+    extractChecklistFromMarkdown,
 } from '@mindwtr/core';
 import { cn } from '../lib/utils';
 import { PromptModal } from './PromptModal';
@@ -64,6 +65,49 @@ interface TaskItemProps {
     enableDoubleClickEdit?: boolean;
     showHoverHint?: boolean;
 }
+
+const normalizeChecklistKey = (value: string): string => value.trim().toLowerCase();
+
+const mergeMarkdownChecklist = (
+    markdownItems: { title: string; isCompleted: boolean }[],
+    checklist: Task['checklist'],
+): Task['checklist'] => {
+    const current = checklist || [];
+    const remainingByTitle = new Map<string, { id: string; title: string; isCompleted: boolean }[]>();
+    for (const item of current) {
+        if (!item?.title) continue;
+        const key = normalizeChecklistKey(item.title);
+        const bucket = remainingByTitle.get(key);
+        if (bucket) {
+            bucket.push(item);
+        } else {
+            remainingByTitle.set(key, [item]);
+        }
+    }
+
+    const usedIds = new Set<string>();
+    const merged: NonNullable<Task['checklist']> = [];
+    for (const item of markdownItems) {
+        const key = normalizeChecklistKey(item.title);
+        const bucket = remainingByTitle.get(key) || [];
+        const reusable = bucket.find((entry) => !usedIds.has(entry.id));
+        if (reusable) {
+            usedIds.add(reusable.id);
+        }
+        merged.push({
+            id: reusable?.id ?? generateUUID(),
+            title: item.title,
+            isCompleted: item.isCompleted,
+        });
+    }
+
+    for (const item of current) {
+        if (!item?.id || usedIds.has(item.id)) continue;
+        merged.push(item);
+    }
+
+    return merged;
+};
 
 export const TaskItem = memo(function TaskItem({
     task,
@@ -725,6 +769,10 @@ export const TaskItem = memo(function TaskItem({
         const resolvedDescription = parsedProps.description
             ? (editDescription ? `${editDescription}\n${parsedProps.description}` : parsedProps.description)
             : (editDescription || undefined);
+        const markdownChecklist = extractChecklistFromMarkdown(String(resolvedDescription ?? ''));
+        const resolvedChecklist = markdownChecklist.length > 0
+            ? mergeMarkdownChecklist(markdownChecklist, task.checklist)
+            : undefined;
         const projectChangedByCommand = hasProjectCommand && resolvedProjectId !== (editProjectId || undefined);
         const resolvedSectionId = projectChangedByCommand
             ? undefined
@@ -743,6 +791,7 @@ export const TaskItem = memo(function TaskItem({
             contexts: mergedContexts,
             tags: mergedTags,
             description: resolvedDescription,
+            ...(resolvedChecklist ? { checklist: resolvedChecklist } : {}),
             textDirection: nextTextDirection,
             location: editLocation || undefined,
             recurrence: recurrenceValue,

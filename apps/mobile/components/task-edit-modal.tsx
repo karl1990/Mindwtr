@@ -28,6 +28,7 @@ import {
     resolveTextDirection,
     validateAttachmentForUpload,
     parseQuickAdd,
+    extractChecklistFromMarkdown,
 } from '@mindwtr/core';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -89,6 +90,14 @@ const logTaskError = (message: string, error?: unknown) => {
     const err = error instanceof Error ? error : new Error(message);
     void logError(err, { scope: 'task', extra: buildTaskExtra(message, error) });
 };
+const isReleasedAudioPlayerError = (error: unknown): boolean => {
+    const message = formatError(error).toLowerCase();
+    return (
+        message.includes('already released')
+        || message.includes('cannot use shared object')
+        || message.includes('cannot be cast to type expo.modules.audio.audioplayer')
+    );
+};
 const COMPACT_STATUS_LABELS: Record<TaskStatus, string> = {
     inbox: 'Inbox',
     next: 'Next',
@@ -97,6 +106,52 @@ const COMPACT_STATUS_LABELS: Record<TaskStatus, string> = {
     reference: 'Ref',
     done: 'Done',
     archived: 'Archived',
+};
+
+const normalizeChecklistKey = (value: string): string => value.trim().toLowerCase();
+
+const applyMarkdownChecklistToTask = (
+    description: string | undefined,
+    checklist: Task['checklist'],
+): Task['checklist'] => {
+    const markdownItems = extractChecklistFromMarkdown(String(description ?? ''));
+    if (markdownItems.length === 0) return checklist;
+
+    const current = checklist || [];
+    const remainingByTitle = new Map<string, { id: string; title: string; isCompleted: boolean }[]>();
+    for (const item of current) {
+        if (!item?.title) continue;
+        const key = normalizeChecklistKey(item.title);
+        const bucket = remainingByTitle.get(key);
+        if (bucket) {
+            bucket.push(item);
+        } else {
+            remainingByTitle.set(key, [item]);
+        }
+    }
+
+    const usedIds = new Set<string>();
+    const merged: NonNullable<Task['checklist']> = [];
+    for (const item of markdownItems) {
+        const key = normalizeChecklistKey(item.title);
+        const bucket = remainingByTitle.get(key) || [];
+        const reusable = bucket.find((entry) => !usedIds.has(entry.id));
+        if (reusable) {
+            usedIds.add(reusable.id);
+        }
+        merged.push({
+            id: reusable?.id ?? generateUUID(),
+            title: item.title,
+            isCompleted: item.isCompleted,
+        });
+    }
+
+    for (const item of current) {
+        if (!item?.id || usedIds.has(item.id)) continue;
+        merged.push(item);
+    }
+
+    return merged;
 };
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
@@ -174,6 +229,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     const [audioLoading, setAudioLoading] = useState(false);
     const audioPlayer = useAudioPlayer(null, { updateInterval: 500 });
     const audioStatus = useAudioPlayerStatus(audioPlayer);
+    const audioLoadedRef = useRef(false);
+    const audioStoppingRef = useRef(false);
     const [showProjectPicker, setShowProjectPicker] = useState(false);
     const [showSectionPicker, setShowSectionPicker] = useState(false);
     const [linkInput, setLinkInput] = useState('');
@@ -458,6 +515,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             contexts: mergedContexts,
             tags: mergedTags,
         };
+        updates.checklist = applyMarkdownChecklistToTask(resolvedDescription, updates.checklist);
         if (parsedProps.status) updates.status = parsedProps.status;
         if (parsedProps.dueDate) updates.dueDate = parsedProps.dueDate;
         if (hasProjectCommand && resolvedProjectId && resolvedProjectId !== existingProjectId) {
@@ -713,10 +771,18 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     };
 
     const unloadAudio = useCallback(async () => {
+        if (audioStoppingRef.current) return;
+        if (!audioLoadedRef.current) return;
+        audioStoppingRef.current = true;
         try {
-            audioPlayer.pause();
+            await Promise.resolve(audioPlayer.pause());
         } catch (error) {
-            logTaskWarn('Stop audio failed', error);
+            if (!isReleasedAudioPlayerError(error)) {
+                logTaskWarn('Stop audio failed', error);
+            }
+        } finally {
+            audioLoadedRef.current = false;
+            audioStoppingRef.current = false;
         }
     }, [audioPlayer]);
 
@@ -772,8 +838,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                 return;
             }
             audioPlayer.replace({ uri: normalizedUri });
-            audioPlayer.play();
+            audioLoadedRef.current = true;
+            await Promise.resolve(audioPlayer.play());
         } catch (error) {
+            audioLoadedRef.current = false;
             logTaskError('Failed to play audio attachment', error);
             Alert.alert(t('quickAdd.audioErrorTitle'), t('quickAdd.audioErrorBody'));
             setAudioModalVisible(false);
@@ -791,14 +859,18 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
     }, [unloadAudio]);
 
     const toggleAudioPlayback = useCallback(async () => {
-        if (!audioStatus?.isLoaded) return;
+        if (!audioStatus?.isLoaded || !audioLoadedRef.current) return;
         try {
             if (audioStatus.playing) {
-                audioPlayer.pause();
+                await Promise.resolve(audioPlayer.pause());
             } else {
-                audioPlayer.play();
+                await Promise.resolve(audioPlayer.play());
             }
         } catch (error) {
+            if (isReleasedAudioPlayerError(error)) {
+                audioLoadedRef.current = false;
+                return;
+            }
             logTaskWarn('Toggle audio playback failed', error);
         }
     }, [audioPlayer, audioStatus]);
@@ -887,6 +959,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             closeAudioModal();
         }
     }, [closeAudioModal, visible]);
+
+    useEffect(() => {
+        if (!audioStatus?.isLoaded) {
+            audioLoadedRef.current = false;
+        }
+    }, [audioStatus?.isLoaded]);
 
     useEffect(() => {
         return () => {
