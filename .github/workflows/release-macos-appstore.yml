@@ -17,7 +17,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-apple-darwin,aarch64-apple-darwin
+          targets: x86_64-apple-darwin
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -123,7 +123,7 @@ jobs:
           set -euo pipefail
           cd apps/desktop
           cargo tauri build \
-            --target universal-apple-darwin \
+            --target x86_64-apple-darwin \
             --bundles app \
             --config src-tauri/tauri.appstore.conf.json
 
@@ -133,7 +133,7 @@ jobs:
           MAS_INSTALLER_SIGNING_IDENTITY: ${{ secrets.MAS_INSTALLER_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          APP_PATH="$(find apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' | head -n 1)"
+          APP_PATH="$(find apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' | head -n 1)"
           if [ -z "${APP_PATH:-}" ]; then
             echo "::error::Built .app bundle not found"
             exit 1
@@ -145,7 +145,9 @@ jobs:
             exit 1
           fi
 
-          PKG_DIR="apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/pkg"
+          APP_BUNDLE_DIR="$(dirname "$APP_PATH")"
+          BUNDLE_DIR="$(dirname "$APP_BUNDLE_DIR")"
+          PKG_DIR="$BUNDLE_DIR/pkg"
           PKG_PATH="$PKG_DIR/Mindwtr-mac-appstore.pkg"
           mkdir -p "$PKG_DIR"
 
@@ -159,7 +161,6 @@ jobs:
 
       - name: Upload to App Store Connect
         env:
-          MAS_APP_PASSWORD: ${{ secrets.MAS_APP_PASSWORD }}
           MAS_APPLE_ID: ${{ secrets.MAS_APPLE_ID }}
           MAS_APPLE_PASSWORD: ${{ secrets.MAS_APPLE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -167,9 +168,9 @@ jobs:
         run: |
           set -euo pipefail
           UPLOAD_APPLE_ID="${MAS_APPLE_ID:-${APPLE_ID:-}}"
-          UPLOAD_APPLE_PASSWORD="${MAS_APP_PASSWORD:-${MAS_APPLE_PASSWORD:-${APPLE_PASSWORD:-}}}"
+          UPLOAD_APPLE_PASSWORD="${MAS_APPLE_PASSWORD:-${APPLE_PASSWORD:-}}"
           if [ -z "${UPLOAD_APPLE_ID:-}" ] || [ -z "${UPLOAD_APPLE_PASSWORD:-}" ]; then
-            echo "::error::Missing upload credentials. Set MAS_APPLE_ID + MAS_APP_PASSWORD (or MAS_APPLE_PASSWORD / APPLE_PASSWORD)."
+            echo "::error::Missing upload credentials. Set APPLE_ID + APPLE_PASSWORD (or MAS_APPLE_ID / MAS_APPLE_PASSWORD)."
             exit 1
           fi
           if [ -z "${PKG_PATH:-}" ] || [ ! -f "$PKG_PATH" ]; then
