@@ -111,10 +111,15 @@ function RootLayoutContent() {
   useEffect(() => {
     setNotificationOpenHandler((payload) => {
       const taskId = typeof payload?.taskId === 'string' ? payload.taskId : undefined;
+      const projectId = typeof payload?.projectId === 'string' ? payload.projectId : undefined;
       if (taskId) {
         useTaskStore.getState().setHighlightTask(taskId);
         const openToken = typeof payload?.notificationId === 'string' ? payload.notificationId : String(Date.now());
         router.push({ pathname: '/focus', params: { taskId, openToken } });
+        return;
+      }
+      if (projectId) {
+        router.push({ pathname: '/projects-screen', params: { projectId } });
         return;
       }
       router.push('/review');
