@@ -61,15 +61,17 @@ const injectExternalCalendars = async (data: AppData): Promise<AppData> =>
 const persistExternalCalendars = async (data: AppData): Promise<void> =>
   persistExternalCalendarsForSync(data, externalCalendarProvider);
 
+const cloneAppData = (data: AppData): AppData => JSON.parse(JSON.stringify(data)) as AppData;
+
 const getInMemoryAppDataSnapshot = (): AppData => {
   const state = useTaskStore.getState();
-  return {
+  return cloneAppData({
     tasks: state._allTasks ?? state.tasks ?? [],
     projects: state._allProjects ?? state.projects ?? [],
     sections: state._allSections ?? state.sections ?? [],
     areas: state._allAreas ?? state.areas ?? [],
     settings: state.settings ?? {},
-  };
+  });
 };
 
 const shouldRunAttachmentCleanup = (lastCleanupAt?: string): boolean => {
@@ -288,8 +290,10 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         step = 'attachments';
         logSyncInfo('Sync step', { step });
         const baseSyncUrl = getBaseSyncUrl(webdavConfigValue.url);
-        const mutated = await syncWebdavAttachments(mergedData, webdavConfigValue, baseSyncUrl);
+        const candidateData = cloneAppData(mergedData);
+        const mutated = await syncWebdavAttachments(candidateData, webdavConfigValue, baseSyncUrl);
         if (mutated) {
+          mergedData = candidateData;
           await mobileStorage.saveData(mergedData);
           wroteLocal = true;
         }
@@ -299,8 +303,10 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         step = 'attachments';
         logSyncInfo('Sync step', { step });
         const baseSyncUrl = getCloudBaseUrl(cloudConfigValue.url);
-        const mutated = await syncCloudAttachments(mergedData, cloudConfigValue, baseSyncUrl);
+        const candidateData = cloneAppData(mergedData);
+        const mutated = await syncCloudAttachments(candidateData, cloudConfigValue, baseSyncUrl);
         if (mutated) {
+          mergedData = candidateData;
           await mobileStorage.saveData(mergedData);
           wroteLocal = true;
         }
@@ -309,8 +315,10 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       if (backend === 'file' && fileSyncPath) {
         step = 'attachments';
         logSyncInfo('Sync step', { step });
-        const mutated = await syncFileAttachments(mergedData, fileSyncPath);
+        const candidateData = cloneAppData(mergedData);
+        const mutated = await syncFileAttachments(candidateData, fileSyncPath);
         if (mutated) {
+          mergedData = candidateData;
           await mobileStorage.saveData(mergedData);
           wroteLocal = true;
         }

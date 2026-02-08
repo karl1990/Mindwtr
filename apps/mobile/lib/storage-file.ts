@@ -72,7 +72,7 @@ async function readFileText(fileUri: string): Promise<string | null> {
 
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
     if (!fileInfo.exists) {
-        console.log('[Sync] File does not exist:', fileUri);
+        void logInfo('Sync file does not exist', { scope: 'sync', extra: { fileUri } });
         return null;
     }
     return await FileSystem.readAsStringAsync(fileUri);
@@ -250,7 +250,7 @@ export const writeSyncFile = async (fileUri: string, data: AppData): Promise<voi
         // SAF URIs (content://) require special handling on Android
         if (fileUri.startsWith('content://') && StorageAccessFramework) {
             await StorageAccessFramework.writeAsStringAsync(fileUri, content);
-            console.log('[Sync] Written via SAF to:', fileUri);
+            void logInfo('Written sync file via SAF', { scope: 'sync', extra: { fileUri } });
         } else {
             const tempUri = `${fileUri}.tmp`;
             await FileSystem.writeAsStringAsync(tempUri, content);
@@ -259,7 +259,7 @@ export const writeSyncFile = async (fileUri: string, data: AppData): Promise<voi
                 await FileSystem.deleteAsync(fileUri, { idempotent: true });
             }
             await FileSystem.moveAsync({ from: tempUri, to: fileUri });
-            console.log('[Sync] Written to sync file:', fileUri);
+            void logInfo('Written sync file', { scope: 'sync', extra: { fileUri } });
         }
     } catch (error) {
         void logError(error, { scope: 'sync', extra: { operation: 'write', message: 'Failed to write sync file' } });
@@ -277,10 +277,15 @@ export const exportData = async (data: AppData): Promise<void> => {
         // On Android, try SAF to let user pick save location
         if (Platform.OS === 'android' && StorageAccessFramework) {
             try {
-                console.log('[Export] Attempting SAF...');
+                void logInfo('Export attempting SAF', { scope: 'sync' });
                 // Request permission to a directory
                 const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-                console.log('[Export] SAF permissions:', permissions);
+                void logInfo('Export SAF permissions', {
+                    scope: 'sync',
+                    extra: {
+                        granted: String(Boolean(permissions?.granted)),
+                    },
+                });
 
                 if (permissions.granted) {
                     // Create the file in the selected directory
@@ -291,19 +296,28 @@ export const exportData = async (data: AppData): Promise<void> => {
                     );
 
                     await StorageAccessFramework.writeAsStringAsync(fileUri, jsonContent);
-                    console.log('[Export] Saved via SAF to:', fileUri);
+                    void logInfo('Export saved via SAF', { scope: 'sync', extra: { fileUri } });
                     return;
                 }
             } catch (safError) {
-                console.log('[Export] SAF not available (Expo Go?), using share:', safError);
+                void logWarn('Export SAF unavailable; falling back to share', {
+                    scope: 'sync',
+                    extra: { error: safError instanceof Error ? safError.message : String(safError) },
+                });
             }
         } else {
-            console.log('[Export] SAF not available, Platform:', Platform.OS, 'SAF:', !!StorageAccessFramework);
+            void logInfo('Export SAF unavailable on this platform', {
+                scope: 'sync',
+                extra: {
+                    platform: Platform.OS,
+                    hasSaf: String(Boolean(StorageAccessFramework)),
+                },
+            });
         }
 
         // Fallback: Use cache + share sheet
         const fileUri = FileSystem.cacheDirectory + filename;
-        console.log('[Export] Writing to cache:', fileUri);
+        void logInfo('Export writing backup to cache before share', { scope: 'sync', extra: { fileUri } });
         await FileSystem.writeAsStringAsync(fileUri, jsonContent);
 
         const sharingAvailable = await Sharing.isAvailableAsync();
