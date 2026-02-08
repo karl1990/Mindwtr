@@ -364,7 +364,7 @@ export function AgendaView() {
                     {title}
                     <span className="text-muted-foreground font-normal">({tasks.length})</span>
                 </h3>
-                <div className="space-y-2">
+                <div className="divide-y divide-border/30">
                     {tasks.map(task => (
                         <TaskItem
                             key={task.id}
@@ -596,7 +596,7 @@ export function AgendaView() {
                     <div className="space-y-2">
                         <h3 className="font-semibold">{t('agenda.top3Title')}</h3>
                         {top3Tasks.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="divide-y divide-border/30">
                                 {top3Tasks.map(task => (
                                     <TaskItem
                                         key={task.id}
@@ -634,7 +634,7 @@ export function AgendaView() {
                         </h3>
 
                         {focusedTasks.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="divide-y divide-border/30">
                                 {focusedTasks.map(task => (
                                     <TaskItem
                                         key={task.id}

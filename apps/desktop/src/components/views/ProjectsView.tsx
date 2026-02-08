@@ -504,7 +504,7 @@ export function ProjectsView() {
 
     const renderSortableTasks = (list: Task[]) => (
         <SortableContext items={list.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
+            <div className="divide-y divide-border/30">
                 {list.map((task) => (
                     <SortableProjectTaskRow key={task.id} task={task} project={selectedProject!} />
                 ))}

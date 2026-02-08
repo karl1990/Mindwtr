@@ -189,7 +189,7 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
             );
         }
         return (
-            <div className="space-y-2">
+            <div className="divide-y divide-border/30">
                 {list.slice(0, 10).map((task) => (
                     <TaskItem key={task.id} task={task} showProjectBadgeInActions={false} />
                 ))}

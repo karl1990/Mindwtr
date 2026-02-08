@@ -162,7 +162,7 @@ export function ContextsView() {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                <div className="flex-1 overflow-y-auto divide-y divide-border/30 pr-2">
                     {filteredTasks.length > 0 ? (
                         filteredTasks.map(task => (
                             <TaskItem key={task.id} task={task} showProjectBadgeInActions={false} />

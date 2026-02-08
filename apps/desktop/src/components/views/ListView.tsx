@@ -875,7 +875,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                         transform: `translateY(${virtualRow.start}px)`,
                                     }}
                                 >
-                                    <div className={cn(isCompact ? "pb-2" : "pb-3")}>
+                                    <div className={cn(isCompact ? "pb-1" : "pb-1.5")}>
                                         <TaskItem
                                             key={task.id}
                                             task={task}
@@ -890,13 +890,14 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                             compactMetaEnabled={showListDetails}
                                             showProjectBadgeInActions={false}
                                         />
+                                        <div className="mx-3 mt-1 h-px bg-border/30" />
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
                 ) : (
-                    <div className={cn(isCompact ? "space-y-2" : "space-y-3")}>
+                    <div className="divide-y divide-border/30">
                         {filteredTasks.map((task, index) => (
                             <TaskItem
                                 key={task.id}
