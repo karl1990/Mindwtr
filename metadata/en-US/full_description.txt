@@ -1,0 +1,27 @@
+Mindwtr is a local-first productivity system built for the Getting Things Done (GTD) methodology. It is designed to be simple by default and powerful when you need it, focusing on reducing cognitive load to keep you in flow.
+
+FEATURES:
+
+• Capture: Quick add tasks from anywhere (global hotkey, share sheet, voice)
+• Clarify: Guided inbox processing with 2-minute rule
+• Organize: Projects, contexts, and status lists
+• Reflect: Weekly review wizard with reminders
+• Engage: Context-filtered next actions
+
+VIEWS:
+
+• Inbox: Capture zone with processing wizard
+• Focus: Agenda (time-based) + Next Actions in one view
+• Projects: Multi-step outcomes with areas
+• Contexts: Hierarchical contexts (@work/meetings)
+• Waiting For: Delegated items
+• Someday/Maybe: Deferred ideas
+• Calendar: Time-based planning
+• Board: Kanban-style drag-and-drop
+
+PRODUCTIVITY & DATA:
+
+• Global Search: Search operators (status:, context:, due:<=7d)
+• Privacy Focused: Local-first data with support for file sync (Dropbox, Syncthing) and WebDAV
+• Pomodoro: Optional focus timer
+• Audio Capture: Voice notes with transcription
