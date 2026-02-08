@@ -13,7 +13,7 @@ import {
     type TaskStatus,
     type AIProviderId,
 } from '@mindwtr/core';
-import { Archive, ArrowRight, Calendar, Check, CheckSquare, Layers, RefreshCw, Sparkles, X, type LucideIcon } from 'lucide-react';
+import { Archive, ArrowRight, Calendar, Check, CheckSquare, ChevronLeft, Layers, RefreshCw, Sparkles, X, type LucideIcon } from 'lucide-react';
 
 import { TaskItem } from '../../TaskItem';
 import { cn } from '../../../lib/utils';
@@ -517,37 +517,37 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                 className="bg-card border border-border rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[85vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="p-6 border-b border-border flex items-center justify-between">
-                    <h3 className="text-xl font-semibold flex items-center gap-2">
-                        <RefreshCw className="w-5 h-5 text-primary" />
+                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                    <h3 className="text-[15px] font-semibold flex items-center gap-2.5">
+                        <RefreshCw className="w-4 h-4 text-primary" />
                         {t('review.title')}
                     </h3>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
                         aria-label={t('common.close')}
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <div className="p-6 flex flex-col flex-1 min-h-0">
-                    <div className="mb-6">
+                <div className="p-5 flex flex-col flex-1 min-h-0">
+                    <div className="mb-5">
                         <div className="flex items-center justify-between mb-3">
-                            <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <h1 className="text-lg font-semibold flex items-center gap-2">
                                 {(() => {
                                     const Icon = steps[currentStepIndex].icon;
-                                    return Icon && <Icon className="w-6 h-6" />;
+                                    return Icon && <Icon className="w-[18px] h-[18px] text-primary" />;
                                 })()}
                                 {steps[currentStepIndex].title}
                             </h1>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                                 {t('review.step')} {currentStepIndex + 1} {t('review.of')} {steps.length}
                             </span>
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-1 bg-muted rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-primary transition-all duration-500 ease-in-out"
+                                className="h-full bg-primary transition-all duration-500 ease-in-out rounded-full"
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
@@ -558,18 +558,18 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                     </div>
 
                     {currentStep !== 'intro' && currentStep !== 'completed' && (
-                        <div className="flex justify-between pt-4 border-t border-border mt-6">
+                        <div className="flex justify-between items-center pt-3.5 border-t border-border mt-5">
                             <button
                                 onClick={prevStep}
-                                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                             >
-                                {t('review.back')}
+                                <ChevronLeft className="w-3.5 h-3.5" /> {t('review.back')}
                             </button>
                             <button
                                 onClick={nextStep}
-                                className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                                className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
                             >
-                                {t('review.nextStepBtn')}
+                                {t('review.nextStepBtn')} <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     )}

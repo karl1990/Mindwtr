@@ -65,11 +65,11 @@ function DroppableColumn({
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col h-full ${columnMinWidth} flex-1 bg-muted/30 rounded-lg border border-border/50 border-t-4 ${columnPadding} ${STATUS_BORDER[id]}`}
+            className={`flex flex-col h-full ${columnMinWidth} flex-1 bg-muted/20 rounded-xl border border-border/30 border-t-[3px] ${columnPadding} ${STATUS_BORDER[id]}`}
         >
-            <h3 className={`font-semibold ${headerMargin} flex items-center justify-between`}>
+            <h3 className={`font-semibold ${headerMargin} flex items-center justify-between text-sm`}>
                 {label}
-                <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{tasks.length}</span>
+                <span className="text-[11px] font-medium bg-muted/60 px-2 py-0.5 rounded-full text-muted-foreground">{tasks.length}</span>
             </h3>
             <div
                 className={`flex-1 ${listSpacing} overflow-y-auto min-h-[100px] focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md px-1`}

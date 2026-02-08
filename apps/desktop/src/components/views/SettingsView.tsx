@@ -767,13 +767,13 @@ export function SettingsView() {
         badge?: boolean;
         badgeLabel?: string;
     }>>(() => [
-        { id: 'main', icon: Monitor, label: t.general, description: `${t.appearance} • ${t.language} • ${t.keybindings}` },
-        { id: 'gtd', icon: ListChecks, label: t.gtd, description: t.gtdDesc },
-        { id: 'notifications', icon: Bell, label: t.notifications },
-        { id: 'sync', icon: Database, label: t.sync },
-        { id: 'ai', icon: Sparkles, label: t.ai, description: t.aiDesc },
-        { id: 'calendar', icon: CalendarDays, label: t.calendar },
-        { id: 'about', icon: Info, label: t.about, badge: hasUpdateBadge, badgeLabel: t.updateAvailable },
+        { id: 'main', icon: Monitor, label: t.general, keywords: [t.appearance, t.density, t.language, t.weekStart, t.keybindings, t.windowDecorations, t.closeBehavior, t.showTray, 'theme', 'dark mode', 'light mode'] },
+        { id: 'gtd', icon: ListChecks, label: t.gtd, keywords: ['auto-archive', 'priorities', 'time estimates', 'pomodoro', 'capture', 'inbox processing', '2-minute rule', 'task editor'] },
+        { id: 'notifications', icon: Bell, label: t.notifications, keywords: ['review reminders', 'weekly review', 'daily digest', 'morning', 'evening'] },
+        { id: 'sync', icon: Database, label: t.sync, keywords: ['file sync', 'WebDAV', 'cloud', 'sync now', 'attachments', 'diagnostics', 'logging'] },
+        { id: 'ai', icon: Sparkles, label: t.ai, keywords: ['OpenAI', 'Gemini', 'Anthropic', 'API key', 'speech', 'whisper', 'copilot', 'model'] },
+        { id: 'calendar', icon: CalendarDays, label: t.calendar, keywords: ['external calendar', 'iCal', 'subscription', 'URL'] },
+        { id: 'about', icon: Info, label: t.about, badge: hasUpdateBadge, badgeLabel: t.updateAvailable, keywords: ['version', 'update', 'license', 'sponsor'] },
     ], [hasUpdateBadge, t]);
 
     const SyncPage = () => {

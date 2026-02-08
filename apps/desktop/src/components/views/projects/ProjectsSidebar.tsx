@@ -256,10 +256,10 @@ export function ProjectsSidebar({
                                                             className={cn(
                                                                 "rounded-lg cursor-pointer transition-colors text-sm border",
                                                                 selectedProjectId === project.id
-                                                                    ? "bg-accent text-accent-foreground border-accent"
+                                                                    ? "bg-primary/10 text-primary border-primary/20"
                                                                     : project.isFocused
-                                                                        ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
-                                                                        : "border-transparent hover:bg-muted/50",
+                                                                        ? "bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15"
+                                                                        : "border-transparent hover:bg-muted/40",
                                                                 isDragging && "opacity-70",
                                                             )}
                                                             onContextMenu={(event) => {
