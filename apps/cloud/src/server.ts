@@ -109,6 +109,16 @@ function tokenToKey(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
 
+function toRateLimitRoute(pathname: string): string {
+    if (/^\/v1\/tasks\/[^/]+\/(complete|archive)$/.test(pathname)) {
+        return '/v1/tasks/:id/:action';
+    }
+    if (/^\/v1\/tasks\/[^/]+$/.test(pathname)) {
+        return '/v1/tasks/:id';
+    }
+    return pathname;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -224,6 +234,7 @@ export const __cloudTestUtils = {
     parseArgs,
     getToken,
     tokenToKey,
+    toRateLimitRoute,
     validateAppData,
     asStatus,
     pickTaskList,
@@ -291,8 +302,10 @@ async function main() {
                 const token = getToken(req);
                 if (!token) return errorResponse('Unauthorized', 401);
                 const key = tokenToKey(token);
+                const routeKey = toRateLimitRoute(pathname);
+                const rateKey = `${key}:${req.method}:${routeKey}`;
                 const now = Date.now();
-                const state = rateLimits.get(key);
+                const state = rateLimits.get(rateKey);
                 if (state && now < state.resetAt) {
                     state.count += 1;
                     if (state.count > maxPerWindow) {
@@ -303,7 +316,7 @@ async function main() {
                         );
                     }
                 } else {
-                    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
+                    rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs });
                 }
                 const filePath = join(dataDir, `${key}.json`);
 

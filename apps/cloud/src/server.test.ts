@@ -22,6 +22,12 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.asStatus('in-progress')).toBeNull();
     });
 
+    test('normalizes rate limit routes for task item endpoints', () => {
+        expect(__cloudTestUtils.toRateLimitRoute('/v1/tasks/abc')).toBe('/v1/tasks/:id');
+        expect(__cloudTestUtils.toRateLimitRoute('/v1/tasks/abc/complete')).toBe('/v1/tasks/:id/:action');
+        expect(__cloudTestUtils.toRateLimitRoute('/v1/tasks')).toBe('/v1/tasks');
+    });
+
     test('enforces JSON body size limit', async () => {
         const body = JSON.stringify({ tasks: [], projects: [] });
         const req = new Request('http://localhost/v1/data', {
