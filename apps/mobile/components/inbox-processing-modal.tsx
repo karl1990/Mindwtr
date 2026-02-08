@@ -18,6 +18,8 @@ type InboxProcessingModalProps = {
   onClose: () => void;
 };
 
+const MAX_TOKEN_SUGGESTIONS = 6;
+
 export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalProps) {
   const { tasks, projects, areas, settings, updateTask, deleteTask, addProject } = useTaskStore();
   const { t } = useLanguage();
@@ -85,6 +87,49 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
+  const contextSuggestionPool = useMemo(() => {
+    const counts = new Map<string, number>();
+    PRESET_CONTEXTS
+      .filter((item) => item.startsWith('@'))
+      .forEach((item) => counts.set(item, (counts.get(item) || 0) + 1));
+    tasks.forEach((task) => {
+      (task.contexts ?? []).forEach((ctx) => {
+        if (!ctx?.startsWith('@')) return;
+        counts.set(ctx, (counts.get(ctx) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([token]) => token);
+  }, [tasks]);
+  const tagSuggestionPool = useMemo(() => {
+    const counts = new Map<string, number>();
+    PRESET_TAGS
+      .filter((item) => item.startsWith('#'))
+      .forEach((item) => counts.set(item, (counts.get(item) || 0) + 1));
+    tasks.forEach((task) => {
+      (task.tags ?? []).forEach((tag) => {
+        if (!tag?.startsWith('#')) return;
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([token]) => token);
+  }, [tasks]);
+  const tokenDraft = newContext.trim();
+  const tokenPrefix = tokenDraft.startsWith('#') ? '#' : tokenDraft.startsWith('@') ? '@' : '';
+  const tokenQuery = tokenPrefix ? tokenDraft.slice(1).toLowerCase() : '';
+  const tokenSuggestions = useMemo(() => {
+    if (!tokenPrefix || tokenQuery.length === 0) return [];
+    const pool = tokenPrefix === '@' ? contextSuggestionPool : tagSuggestionPool;
+    const selected = new Set(tokenPrefix === '@' ? selectedContexts : selectedTags);
+    const normalizedQuery = tokenQuery.toLowerCase();
+    return pool
+      .filter((item) => !selected.has(item))
+      .filter((item) => item.slice(1).toLowerCase().includes(normalizedQuery))
+      .slice(0, MAX_TOKEN_SUGGESTIONS);
+  }, [contextSuggestionPool, selectedContexts, selectedTags, tagSuggestionPool, tokenPrefix, tokenQuery]);
 
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return projects;
@@ -351,6 +396,17 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
       if (!selectedContexts.includes(normalized)) {
         setSelectedContexts((prev) => [...prev, normalized]);
       }
+    }
+    setNewContext('');
+  };
+
+  const applyTokenSuggestion = (token: string) => {
+    if (token.startsWith('#')) {
+      if (!selectedTags.includes(token)) {
+        setSelectedTags((prev) => [...prev, token]);
+      }
+    } else if (!selectedContexts.includes(token)) {
+      setSelectedContexts((prev) => [...prev, token]);
     }
     setNewContext('');
   };
@@ -1012,11 +1068,15 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                 {selectedContexts.length > 0 && (
                   <View style={[styles.selectedContextsContainer, { backgroundColor: '#3B82F620' }]}>
                     <Text style={{ fontSize: 12, color: '#3B82F6', marginBottom: 4 }}>{t('inbox.selectedLabel')}</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    <View style={styles.selectedTokensRow}>
                       {selectedContexts.map(ctx => (
-                        <View key={ctx} style={{ backgroundColor: '#3B82F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                          <Text style={{ color: '#FFF', fontSize: 12 }}>{ctx}</Text>
-                        </View>
+                        <TouchableOpacity
+                          key={ctx}
+                          onPress={() => toggleContext(ctx)}
+                          style={[styles.selectedTokenChip, styles.selectedContextChip]}
+                        >
+                          <Text style={styles.selectedTokenText}>{ctx} x</Text>
+                        </TouchableOpacity>
                       ))}
                     </View>
                   </View>
@@ -1025,11 +1085,15 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                 {selectedTags.length > 0 && (
                   <View style={[styles.selectedContextsContainer, { backgroundColor: '#8B5CF620' }]}>
                     <Text style={{ fontSize: 12, color: '#8B5CF6', marginBottom: 4 }}>{t('taskEdit.tagsLabel')}</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    <View style={styles.selectedTokensRow}>
                       {selectedTags.map(tag => (
-                        <View key={tag} style={{ backgroundColor: '#8B5CF6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                          <Text style={{ color: '#FFF', fontSize: 12 }}>{tag}</Text>
-                        </View>
+                        <TouchableOpacity
+                          key={tag}
+                          onPress={() => toggleTag(tag)}
+                          style={[styles.selectedTokenChip, styles.selectedTagChip]}
+                        >
+                          <Text style={styles.selectedTokenText}>{tag} x</Text>
+                        </TouchableOpacity>
                       ))}
                     </View>
                   </View>
@@ -1053,45 +1117,23 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.contextWrap}>
-                  {PRESET_CONTEXTS.filter((ctx) => ctx.startsWith('@')).map(ctx => (
-                    <TouchableOpacity
-                      key={ctx}
-                      style={[
-                        styles.contextChip,
-                        selectedContexts.includes(ctx)
-                          ? { backgroundColor: '#3B82F6' }
-                          : { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }
-                      ]}
-                      onPress={() => toggleContext(ctx)}
-                    >
-                      <Text style={[
-                        styles.contextChipText,
-                        { color: selectedContexts.includes(ctx) ? '#FFF' : tc.text }
-                      ]}>{ctx}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {tokenSuggestions.length > 0 && (
+                  <View style={[styles.tokenSuggestionsContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                    {tokenSuggestions.map((token) => (
+                      <TouchableOpacity
+                        key={token}
+                        style={styles.tokenSuggestionChip}
+                        onPress={() => applyTokenSuggestion(token)}
+                      >
+                        <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
-                <View style={styles.contextWrap}>
-                  {PRESET_TAGS.map(tag => (
-                    <TouchableOpacity
-                      key={tag}
-                      style={[
-                        styles.contextChip,
-                        selectedTags.includes(tag)
-                          ? { backgroundColor: '#8B5CF6' }
-                          : { backgroundColor: tc.cardBg, borderWidth: 1, borderColor: tc.border }
-                      ]}
-                      onPress={() => toggleTag(tag)}
-                    >
-                      <Text style={[
-                        styles.contextChipText,
-                        { color: selectedTags.includes(tag) ? '#FFF' : tc.text }
-                      ]}>{tag}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={[styles.stepHint, { color: tc.secondaryText }]}>
+                  Type @ for contexts or # for tags to get suggestions.
+                </Text>
 
                 <TouchableOpacity
                   style={[styles.bigButton, styles.buttonPrimary, { marginTop: 16 }]}

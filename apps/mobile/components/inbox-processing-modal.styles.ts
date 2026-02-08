@@ -262,6 +262,26 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
   },
+  selectedTokensRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  selectedTokenChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  selectedContextChip: {
+    backgroundColor: '#3B82F6',
+  },
+  selectedTagChip: {
+    backgroundColor: '#8B5CF6',
+  },
+  selectedTokenText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
   customContextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,6 +307,22 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  tokenSuggestionsContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  tokenSuggestionChip: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  tokenSuggestionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   contextWrap: {
     flexDirection: 'row',
