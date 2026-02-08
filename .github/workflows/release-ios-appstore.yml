@@ -101,13 +101,17 @@ jobs:
             exit 1
           fi
 
-          b64url() {
-            openssl base64 -A | tr '+/' '-_' | tr -d '='
-          }
-
           REMOTE_MAX_BUILD=0
           REMOTE_LOOKUP_STATUS="skipped"
           if [ -n "${IOS_ASC_KEY_ID:-}" ] && [ -n "${IOS_ASC_ISSUER_ID:-}" ] && [ -n "${IOS_ASC_PRIVATE_KEY:-}" ]; then
+            ASC_KEY_ID="$(printf '%s' "$IOS_ASC_KEY_ID" | tr -d '\r\n\t ')"
+            ASC_ISSUER_ID="$(printf '%s' "$IOS_ASC_ISSUER_ID" | tr -d '\r\n\t ')"
+            if ! printf '%s' "$ASC_KEY_ID" | grep -Eq '^[A-Z0-9]{10}$'; then
+              echo "::warning::IOS_ASC_KEY_ID format looks invalid after trimming (expected 10 chars, e.g. ABCD123456)."
+            fi
+            if ! printf '%s' "$ASC_ISSUER_ID" | grep -Eq '^[0-9a-fA-F-]{36}$'; then
+              echo "::warning::IOS_ASC_ISSUER_ID format looks invalid after trimming (expected UUID)."
+            fi
             KEY_PATH="$RUNNER_TEMP/ios-asc-key.p8"
             if printf '%s' "$IOS_ASC_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY"; then
               # Support both multiline PEM and single-line PEM with '\n' escapes
@@ -139,52 +143,69 @@ jobs:
                 return 1
               }
 
-              NOW="$(date +%s)"
-              EXP="$((NOW + 1200))"
-              JWT_HEADER="$(printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$IOS_ASC_KEY_ID" | b64url)"
-              JWT_PAYLOAD="$(printf '{"iss":"%s","iat":%s,"exp":%s,"aud":"appstoreconnect-v1"}' "$IOS_ASC_ISSUER_ID" "$NOW" "$EXP" | b64url)"
-              JWT_UNSIGNED="${JWT_HEADER}.${JWT_PAYLOAD}"
-              JWT_SIGNATURE="$(printf '%s' "$JWT_UNSIGNED" | openssl dgst -binary -sha256 -sign "$KEY_PATH" | b64url)"
-              ASC_TOKEN="${JWT_UNSIGNED}.${JWT_SIGNATURE}"
+              if ! ASC_TOKEN="$(
+                node <<'NODE' "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$KEY_PATH"
+const fs = require("fs");
+const crypto = require("crypto");
+const [keyId, issuerId, keyPath] = process.argv.slice(2);
+const now = Math.floor(Date.now() / 1000);
+const exp = now + 1200;
+const encodeJson = (obj) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+const header = encodeJson({ alg: "ES256", kid: keyId, typ: "JWT" });
+const payload = encodeJson({ iss: issuerId, iat: now, exp, aud: "appstoreconnect-v1" });
+const unsignedToken = `${header}.${payload}`;
+const privateKey = fs.readFileSync(keyPath, "utf8");
+const signature = crypto.sign("sha256", Buffer.from(unsignedToken), {
+    key: privateKey,
+    dsaEncoding: "ieee-p1363",
+});
+process.stdout.write(`${unsignedToken}.${signature.toString("base64url")}`);
+NODE
+              )"; then
+                echo "::warning::Failed to generate App Store Connect JWT from IOS_ASC_* secrets."
+                REMOTE_LOOKUP_STATUS="invalid_jwt"
+              fi
 
               APP_LOOKUP_JSON_FILE="$RUNNER_TEMP/asc-app-lookup.json"
-              if api_get "$APP_LOOKUP_JSON_FILE" -G \
-                -H "Authorization: Bearer ${ASC_TOKEN}" \
-                --data-urlencode "filter[bundleId]=${EXPECTED_BUNDLE_ID}" \
-                --data-urlencode "limit=1" \
-                "https://api.appstoreconnect.apple.com/v1/apps"; then
-                APPSTORE_APP_ID="$(jq -r '.data[0].id // empty' "$APP_LOOKUP_JSON_FILE")"
-                if [ -n "${APPSTORE_APP_ID}" ]; then
-                  BUILDS_JSON_FILE="$RUNNER_TEMP/asc-builds-page.json"
-                  if api_get "$BUILDS_JSON_FILE" -G \
-                    -H "Authorization: Bearer ${ASC_TOKEN}" \
-                    --data-urlencode "filter[app]=${APPSTORE_APP_ID}" \
-                    --data-urlencode "limit=200" \
-                    "https://api.appstoreconnect.apple.com/v1/builds"; then
-                    while : ; do
-                      PAGE_MAX="$(jq -r '[.data[]?.attributes.version | select(type=="string") | select(test("^[0-9]+$")) | tonumber] | max // 0' "$BUILDS_JSON_FILE")"
-                      if [ "${PAGE_MAX}" -gt "${REMOTE_MAX_BUILD}" ]; then
-                        REMOTE_MAX_BUILD="${PAGE_MAX}"
-                      fi
-                      NEXT_URL="$(jq -r '.links.next // empty' "$BUILDS_JSON_FILE")"
-                      if [ -z "${NEXT_URL}" ]; then
-                        REMOTE_LOOKUP_STATUS="ok"
-                        break
-                      fi
-                      if ! api_get "$BUILDS_JSON_FILE" -g -H "Authorization: Bearer ${ASC_TOKEN}" "$NEXT_URL"; then
-                        REMOTE_LOOKUP_STATUS="api_error"
-                        break
-                      fi
-                    done
+              if [ "${REMOTE_LOOKUP_STATUS}" != "invalid_jwt" ]; then
+                if api_get "$APP_LOOKUP_JSON_FILE" -G \
+                  -H "Authorization: Bearer ${ASC_TOKEN}" \
+                  --data-urlencode "filter[bundleId]=${EXPECTED_BUNDLE_ID}" \
+                  --data-urlencode "limit=1" \
+                  "https://api.appstoreconnect.apple.com/v1/apps"; then
+                  APPSTORE_APP_ID="$(jq -r '.data[0].id // empty' "$APP_LOOKUP_JSON_FILE")"
+                  if [ -n "${APPSTORE_APP_ID}" ]; then
+                    BUILDS_JSON_FILE="$RUNNER_TEMP/asc-builds-page.json"
+                    if api_get "$BUILDS_JSON_FILE" -G \
+                      -H "Authorization: Bearer ${ASC_TOKEN}" \
+                      --data-urlencode "filter[app]=${APPSTORE_APP_ID}" \
+                      --data-urlencode "limit=200" \
+                      "https://api.appstoreconnect.apple.com/v1/builds"; then
+                      while : ; do
+                        PAGE_MAX="$(jq -r '[.data[]?.attributes.version | select(type=="string") | select(test("^[0-9]+$")) | tonumber] | max // 0' "$BUILDS_JSON_FILE")"
+                        if [ "${PAGE_MAX}" -gt "${REMOTE_MAX_BUILD}" ]; then
+                          REMOTE_MAX_BUILD="${PAGE_MAX}"
+                        fi
+                        NEXT_URL="$(jq -r '.links.next // empty' "$BUILDS_JSON_FILE")"
+                        if [ -z "${NEXT_URL}" ]; then
+                          REMOTE_LOOKUP_STATUS="ok"
+                          break
+                        fi
+                        if ! api_get "$BUILDS_JSON_FILE" -g -H "Authorization: Bearer ${ASC_TOKEN}" "$NEXT_URL"; then
+                          REMOTE_LOOKUP_STATUS="api_error"
+                          break
+                        fi
+                      done
+                    else
+                      REMOTE_LOOKUP_STATUS="api_error"
+                    fi
                   else
-                    REMOTE_LOOKUP_STATUS="api_error"
+                    echo "::warning::App Store Connect app lookup returned no app for bundle id ${EXPECTED_BUNDLE_ID}."
+                    REMOTE_LOOKUP_STATUS="no_app"
                   fi
                 else
-                  echo "::warning::App Store Connect app lookup returned no app for bundle id ${EXPECTED_BUNDLE_ID}."
-                  REMOTE_LOOKUP_STATUS="no_app"
+                  REMOTE_LOOKUP_STATUS="api_error"
                 fi
-              else
-                REMOTE_LOOKUP_STATUS="api_error"
               fi
             fi
           else
