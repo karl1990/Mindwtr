@@ -1368,7 +1368,7 @@ export class SyncService {
         let step = 'init';
         let backend: SyncBackend = 'off';
         let syncUrl: string | undefined;
-        let localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
+        let localSnapshotChangeAt = 0;
 
         SyncService.updateSyncStatus({
             inFlight: true,
@@ -1387,6 +1387,7 @@ export class SyncService {
             // 1. Flush pending writes so disk reflects the latest state
             setStep('flush');
             await flushPendingSave();
+            localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
 
             // 2. Read/merge/write via shared core orchestration.
             backend = await SyncService.getSyncBackend();
