@@ -1,5 +1,6 @@
 import { getDailyDigestSummary, getNextScheduledAt, stripMarkdown, type Language, Task, parseTimeOfDay, getTranslationsSync, loadTranslations, loadStoredLanguageSync, safeParseDate, hasTimeComponent } from '@mindwtr/core';
 import { useTaskStore } from '@mindwtr/core';
+import { isTauriRuntime } from './runtime';
 
 const notifiedAtByTask = new Map<string, string>();
 const notifiedAtByProject = new Map<string, string>();
@@ -34,7 +35,7 @@ function localDateKey(date: Date): string {
 }
 
 async function loadTauriNotificationApi(): Promise<TauriNotificationApi | null> {
-    if (!(window as any).__TAURI__) return null;
+    if (!isTauriRuntime()) return null;
     if (tauriNotificationApi) return tauriNotificationApi;
     try {
         // Optional dependency. If not installed, we fall back to Web Notifications.
