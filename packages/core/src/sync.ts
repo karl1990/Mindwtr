@@ -424,6 +424,28 @@ function createEmptyEntityStats(localTotal: number, incomingTotal: number): Enti
     };
 }
 
+const CONTENT_DIFF_IGNORED_KEYS = new Set(['rev', 'revBy', 'updatedAt', 'createdAt', 'localStatus']);
+
+const toComparableValue = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+        return value.map((item) => toComparableValue(item));
+    }
+    if (value && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        const comparable: Record<string, unknown> = {};
+        for (const key of Object.keys(record).sort((a, b) => a.localeCompare(b))) {
+            if (CONTENT_DIFF_IGNORED_KEYS.has(key)) continue;
+            if (key === 'uri' && record.kind === 'file') continue;
+            comparable[key] = toComparableValue(record[key]);
+        }
+        return comparable;
+    }
+    return value;
+};
+
+const hasContentDifference = (localItem: unknown, incomingItem: unknown): boolean =>
+    JSON.stringify(toComparableValue(localItem)) !== JSON.stringify(toComparableValue(incomingItem));
+
 function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; deletedAt?: string }>(
     local: T[],
     incoming: T[],
@@ -492,9 +514,10 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         const incomingDeleted = !!incomingItem.deletedAt;
         const revDiff = localRev - incomingRev;
         const revByDiff = localRevBy !== incomingRevBy;
+        const contentDiff = hasContentDifference(localItem, incomingItem);
 
         const differs = hasRevision
-            ? revDiff !== 0 || revByDiff || localDeleted !== incomingDeleted
+            ? revDiff !== 0 || revByDiff || localDeleted !== incomingDeleted || contentDiff
             : safeLocalTime !== safeIncomingTime || localDeleted !== incomingDeleted;
 
         if (differs) {

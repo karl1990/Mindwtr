@@ -393,6 +393,28 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].title).toBe('incoming');
         });
 
+        it('counts a conflict when revision metadata matches but content differs', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                title: 'local',
+                rev: 7,
+                revBy: 'device-a',
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                title: 'incoming',
+                rev: 7,
+                revBy: 'device-a',
+            } satisfies Task;
+
+            const result = mergeAppDataWithStats(mockAppData([localTask]), mockAppData([incomingTask]));
+
+            expect(result.data.tasks).toHaveLength(1);
+            expect(result.data.tasks[0].title).toBe('incoming');
+            expect(result.stats.tasks.conflicts).toBe(1);
+            expect(result.stats.tasks.conflictIds).toContain('1');
+        });
+
         it('does not bias toward deletion when operation times are equal', () => {
             const local = mockAppData([
                 createMockTask('1', '2023-01-02T00:00:00.000Z', '2023-01-02T00:05:00.000Z'),
