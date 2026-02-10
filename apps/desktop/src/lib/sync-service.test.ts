@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getFileSyncDir, hashString, normalizeSyncBackend } from './sync-service-utils';
+import { SyncService, __syncServiceTestUtils } from './sync-service';
+
+afterEach(async () => {
+    __syncServiceTestUtils.resetDependenciesForTests();
+    await SyncService.resetForTests();
+});
 
 describe('sync-service test utils', () => {
     it('normalizes known sync backends and defaults unknown values to off', () => {
@@ -21,5 +27,51 @@ describe('sync-service test utils', () => {
     it('hashes sync payloads with sha256 output', async () => {
         const hash = await hashString('mindwtr');
         expect(hash).toBe('feb7a7b01b1c68e586e77288a4b2598d146ee3696ec7dbfac0074196b8d68c33');
+    });
+});
+
+describe('SyncService testability hooks', () => {
+    it('supports resetting singleton state between tests', async () => {
+        (SyncService as any).syncQueued = true;
+        (SyncService as any).syncStatus = {
+            inFlight: true,
+            queued: true,
+            step: 'syncing',
+            lastResult: 'error',
+            lastResultAt: '2025-01-01T00:00:00.000Z',
+        };
+        (SyncService as any).syncListeners.add(() => {});
+        __syncServiceTestUtils.clearWebdavDownloadBackoff();
+        (SyncService as any).externalSyncTimer = setTimeout(() => undefined, 1_000);
+
+        await SyncService.resetForTests();
+
+        expect(SyncService.getSyncStatus()).toEqual({
+            inFlight: false,
+            queued: false,
+            step: null,
+            lastResult: null,
+            lastResultAt: null,
+        });
+        expect((SyncService as any).syncListeners.size).toBe(0);
+        expect((SyncService as any).syncQueued).toBe(false);
+        expect((SyncService as any).externalSyncTimer).toBeNull();
+    });
+
+    it('allows injecting tauri dependencies for orchestration tests', async () => {
+        const invoke = vi.fn(async (command: string) => {
+            if (command === 'get_sync_backend') return 'cloud';
+            return '';
+        });
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+        });
+        (SyncService as any).didMigrate = true;
+
+        const backend = await SyncService.getSyncBackend();
+
+        expect(backend).toBe('cloud');
+        expect(invoke).toHaveBeenCalledWith('get_sync_backend', undefined);
     });
 });

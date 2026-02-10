@@ -76,6 +76,39 @@ const WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC = 10;
 const WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS = 15 * 60_000;
 const WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS = 2 * 60_000;
 const webdavAttachmentDownloadBackoff = new Map<string, number>();
+type SyncServiceDependencies = {
+    isTauriRuntime: () => boolean;
+    invoke: <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+    getTauriFetch: () => Promise<typeof fetch | undefined>;
+};
+
+const defaultInvoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+    const mod = await import('@tauri-apps/api/core');
+    return mod.invoke<T>(command as any, args as any);
+};
+
+const defaultGetTauriFetch = async (): Promise<typeof fetch | undefined> => {
+    if (!syncServiceDependencies.isTauriRuntime()) return undefined;
+    try {
+        const mod = await import('@tauri-apps/plugin-http');
+        return mod.fetch;
+    } catch (error) {
+        logSyncWarning('Failed to load tauri http fetch', error);
+        return undefined;
+    }
+};
+
+const defaultSyncServiceDependencies: SyncServiceDependencies = {
+    isTauriRuntime,
+    invoke: defaultInvoke,
+    getTauriFetch: defaultGetTauriFetch,
+};
+
+let syncServiceDependencies: SyncServiceDependencies = {
+    ...defaultSyncServiceDependencies,
+};
+
+const isTauriRuntimeEnv = () => syncServiceDependencies.isTauriRuntime();
 
 const logSyncWarning = (message: string, error?: unknown) => {
     const extra = error
@@ -138,7 +171,7 @@ class LocalSyncAbort extends Error {
 
 // Sync should start from persisted data so startup sync cannot overwrite settings with an unhydrated store snapshot.
 const readLocalDataForSync = async (): Promise<AppData> => {
-    if (isTauriRuntime()) {
+    if (isTauriRuntimeEnv()) {
         try {
             const persisted = await tauriInvoke<AppData>('get_data');
             return normalizeAppData(persisted);
@@ -169,7 +202,7 @@ const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPLOAD_TIMEOUT_MS = 120_000;
 
 const cleanupAttachmentTempFiles = async (): Promise<void> => {
-    if (!isTauriRuntime()) return;
+    if (!isTauriRuntimeEnv()) return;
     try {
         const { BaseDirectory, readDir, remove } = await import('@tauri-apps/plugin-fs');
         const entries = await readDir(LOCAL_ATTACHMENTS_DIR, { baseDir: BaseDirectory.Data });
@@ -359,28 +392,20 @@ const getCloudBaseUrl = (fullUrl: string): string => {
 };
 
 async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-    const mod = await import('@tauri-apps/api/core');
-    return mod.invoke<T>(command as any, args as any);
+    return syncServiceDependencies.invoke<T>(command, args);
 }
 
 type WebDavConfig = { url: string; username: string; password?: string; hasPassword?: boolean };
 type CloudConfig = { url: string; token: string };
 
 async function getTauriFetch(): Promise<typeof fetch | undefined> {
-    if (!isTauriRuntime()) return undefined;
-    try {
-        const mod = await import('@tauri-apps/plugin-http');
-        return mod.fetch;
-    } catch (error) {
-        logSyncWarning('Failed to load tauri http fetch', error);
-        return undefined;
-    }
+    return syncServiceDependencies.getTauriFetch();
 }
 
 async function resolveWebdavPassword(config: WebDavConfig): Promise<string> {
     if (typeof config.password === 'string') return config.password;
     if (config.hasPassword === false) return '';
-    if (!isTauriRuntime()) return '';
+    if (!isTauriRuntimeEnv()) return '';
     try {
         return await tauriInvoke<string>('get_webdav_password');
     } catch (error) {
@@ -394,7 +419,7 @@ async function syncAttachments(
     webDavConfig: WebDavConfig,
     baseSyncUrl: string
 ): Promise<boolean> {
-    if (!isTauriRuntime()) return false;
+    if (!isTauriRuntimeEnv()) return false;
     if (!webDavConfig.url) return false;
 
     const fetcher = await getTauriFetch();
@@ -706,7 +731,7 @@ async function syncCloudAttachments(
     cloudConfig: CloudConfig,
     baseSyncUrl: string
 ): Promise<boolean> {
-    if (!isTauriRuntime()) return false;
+    if (!isTauriRuntimeEnv()) return false;
     if (!cloudConfig.url) return false;
 
     const fetcher = await getTauriFetch();
@@ -865,7 +890,7 @@ async function syncFileAttachments(
     appData: AppData,
     baseSyncDir: string
 ): Promise<boolean> {
-    if (!isTauriRuntime()) return false;
+    if (!isTauriRuntimeEnv()) return false;
     if (!baseSyncDir) return false;
 
     const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
@@ -1020,6 +1045,29 @@ export class SyncService {
         return () => SyncService.syncListeners.delete(listener);
     }
 
+    static async resetForTests(): Promise<void> {
+        await SyncService.stopFileWatcher();
+        SyncService.didMigrate = false;
+        SyncService.syncInFlight = null;
+        SyncService.syncQueued = false;
+        SyncService.syncStatus = {
+            inFlight: false,
+            queued: false,
+            step: null,
+            lastResult: null,
+            lastResultAt: null,
+        };
+        SyncService.syncListeners.clear();
+        SyncService.fileWatcherStop = null;
+        SyncService.fileWatcherPath = null;
+        SyncService.fileWatcherBackend = null;
+        SyncService.lastWrittenHash = null;
+        SyncService.lastObservedHash = null;
+        SyncService.ignoreFileEventsUntil = 0;
+        SyncService.externalSyncTimer = null;
+        webdavAttachmentDownloadBackoff.clear();
+    }
+
     private static updateSyncStatus(partial: Partial<typeof SyncService.syncStatus>) {
         SyncService.syncStatus = { ...SyncService.syncStatus, ...partial };
         SyncService.syncListeners.forEach((listener) => listener(SyncService.syncStatus));
@@ -1072,7 +1120,7 @@ export class SyncService {
     }
 
     private static async maybeMigrateLegacyLocalStorageToConfig() {
-        if (!isTauriRuntime() || SyncService.didMigrate) return;
+        if (!isTauriRuntimeEnv() || SyncService.didMigrate) return;
         SyncService.didMigrate = true;
 
         const legacyBackend = localStorage.getItem(SYNC_BACKEND_KEY);
@@ -1122,7 +1170,7 @@ export class SyncService {
     }
 
     static async getSyncBackend(): Promise<SyncBackend> {
-        if (!isTauriRuntime()) return SyncService.getSyncBackendLocal();
+        if (!isTauriRuntimeEnv()) return SyncService.getSyncBackendLocal();
         await SyncService.maybeMigrateLegacyLocalStorageToConfig();
         try {
             const backend = await tauriInvoke<string>('get_sync_backend');
@@ -1134,7 +1182,7 @@ export class SyncService {
     }
 
     static async setSyncBackend(backend: SyncBackend): Promise<void> {
-        if (!isTauriRuntime()) {
+        if (!isTauriRuntimeEnv()) {
             SyncService.setSyncBackendLocal(backend);
             return;
         }
@@ -1147,7 +1195,7 @@ export class SyncService {
     }
 
     static async getWebDavConfig(options?: { silent?: boolean }): Promise<WebDavConfig> {
-        if (!isTauriRuntime()) return SyncService.getWebDavConfigLocal();
+        if (!isTauriRuntimeEnv()) return SyncService.getWebDavConfigLocal();
         await SyncService.maybeMigrateLegacyLocalStorageToConfig();
         try {
             return await tauriInvoke<WebDavConfig>('get_webdav_config');
@@ -1160,7 +1208,7 @@ export class SyncService {
     }
 
     static async setWebDavConfig(config: { url: string; username?: string; password?: string }): Promise<void> {
-        if (!isTauriRuntime()) {
+        if (!isTauriRuntimeEnv()) {
             SyncService.setWebDavConfigLocal(config);
             return;
         }
@@ -1176,7 +1224,7 @@ export class SyncService {
     }
 
     static async getCloudConfig(options?: { silent?: boolean }): Promise<CloudConfig> {
-        if (!isTauriRuntime()) return SyncService.getCloudConfigLocal();
+        if (!isTauriRuntimeEnv()) return SyncService.getCloudConfigLocal();
         await SyncService.maybeMigrateLegacyLocalStorageToConfig();
         try {
             return await tauriInvoke<CloudConfig>('get_cloud_config');
@@ -1189,7 +1237,7 @@ export class SyncService {
     }
 
     static async setCloudConfig(config: { url: string; token?: string }): Promise<void> {
-        if (!isTauriRuntime()) {
+        if (!isTauriRuntimeEnv()) {
             SyncService.setCloudConfigLocal(config);
             return;
         }
@@ -1207,7 +1255,7 @@ export class SyncService {
      * Get the currently configured sync path from the backend
      */
     static async getSyncPath(): Promise<string> {
-        if (!isTauriRuntime()) return '';
+        if (!isTauriRuntimeEnv()) return '';
         try {
             return await tauriInvoke<string>('get_sync_path');
         } catch (error) {
@@ -1220,7 +1268,7 @@ export class SyncService {
      * Set the sync path in the backend
      */
     static async setSyncPath(path: string): Promise<{ success: boolean; path: string }> {
-        if (!isTauriRuntime()) return { success: false, path: '' };
+        if (!isTauriRuntimeEnv()) return { success: false, path: '' };
         try {
             const result = await tauriInvoke<{ success: boolean; path: string }>('set_sync_path', { syncPath: path });
             if (result?.success) {
@@ -1240,7 +1288,7 @@ export class SyncService {
     }
 
     private static async handleFileChange(paths: string[]) {
-        if (!isTauriRuntime()) return;
+        if (!isTauriRuntimeEnv()) return;
         if (Date.now() < SyncService.ignoreFileEventsUntil) return;
 
         const hasSyncFile = paths.some((path) => isSyncFilePath(path, SYNC_FILE_NAME, LEGACY_SYNC_FILE_NAME));
@@ -1281,7 +1329,7 @@ export class SyncService {
     }
 
     static async startFileWatcher(): Promise<void> {
-        if (!isTauriRuntime()) return;
+        if (!isTauriRuntimeEnv()) return;
         const backend = await SyncService.getSyncBackend();
         if (backend !== 'file') {
             await SyncService.stopFileWatcher();
@@ -1336,7 +1384,7 @@ export class SyncService {
     }
 
     static async cleanupAttachmentsNow(): Promise<void> {
-        if (!isTauriRuntime()) return;
+        if (!isTauriRuntimeEnv()) return;
         const backend = await SyncService.getSyncBackend();
         const data = await tauriInvoke<AppData>('get_data');
         const cleaned = await cleanupOrphanedAttachments(data, backend);
@@ -1400,7 +1448,7 @@ export class SyncService {
             };
 
             // Pre-sync local attachments so cloudKeys exist before writing remote data.
-            if (isTauriRuntime() && (backend === 'webdav' || backend === 'file' || backend === 'cloud')) {
+            if (isTauriRuntimeEnv() && (backend === 'webdav' || backend === 'file' || backend === 'cloud')) {
                 setStep('attachments_prepare');
                 try {
                     const localData = await readLocalDataForSync();
@@ -1434,7 +1482,7 @@ export class SyncService {
                 },
                 readRemote: async () => {
                     if (backend === 'webdav') {
-                        if (isTauriRuntime()) {
+                        if (isTauriRuntimeEnv()) {
                             if (!webdavConfig?.url) {
                                 throw new Error('WebDAV URL not configured');
                             }
@@ -1462,14 +1510,14 @@ export class SyncService {
                         const fetcher = await getTauriFetch();
                         return await cloudGetJson<AppData>(normalizedUrl, { token: cloudConfig.token, fetcher });
                     }
-                    if (!isTauriRuntime()) {
+                    if (!isTauriRuntimeEnv()) {
                         throw new Error('File sync is not available in the web app.');
                     }
                     return await tauriInvoke<AppData>('read_sync_file');
                 },
                 writeLocal: async (data) => {
                     ensureLocalSnapshotFresh();
-                    if (isTauriRuntime()) {
+                    if (isTauriRuntimeEnv()) {
                         await tauriInvoke('save_data', { data });
                     } else {
                         await webStorage.saveData(data);
@@ -1479,7 +1527,7 @@ export class SyncService {
                     ensureLocalSnapshotFresh();
                     const sanitized = sanitizeAppDataForRemote(data);
                     if (backend === 'webdav') {
-                        if (isTauriRuntime()) {
+                        if (isTauriRuntimeEnv()) {
                             await tauriInvoke('webdav_put_json', { data: sanitized });
                             return;
                         }
@@ -1520,7 +1568,7 @@ export class SyncService {
                 + (stats.projects.timestampAdjustments || 0)
                 + (stats.sections.timestampAdjustments || 0)
                 + (stats.areas.timestampAdjustments || 0);
-            if (isTauriRuntime() && (conflictCount > 0 || maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS || timestampAdjustments > 0)) {
+            if (isTauriRuntimeEnv() && (conflictCount > 0 || maxClockSkewMs > CLOCK_SKEW_THRESHOLD_MS || timestampAdjustments > 0)) {
                 const conflictSamples = [
                     ...(stats.tasks.conflictIds || []),
                     ...(stats.projects.conflictIds || []),
@@ -1543,7 +1591,7 @@ export class SyncService {
 
             ensureLocalSnapshotFresh();
 
-            if ((backend === 'webdav' || backend === 'file' || backend === 'cloud') && isTauriRuntime()) {
+            if ((backend === 'webdav' || backend === 'file' || backend === 'cloud') && isTauriRuntimeEnv()) {
                 setStep('attachments');
                 try {
                     ensureLocalSnapshotFresh();
@@ -1589,7 +1637,7 @@ export class SyncService {
 
             await cleanupAttachmentTempFiles();
 
-            if (isTauriRuntime() && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
+            if (isTauriRuntimeEnv() && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt)) {
                 setStep('attachments_cleanup');
                 ensureLocalSnapshotFresh();
                 mergedData = await cleanupOrphanedAttachments(mergedData, backend);
@@ -1681,3 +1729,20 @@ export class SyncService {
         return result;
     }
 }
+
+export const __syncServiceTestUtils = {
+    setDependenciesForTests(overrides: Partial<SyncServiceDependencies>) {
+        syncServiceDependencies = {
+            ...syncServiceDependencies,
+            ...overrides,
+        };
+    },
+    resetDependenciesForTests() {
+        syncServiceDependencies = {
+            ...defaultSyncServiceDependencies,
+        };
+    },
+    clearWebdavDownloadBackoff() {
+        webdavAttachmentDownloadBackoff.clear();
+    },
+};
