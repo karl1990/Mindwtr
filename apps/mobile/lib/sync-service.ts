@@ -21,6 +21,7 @@ import {
 const DEFAULT_SYNC_TIMEOUT_MS = 30_000;
 const WEBDAV_RETRY_OPTIONS = { maxAttempts: 5, baseDelayMs: 2000, maxDelayMs: 30_000 };
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const ATTACHMENT_CLEANUP_BATCH_LIMIT = 25;
 const SYNC_CONFIG_CACHE_TTL_MS = 3_000;
 const SYNC_FILE_NAME = 'data.json';
 const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
@@ -447,8 +448,14 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
           const fileBaseDir = isFileBackend && fileSyncPath && !fileSyncPath.startsWith('content://')
             ? getFileSyncBaseDir(fileSyncPath)
             : null;
+          let processedCount = 0;
+          const reachedBatchLimit = cleanupTargets.size > ATTACHMENT_CLEANUP_BATCH_LIMIT;
 
           for (const attachment of cleanupTargets.values()) {
+            if (processedCount >= ATTACHMENT_CLEANUP_BATCH_LIMIT) {
+              break;
+            }
+            processedCount += 1;
             ensureLocalSnapshotFresh();
             await deleteAttachmentFile(attachment.uri);
             if (attachment.cloudKey) {
@@ -475,7 +482,13 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
               }
             }
           }
-          if (orphaned.length > 0) {
+          if (reachedBatchLimit) {
+            logSyncInfo('Attachment cleanup batch limit reached', {
+              limit: String(ATTACHMENT_CLEANUP_BATCH_LIMIT),
+              total: String(cleanupTargets.size),
+            });
+          }
+          if (orphaned.length > 0 && !reachedBatchLimit) {
             mergedData = removeOrphanedAttachmentsFromData(mergedData);
           }
         }
