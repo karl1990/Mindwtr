@@ -41,7 +41,7 @@ config.resolver.nodeModulesPaths = [
     coreNodeModulesRoot,
     workspaceNodeModulesRoot,
 ];
-config.resolver.disableHierarchicalLookup = true;
+config.resolver.disableHierarchicalLookup = false;
 
 // 2.1 Force Metro to resolve runtime helpers from the workspace root.
 config.resolver.extraNodeModules = {
