@@ -489,6 +489,40 @@ describe('Sync Logic', () => {
             expect(merged.settings.theme).toBe('dark');
         });
 
+        it('merges synced language settings per field', () => {
+            const local: AppData = {
+                ...mockAppData(),
+                settings: {
+                    language: 'en',
+                    weekStart: 'monday',
+                    dateFormat: 'yyyy-MM-dd',
+                    syncPreferences: { language: true },
+                    syncPreferencesUpdatedAt: {
+                        preferences: '2024-01-01T00:00:00.000Z',
+                        language: '2024-01-01T00:00:00.000Z',
+                    },
+                },
+            };
+            const incoming: AppData = {
+                ...mockAppData(),
+                settings: {
+                    language: 'es',
+                    weekStart: 'monday',
+                    syncPreferences: { language: true },
+                    syncPreferencesUpdatedAt: {
+                        preferences: '2024-01-02T00:00:00.000Z',
+                        language: '2024-01-02T00:00:00.000Z',
+                    },
+                },
+            };
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.settings.language).toBe('es');
+            expect(merged.settings.weekStart).toBe('monday');
+            expect(merged.settings.dateFormat).toBe('yyyy-MM-dd');
+        });
+
         it('keeps area tombstones so deletions sync across devices', () => {
             const local: AppData = {
                 ...mockAppData(),

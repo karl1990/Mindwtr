@@ -330,17 +330,41 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
     }
 
     const shouldSync = (key: SettingsSyncGroup): boolean => mergedPrefs?.[key] === true;
+    const isSameValue = (left: unknown, right: unknown): boolean => {
+        if (left === right) return true;
+        return JSON.stringify(left) === JSON.stringify(right);
+    };
+    const chooseGroupFieldValue = <T>(localValue: T, incomingValue: T, incomingWins: boolean): T => {
+        if (incomingValue === undefined) return localValue;
+        if (localValue === undefined) return incomingValue;
+        if (isSameValue(localValue, incomingValue)) return localValue;
+        return incomingWins ? incomingValue : localValue;
+    };
+    const mergeRecordFields = <T extends Record<string, unknown>>(localValue: T, incomingValue: T, incomingWins: boolean): T => {
+        const mergedValue: Record<string, unknown> = {};
+        const localRecord = (localValue ?? {}) as Record<string, unknown>;
+        const incomingRecord = (incomingValue ?? {}) as Record<string, unknown>;
+        const keys = new Set([...Object.keys(localRecord), ...Object.keys(incomingRecord)]);
+        for (const fieldKey of keys) {
+            mergedValue[fieldKey] = chooseGroupFieldValue(localRecord[fieldKey], incomingRecord[fieldKey], incomingWins);
+        }
+        return mergedValue as T;
+    };
     const mergeGroup = <T>(
         key: SettingsSyncGroup,
         localValue: T,
         incomingValue: T,
-        apply: (value: T, incomingWins: boolean) => void
+        apply: (value: T, incomingWins: boolean) => void,
+        mergeValues?: (localValue: T, incomingValue: T, incomingWins: boolean) => T
     ) => {
         if (!shouldSync(key)) return;
         const localAt = localSettings.syncPreferencesUpdatedAt?.[key];
         const incomingAt = incomingSettings.syncPreferencesUpdatedAt?.[key];
         const incomingWins = isIncomingNewer(localAt, incomingAt);
-        apply(incomingWins ? incomingValue : localValue, incomingWins);
+        const resolvedValue = mergeValues
+            ? mergeValues(localValue, incomingValue, incomingWins)
+            : (incomingWins ? incomingValue : localValue);
+        apply(resolvedValue, incomingWins);
         const winnerAt = incomingWins ? incomingAt : localAt;
         if (winnerAt) nextSyncUpdatedAt[key] = winnerAt;
     };
@@ -361,7 +385,8 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
             merged.theme = value.theme;
             merged.appearance = value.appearance;
             merged.keybindingStyle = value.keybindingStyle;
-        }
+        },
+        (localValue, incomingValue, incomingWins) => mergeRecordFields(localValue, incomingValue, incomingWins)
     );
 
     mergeGroup(
@@ -372,7 +397,8 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
             merged.language = value.language;
             merged.weekStart = value.weekStart;
             merged.dateFormat = value.dateFormat;
-        }
+        },
+        (localValue, incomingValue, incomingWins) => mergeRecordFields(localValue, incomingValue, incomingWins)
     );
 
     mergeGroup(
@@ -390,7 +416,8 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
         incomingSettings.ai,
         (value) => {
             merged.ai = sanitizeAiForSync(value, localSettings.ai);
-        }
+        },
+        (localValue, incomingValue, incomingWins) => chooseGroupFieldValue(localValue, incomingValue, incomingWins)
     );
 
     merged.syncPreferencesUpdatedAt = Object.keys(nextSyncUpdatedAt).length > 0 ? nextSyncUpdatedAt : merged.syncPreferencesUpdatedAt;
