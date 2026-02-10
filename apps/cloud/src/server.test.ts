@@ -25,6 +25,32 @@ describe('cloud server utils', () => {
         expect(result.ok).toBe(false);
     });
 
+    test('rejects invalid task status and timestamps in app data', () => {
+        const invalidStatus = __cloudTestUtils.validateAppData({
+            tasks: [{
+                id: 't1',
+                title: 'Task 1',
+                status: 'todo',
+                createdAt: '2024-01-01T00:00:00.000Z',
+                updatedAt: '2024-01-01T00:00:00.000Z',
+            }],
+            projects: [],
+        });
+        expect(invalidStatus.ok).toBe(false);
+
+        const invalidTimestamp = __cloudTestUtils.validateAppData({
+            tasks: [{
+                id: 't1',
+                title: 'Task 1',
+                status: 'inbox',
+                createdAt: 'invalid',
+                updatedAt: '2024-01-01T00:00:00.000Z',
+            }],
+            projects: [],
+        });
+        expect(invalidTimestamp.ok).toBe(false);
+    });
+
     test('accepts only core task statuses', () => {
         expect(__cloudTestUtils.asStatus('reference')).toBe('reference');
         expect(__cloudTestUtils.asStatus('todo')).toBeNull();
