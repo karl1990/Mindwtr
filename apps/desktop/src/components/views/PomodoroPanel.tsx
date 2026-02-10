@@ -75,6 +75,10 @@ let persistedSnapshot: PomodoroSnapshot = createInitialSnapshot();
 export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     const updateTask = useTaskStore((state) => state.updateTask);
     const { t } = useLanguage();
+    const resolveText = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
     const [snapshot, setSnapshot] = useState<PomodoroSnapshot>(() => {
         persistedSnapshot = reconcileSnapshot(persistedSnapshot, Date.now());
         return persistedSnapshot;
@@ -243,7 +247,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
 
             <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">
-                    {t('taskEdit.title') === 'taskEdit.title' ? 'Task' : t('taskEdit.title')}
+                    {resolveText('taskEdit.title', 'Task')}
                 </label>
                 <select
                     className="w-full text-sm px-3 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -279,8 +283,8 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
                 >
                     {timerState.isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                     {timerState.isRunning
-                        ? (t('common.pause') === 'common.pause' ? 'Pause' : t('common.pause'))
-                        : (t('common.start') === 'common.start' ? 'Start' : t('common.start'))}
+                        ? resolveText('common.pause', 'Pause')
+                        : resolveText('common.start', 'Start')}
                 </button>
                 <button
                     type="button"
@@ -288,7 +292,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
                     className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded border border-border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors"
                 >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    {t('common.reset') === 'common.reset' ? 'Reset' : t('common.reset')}
+                    {resolveText('common.reset', 'Reset')}
                 </button>
                 <button
                     type="button"

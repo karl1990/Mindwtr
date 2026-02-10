@@ -291,6 +291,10 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             return sortTasksBy(filtered, sortBy);
         });
     }, [baseTasks, statusFilter, selectedTokens, activePriorities, activeTimeEstimates, sequentialProjectFirstTasks, projectMap, sortBy, sortByProjectOrder, resolvedAreaFilter, areaById]);
+    const resolveText = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
     const isReferenceAreaGrouping = statusFilter === 'reference';
     const referenceAreaGroups = useMemo(() => {
         if (!isReferenceAreaGrouping) return [] as Array<{ id: string; title: string; tasks: Task[]; muted?: boolean }>;
@@ -317,7 +321,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
         if (generalTasks.length > 0) {
             groups.push({
                 id: 'general',
-                title: t('settings.general') === 'settings.general' ? 'General' : t('settings.general'),
+                title: resolveText('settings.general', 'General'),
                 tasks: generalTasks,
                 muted: true,
             });
@@ -652,11 +656,6 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             detail: { initialProps: { status: initialStatus }, captureMode },
         }));
     }, []);
-
-    const resolveText = useCallback((key: string, fallback: string) => {
-        const value = t(key);
-        return value === key ? fallback : value;
-    }, [t]);
 
     const emptyState = useMemo(() => {
         switch (statusFilter) {

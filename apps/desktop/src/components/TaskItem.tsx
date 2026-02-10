@@ -909,6 +909,10 @@ export const TaskItem = memo(function TaskItem({
         const label = t('task.select');
         return label === 'task.select' ? 'Select task' : label;
     })();
+    const resolveText = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
 
     return (
         <>
@@ -1047,16 +1051,16 @@ export const TaskItem = memo(function TaskItem({
             {showDeleteConfirm && (
                 <ConfirmModal
                     isOpen={showDeleteConfirm}
-                    title={t('common.delete') === 'common.delete' ? 'Delete task' : t('common.delete')}
-                    message={t('list.confirmBatchDelete') === 'list.confirmBatchDelete' ? 'Delete selected tasks?' : t('list.confirmBatchDelete')}
-                    confirmLabel={t('common.delete') === 'common.delete' ? 'Delete' : t('common.delete')}
+                    title={resolveText('common.delete', 'Delete task')}
+                    message={resolveText('list.confirmBatchDelete', 'Delete selected tasks?')}
+                    confirmLabel={resolveText('common.delete', 'Delete')}
                     destructive
                     onCancel={() => setShowDeleteConfirm(false)}
                     onConfirm={() => {
                         setShowDeleteConfirm(false);
                         void deleteTask(task.id);
-                        const restoreLabel = t('trash.restoreToInbox') === 'trash.restoreToInbox' ? 'Restore' : t('trash.restoreToInbox');
-                        const deletedMessage = t('task.aria.delete') === 'task.aria.delete' ? 'Task deleted' : t('task.aria.delete');
+                        const restoreLabel = resolveText('trash.restoreToInbox', 'Restore');
+                        const deletedMessage = resolveText('task.aria.delete', 'Task deleted');
                         showToast(
                             deletedMessage,
                             'info',
@@ -1080,7 +1084,7 @@ export const TaskItem = memo(function TaskItem({
                     description={t('taskEdit.discardChangesDesc') === 'taskEdit.discardChangesDesc'
                         ? 'Your changes will be lost if you leave now.'
                         : t('taskEdit.discardChangesDesc')}
-                    confirmLabel={t('common.discard') === 'common.discard' ? 'Discard' : t('common.discard')}
+                    confirmLabel={resolveText('common.discard', 'Discard')}
                     cancelLabel={t('common.cancel')}
                     onCancel={() => setShowDiscardConfirm(false)}
                     onConfirm={() => {
