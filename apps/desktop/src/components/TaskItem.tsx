@@ -216,6 +216,7 @@ export const TaskItem = memo(function TaskItem({
     }, [editTextDirection]);
     const [isViewOpen, setIsViewOpen] = useState(false);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const prioritiesEnabled = settings?.features?.priorities === true;
     const timeEstimatesEnabled = settings?.features?.timeEstimates === true;
     const isCompact = settings?.appearance?.density === 'compact';
@@ -952,7 +953,7 @@ export const TaskItem = memo(function TaskItem({
                                 onToggleSelect,
                                 onToggleView: () => setIsViewOpen((prev) => !prev),
                                 onEdit: startEditing,
-                                onDelete: () => deleteTask(task.id),
+                                onDelete: () => setShowDeleteConfirm(true),
                                 onDuplicate: () => duplicateTask(task.id, false),
                                 onStatusChange: (status) => moveTask(task.id, status),
                                 onOpenProject: project ? handleOpenProject : undefined,
@@ -1036,6 +1037,20 @@ export const TaskItem = memo(function TaskItem({
                         const added = handleAddLinkAttachment(value);
                         if (!added) return;
                         setShowLinkPrompt(false);
+                    }}
+                />
+            )}
+            {showDeleteConfirm && (
+                <ConfirmModal
+                    isOpen={showDeleteConfirm}
+                    title={t('common.delete') === 'common.delete' ? 'Delete task' : t('common.delete')}
+                    message={t('list.confirmBatchDelete') === 'list.confirmBatchDelete' ? 'Delete selected tasks?' : t('list.confirmBatchDelete')}
+                    confirmLabel={t('common.delete') === 'common.delete' ? 'Delete' : t('common.delete')}
+                    destructive
+                    onCancel={() => setShowDeleteConfirm(false)}
+                    onConfirm={() => {
+                        setShowDeleteConfirm(false);
+                        void deleteTask(task.id);
                     }}
                 />
             )}
