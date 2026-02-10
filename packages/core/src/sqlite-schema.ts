@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   timeEstimate TEXT,
   reviewAt TEXT,
   completedAt TEXT,
+  rev INTEGER,
+  revBy TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   deletedAt TEXT,
@@ -47,6 +49,8 @@ CREATE TABLE IF NOT EXISTS projects (
   reviewAt TEXT,
   areaId TEXT,
   areaTitle TEXT,
+  rev INTEGER,
+  revBy TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   deletedAt TEXT
@@ -58,6 +62,8 @@ CREATE TABLE IF NOT EXISTS areas (
   color TEXT,
   icon TEXT,
   orderNum INTEGER NOT NULL,
+  rev INTEGER,
+  revBy TEXT,
   createdAt TEXT,
   updatedAt TEXT,
   deletedAt TEXT
@@ -70,6 +76,8 @@ CREATE TABLE IF NOT EXISTS sections (
   description TEXT,
   orderNum INTEGER,
   isCollapsed INTEGER,
+  rev INTEGER,
+  revBy TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   deletedAt TEXT

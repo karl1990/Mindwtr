@@ -183,6 +183,7 @@ export class SqliteAdapter {
         }
         await this.ensureTaskColumns();
         await this.ensureProjectColumns();
+        await this.ensureSectionColumns();
         await this.ensureAreaColumns();
         if (this.client.exec) {
             await this.client.exec(SQLITE_FTS_SCHEMA);
@@ -283,6 +284,8 @@ export class SqliteAdapter {
             { name: 'timeEstimate', sql: 'ALTER TABLE tasks ADD COLUMN timeEstimate TEXT' },
             { name: 'reviewAt', sql: 'ALTER TABLE tasks ADD COLUMN reviewAt TEXT' },
             { name: 'completedAt', sql: 'ALTER TABLE tasks ADD COLUMN completedAt TEXT' },
+            { name: 'rev', sql: 'ALTER TABLE tasks ADD COLUMN rev INTEGER' },
+            { name: 'revBy', sql: 'ALTER TABLE tasks ADD COLUMN revBy TEXT' },
             { name: 'createdAt', sql: 'ALTER TABLE tasks ADD COLUMN createdAt TEXT' },
             { name: 'updatedAt', sql: 'ALTER TABLE tasks ADD COLUMN updatedAt TEXT' },
             { name: 'deletedAt', sql: 'ALTER TABLE tasks ADD COLUMN deletedAt TEXT' },
@@ -308,6 +311,8 @@ export class SqliteAdapter {
             { name: 'reviewAt', sql: 'ALTER TABLE projects ADD COLUMN reviewAt TEXT' },
             { name: 'areaId', sql: 'ALTER TABLE projects ADD COLUMN areaId TEXT' },
             { name: 'areaTitle', sql: 'ALTER TABLE projects ADD COLUMN areaTitle TEXT' },
+            { name: 'rev', sql: 'ALTER TABLE projects ADD COLUMN rev INTEGER' },
+            { name: 'revBy', sql: 'ALTER TABLE projects ADD COLUMN revBy TEXT' },
             { name: 'createdAt', sql: 'ALTER TABLE projects ADD COLUMN createdAt TEXT' },
             { name: 'updatedAt', sql: 'ALTER TABLE projects ADD COLUMN updatedAt TEXT' },
             { name: 'deletedAt', sql: 'ALTER TABLE projects ADD COLUMN deletedAt TEXT' },
@@ -322,6 +327,26 @@ export class SqliteAdapter {
         );
     }
 
+    private async ensureSectionColumns() {
+        const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(sections)');
+        const names = new Set(columns.map((col) => col.name));
+        const definitions: Array<{ name: string; sql: string }> = [
+            { name: 'description', sql: 'ALTER TABLE sections ADD COLUMN description TEXT' },
+            { name: 'orderNum', sql: 'ALTER TABLE sections ADD COLUMN orderNum INTEGER' },
+            { name: 'isCollapsed', sql: 'ALTER TABLE sections ADD COLUMN isCollapsed INTEGER' },
+            { name: 'rev', sql: 'ALTER TABLE sections ADD COLUMN rev INTEGER' },
+            { name: 'revBy', sql: 'ALTER TABLE sections ADD COLUMN revBy TEXT' },
+            { name: 'createdAt', sql: 'ALTER TABLE sections ADD COLUMN createdAt TEXT' },
+            { name: 'updatedAt', sql: 'ALTER TABLE sections ADD COLUMN updatedAt TEXT' },
+            { name: 'deletedAt', sql: 'ALTER TABLE sections ADD COLUMN deletedAt TEXT' },
+        ];
+        for (const definition of definitions) {
+            if (!names.has(definition.name)) {
+                await this.client.run(definition.sql);
+            }
+        }
+    }
+
     private async ensureAreaColumns() {
         const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(areas)');
         const names = new Set(columns.map((col) => col.name));
@@ -329,6 +354,8 @@ export class SqliteAdapter {
             { name: 'color', sql: 'ALTER TABLE areas ADD COLUMN color TEXT' },
             { name: 'icon', sql: 'ALTER TABLE areas ADD COLUMN icon TEXT' },
             { name: 'orderNum', sql: 'ALTER TABLE areas ADD COLUMN orderNum INTEGER' },
+            { name: 'rev', sql: 'ALTER TABLE areas ADD COLUMN rev INTEGER' },
+            { name: 'revBy', sql: 'ALTER TABLE areas ADD COLUMN revBy TEXT' },
             { name: 'createdAt', sql: 'ALTER TABLE areas ADD COLUMN createdAt TEXT' },
             { name: 'updatedAt', sql: 'ALTER TABLE areas ADD COLUMN updatedAt TEXT' },
             { name: 'deletedAt', sql: 'ALTER TABLE areas ADD COLUMN deletedAt TEXT' },
@@ -485,6 +512,8 @@ export class SqliteAdapter {
             timeEstimate: row.timeEstimate as Task['timeEstimate'] | undefined,
             reviewAt: row.reviewAt as string | undefined,
             completedAt: row.completedAt as string | undefined,
+            rev: row.rev === null || row.rev === undefined ? undefined : Number(row.rev),
+            revBy: row.revBy as string | undefined,
             createdAt: String(row.createdAt ?? ''),
             updatedAt: String(row.updatedAt ?? ''),
             deletedAt: row.deletedAt as string | undefined,
@@ -507,6 +536,8 @@ export class SqliteAdapter {
             reviewAt: row.reviewAt as string | undefined,
             areaId: row.areaId as string | undefined,
             areaTitle: row.areaTitle as string | undefined,
+            rev: row.rev === null || row.rev === undefined ? undefined : Number(row.rev),
+            revBy: row.revBy as string | undefined,
             createdAt: String(row.createdAt ?? ''),
             updatedAt: String(row.updatedAt ?? ''),
             deletedAt: row.deletedAt as string | undefined,
@@ -521,6 +552,8 @@ export class SqliteAdapter {
             description: row.description as string | undefined,
             order: row.orderNum === null || row.orderNum === undefined ? 0 : Number(row.orderNum),
             isCollapsed: fromBool(row.isCollapsed),
+            rev: row.rev === null || row.rev === undefined ? undefined : Number(row.rev),
+            revBy: row.revBy as string | undefined,
             createdAt: String(row.createdAt ?? ''),
             updatedAt: String(row.updatedAt ?? ''),
             deletedAt: row.deletedAt as string | undefined,
@@ -545,6 +578,8 @@ export class SqliteAdapter {
             color: row.color as string | undefined,
             icon: row.icon as string | undefined,
             order: Number(row.orderNum ?? 0),
+            rev: row.rev === null || row.rev === undefined ? undefined : Number(row.rev),
+            revBy: row.revBy as string | undefined,
             createdAt: row.createdAt as string | undefined,
             updatedAt: row.updatedAt as string | undefined,
             deletedAt: row.deletedAt as string | undefined,
@@ -722,6 +757,8 @@ export class SqliteAdapter {
                     'timeEstimate',
                     'reviewAt',
                     'completedAt',
+                    'rev',
+                    'revBy',
                     'createdAt',
                     'updatedAt',
                     'deletedAt',
@@ -752,6 +789,8 @@ export class SqliteAdapter {
                     task.timeEstimate ?? null,
                     task.reviewAt ?? null,
                     task.completedAt ?? null,
+                    task.rev ?? null,
+                    task.revBy ?? null,
                     task.createdAt,
                     task.updatedAt,
                     task.deletedAt ?? null,
@@ -780,6 +819,8 @@ export class SqliteAdapter {
                  timeEstimate=excluded.timeEstimate,
                  reviewAt=excluded.reviewAt,
                  completedAt=excluded.completedAt,
+                 rev=excluded.rev,
+                 revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt,
@@ -802,6 +843,8 @@ export class SqliteAdapter {
                     'reviewAt',
                     'areaId',
                     'areaTitle',
+                    'rev',
+                    'revBy',
                     'createdAt',
                     'updatedAt',
                     'deletedAt',
@@ -820,6 +863,8 @@ export class SqliteAdapter {
                     project.reviewAt ?? null,
                     project.areaId ?? null,
                     project.areaTitle ?? null,
+                    project.rev ?? null,
+                    project.revBy ?? null,
                     project.createdAt,
                     project.updatedAt,
                     project.deletedAt ?? null,
@@ -836,6 +881,8 @@ export class SqliteAdapter {
                  reviewAt=excluded.reviewAt,
                  areaId=excluded.areaId,
                  areaTitle=excluded.areaTitle,
+                 rev=excluded.rev,
+                 revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt`,
@@ -850,6 +897,8 @@ export class SqliteAdapter {
                     'description',
                     'orderNum',
                     'isCollapsed',
+                    'rev',
+                    'revBy',
                     'createdAt',
                     'updatedAt',
                     'deletedAt',
@@ -861,6 +910,8 @@ export class SqliteAdapter {
                     section.description ?? null,
                     Number.isFinite(section.order) ? section.order : 0,
                     toBool(section.isCollapsed),
+                    section.rev ?? null,
+                    section.revBy ?? null,
                     section.createdAt,
                     section.updatedAt,
                     section.deletedAt ?? null,
@@ -870,6 +921,8 @@ export class SqliteAdapter {
                  description=excluded.description,
                  orderNum=excluded.orderNum,
                  isCollapsed=excluded.isCollapsed,
+                 rev=excluded.rev,
+                 revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt`,
@@ -883,6 +936,8 @@ export class SqliteAdapter {
                     'color',
                     'icon',
                     'orderNum',
+                    'rev',
+                    'revBy',
                     'createdAt',
                     'updatedAt',
                     'deletedAt',
@@ -893,6 +948,8 @@ export class SqliteAdapter {
                     area.color ?? null,
                     area.icon ?? null,
                     area.order,
+                    area.rev ?? null,
+                    area.revBy ?? null,
                     area.createdAt ?? null,
                     area.updatedAt ?? null,
                     area.deletedAt ?? null,
@@ -901,6 +958,8 @@ export class SqliteAdapter {
                  color=excluded.color,
                  icon=excluded.icon,
                  orderNum=excluded.orderNum,
+                 rev=excluded.rev,
+                 revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt`,
