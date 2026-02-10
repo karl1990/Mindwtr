@@ -32,7 +32,7 @@
 "\u5B8C\u5168\u79BB\u7EBF\u53EF\u7528\uFF0C\u65E0\u9700\u4E92\u8054\u7F51\u8FDE\u63A5",
           "\u5B8C\u5168\u5F00\u6E90\uFF0C\u5B89\u5168\u900F\u660E"
         ],
-        "ReleaseNotes": "\u2022 新增任务定时与回顾提醒通知，点击通知后的跳转更准确。\n\u2022 新增桌面端与移动端可选番茄专注计时器（默认关闭）。\n\u2022 优化移动端体验：修复已完成搜索跳转、iOS 键盘间隙、音频重复播放与弹窗返回行为。",
+        "ReleaseNotes": "\u2022 提升跨设备同步稳定性，修复了可能回滚较新编辑内容的修订冲突边界问题。\n\u2022 优化回顾与看板编辑体验，包含更智能的 @/# 建议与更清晰的看板任务编辑弹窗。\n\u2022 加强 FOSS Android 发布流程，提升可复现构建能力并进一步清理不必要权限。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -84,7 +84,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "\u2022 Added reliable scheduled-time notifications for tasks and review reminders, with better deep-link routing when tapping notifications.\n\u2022 Added optional Pomodoro Focus timer on desktop and mobile (disabled by default).\n\u2022 Improved mobile UX: fixed done-search routing, iOS keyboard gap, audio replay, and modal back behavior.",
+        "ReleaseNotes": "\u2022 Improved cross-device sync stability by fixing a revision tie-break edge case that could revert newer edits.\n\u2022 Improved review and board editing UX, including smarter @/# suggestions and a clearer board task edit modal.\n\u2022 Hardened FOSS Android release flow for reproducible builds and stricter permission cleanup.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -132,7 +132,7 @@
           "No requiere conexi\u00F3n a internet para funcionar",
           "C\u00F3digo abierto y transparente"
         ],
-        "ReleaseNotes": "\u2022 Se agregaron notificaciones fiables para tareas programadas y recordatorios de revisi\u00f3n, con mejor navegaci\u00f3n al tocar la notificaci\u00f3n.\n\u2022 Se a\u00f1adi\u00f3 el temporizador Pomodoro opcional en escritorio y m\u00f3vil (desactivado por defecto).\n\u2022 Mejoras en m\u00f3vil: correcci\u00f3n de navegaci\u00f3n de tareas completadas, hueco de teclado en iOS, repetici\u00f3n de audio y comportamiento de cierre de modales.",
+        "ReleaseNotes": "\u2022 Se mejor\u00f3 la estabilidad de sincronizaci\u00f3n entre dispositivos corrigiendo un caso l\u00edmite de conflictos que pod\u00eda revertir cambios m\u00e1s recientes.\n\u2022 Se mejor\u00f3 la experiencia de revisi\u00f3n y edici\u00f3n en tablero, incluyendo sugerencias @/# m\u00e1s inteligentes y un editor de tareas m\u00e1s claro.\n\u2022 Se reforz\u00f3 el flujo FOSS de Android para builds reproducibles y limpieza m\u00e1s estricta de permisos.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
