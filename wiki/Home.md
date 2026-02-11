@@ -15,10 +15,6 @@
 
 ---
 
-## Latest Release
-
-- **0.6.13**: major sync hardening, cloud attachment security improvements, desktop delete undo flow, and broader sync/cloud test coverage.
-
 ## 🧠 Design Philosophy
 
 Mindwtr is **simple by default and powerful when needed**. We focus on reducing cognitive load, cutting the fat, and keeping you in flow.
