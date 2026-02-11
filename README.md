@@ -33,6 +33,13 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
          style="height: 56px"
          height="56" />
   </a>
+  <a href="https://apps.apple.com/app/mindwtr/id6758597144" target="_blank">
+    <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83"
+         align="center"
+         alt="Download on the App Store"
+         style="height: 50px"
+         height="50" />
+  </a>
   <a href="https://snapcraft.io/mindwtr" target="_blank">
     <img alt="Get it from the Snap Store"
          src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
@@ -116,7 +123,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 ### Cross-Platform
 - 🖥️ **Desktop** - Tauri v2 (macOS, Linux, Windows)
-- 📱 **Mobile** - React Native/Expo (iOS via TestFlight, Android)
+- 📱 **Mobile** - React Native/Expo (iOS via App Store/TestFlight, Android)
 - 📲 **Android Widget** - Home screen focus/next widget
 - ⌨️ **Keyboard Shortcuts** - Vim and Emacs presets
 - 🎨 **Themes** - Light/Dark
@@ -226,7 +233,12 @@ brew install --cask mindwtr
 Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases).
 
 **iOS:**
-Available on TestFlight: [Join the beta](https://testflight.apple.com/join/7SMJCTSR).
+<a href="https://apps.apple.com/app/mindwtr/id6758597144">
+  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" alt="Download on the App Store">
+</a>
+
+Available on the App Store: [Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144).
+TestFlight beta: [Join the beta](https://testflight.apple.com/join/7SMJCTSR).
 
 However, maintaining the iOS version on the App Store requires a substantial annual fee (see the [Apple Developer Program](https://developer.apple.com/support/enrollment/)), which I currently cover out of pocket.
 
@@ -245,7 +257,7 @@ Install guides:
 
 - 📦 Add to Flathub
 - 🤖 Add to F-Droid
-- 📱 iOS release
+- 📱 Improve iOS experience
 - ✉️ Email to Inbox
 
 ## Documentation

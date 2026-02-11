@@ -8,7 +8,7 @@ Frequently asked questions about Mindwtr.
 
 ### What is Mindwtr?
 
-Mindwtr is a cross-platform Getting Things Done (GTD) productivity app that helps you capture, clarify, organize, and engage with your tasks. Available for desktop (Windows, macOS, Linux) and mobile (Android, iOS simulator builds).
+Mindwtr is a cross-platform Getting Things Done (GTD) productivity app that helps you capture, clarify, organize, and engage with your tasks. Available for desktop (Windows, macOS, Linux) and mobile (Android, iOS).
 
 ### Is Mindwtr free?
 
@@ -227,7 +227,7 @@ This clears the quarantine flag. The app is not notarized with Apple.
 ### Which platforms are supported?
 
 - **Android:** Full support via Google Play or APK download
-- **iOS:** iOS builds require an Apple Developer account ($99/year). Currently available as simulator builds only. If you want iOS builds, please consider [sponsoring the developer](https://github.com/sponsors/dongdongbh) so we can fund the Apple Developer account.
+- **iOS:** Available on the App Store and via TestFlight beta. Maintaining the App Store release still requires an annual Apple Developer fee, so sponsorship support helps keep iOS available.
 
 ### Why does editing feel different on desktop and mobile?
 

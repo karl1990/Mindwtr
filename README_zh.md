@@ -33,6 +33,13 @@
          style="height: 56px"
          height="56" />
   </a>
+  <a href="https://apps.apple.com/app/mindwtr/id6758597144" target="_blank">
+    <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83"
+         align="center"
+         alt="Download on the App Store"
+         style="height: 50px"
+         height="50" />
+  </a>
   <a href="https://snapcraft.io/mindwtr" target="_blank">
     <img alt="Get it from the Snap Store"
          src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
@@ -116,7 +123,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 
 ### 跨平台
 - 🖥️ **桌面端** - Tauri v2（macOS、Linux、Windows）
-- 📱 **移动端** - React Native/Expo（iOS 通过 TestFlight、Android）
+- 📱 **移动端** - React Native/Expo（iOS 通过 App Store/TestFlight、Android）
 - 📲 **Android 小部件** - 桌面焦点/下一步小组件
 - ⌨️ **键盘快捷键** - Vim 与 Emacs 预设
 - 🎨 **主题** - 明/暗模式
@@ -226,7 +233,12 @@ brew install --cask mindwtr
 其他方式：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
 **iOS：**
-已上线 TestFlight：[加入测试版](https://testflight.apple.com/join/7SMJCTSR)。
+<a href="https://apps.apple.com/app/mindwtr/id6758597144">
+  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83" alt="Download on the App Store">
+</a>
+
+已上线 App Store：[Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144)。
+TestFlight 测试版：[加入测试版](https://testflight.apple.com/join/7SMJCTSR)。
 
 不过，维护 iOS 版上架 App Store 需要支付较高的年费（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我自费承担。
 
@@ -245,7 +257,7 @@ brew install --cask mindwtr
 
 - 📦 上架 Flathub
 - 🤖 上架 F-Droid
-- 📱 iOS 正式发布
+- 📱 持续优化 iOS 体验
 - ✉️ 邮件添加到收件箱
 
 ## 文档

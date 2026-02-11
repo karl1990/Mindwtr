@@ -36,7 +36,7 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
   - [[Desktop Installation]] — Install on Linux, Windows, macOS
   - [[Desktop Keyboard Shortcuts]] — Vim and Emacs keybindings
 - [[User Guide Mobile]] — Complete mobile app documentation
-  - [[Mobile Installation]] — Install on Android and iOS (TestFlight)
+  - [[Mobile Installation]] — Install on Android and iOS (App Store/TestFlight)
 - [[Pomodoro Focus]] — Optional deep-work timer in Focus view
 - [[Docker Deployment]] — Run PWA and Cloud Server with Docker
 
@@ -128,6 +128,11 @@ Mindwtr is **simple by default and powerful when needed**. We focus on reducing 
 
 Mindwtr is available on Google Play:
 https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr
+
+## App Store (iOS)
+
+Mindwtr is available on the Apple App Store:
+https://apps.apple.com/app/mindwtr/id6758597144
 
 <div align="center">
 

@@ -27,7 +27,7 @@ See [[Desktop Installation]] for detailed instructions.
 | Platform    | Installation                                                                 |
 | ----------- | ---------------------------------------------------------------------------- |
 | **Android** | Google Play or APK from [Releases](https://github.com/dongdongbh/Mindwtr/releases) |
-| **iOS**     | Simulator builds only (requires Apple Developer account)                     |
+| **iOS**     | App Store, TestFlight beta, or simulator/self-build for development          |
 
 See [[Mobile Installation]] for detailed instructions.
 
