@@ -8,6 +8,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Alert, AppState, AppStateStatus, SafeAreaView, Text, View } from 'react-native';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quick-capture-context';
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
@@ -16,16 +17,45 @@ import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage 
 import { mobileStorage } from '../lib/storage-adapter';
 import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
 import { performMobileSync } from '../lib/sync-service';
-import { isLikelyOfflineSyncError } from '../lib/sync-service-utils';
+import { isLikelyOfflineSyncError, resolveBackend, type SyncBackend } from '../lib/sync-service-utils';
+import { SYNC_BACKEND_KEY } from '../lib/sync-constants';
 import { updateAndroidWidgetFromStore } from '../lib/widget-service';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
 import { logError, logWarn, setupGlobalErrorLogging } from '../lib/app-log';
 
-const AUTO_SYNC_MIN_INTERVAL_MS = 30_000;
-const AUTO_SYNC_DEBOUNCE_FIRST_CHANGE_MS = 8_000;
-const AUTO_SYNC_DEBOUNCE_CONTINUOUS_CHANGE_MS = 15_000;
-const FOREGROUND_SYNC_MIN_INTERVAL_MS = 45_000;
+type AutoSyncCadence = {
+  minIntervalMs: number;
+  debounceFirstChangeMs: number;
+  debounceContinuousChangeMs: number;
+  foregroundMinIntervalMs: number;
+};
+
+const AUTO_SYNC_BACKEND_CACHE_TTL_MS = 5_000;
+const AUTO_SYNC_CADENCE_FILE: AutoSyncCadence = {
+  minIntervalMs: 30_000,
+  debounceFirstChangeMs: 8_000,
+  debounceContinuousChangeMs: 15_000,
+  foregroundMinIntervalMs: 45_000,
+};
+const AUTO_SYNC_CADENCE_REMOTE: AutoSyncCadence = {
+  minIntervalMs: 5_000,
+  debounceFirstChangeMs: 2_000,
+  debounceContinuousChangeMs: 5_000,
+  foregroundMinIntervalMs: 30_000,
+};
+const AUTO_SYNC_CADENCE_OFF: AutoSyncCadence = {
+  minIntervalMs: 60_000,
+  debounceFirstChangeMs: 15_000,
+  debounceContinuousChangeMs: 30_000,
+  foregroundMinIntervalMs: 60_000,
+};
+
+const getCadenceForBackend = (backend: SyncBackend): AutoSyncCadence => {
+  if (backend === 'file') return AUTO_SYNC_CADENCE_FILE;
+  if (backend === 'webdav' || backend === 'cloud') return AUTO_SYNC_CADENCE_REMOTE;
+  return AUTO_SYNC_CADENCE_OFF;
+};
 
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
@@ -64,8 +94,27 @@ function RootLayoutContent() {
   const loadAttempts = useRef(0);
   const lastSyncErrorShown = useRef<string | null>(null);
   const lastSyncErrorAt = useRef(0);
+  const syncCadenceRef = useRef<AutoSyncCadence>(AUTO_SYNC_CADENCE_REMOTE);
+  const syncBackendCacheRef = useRef<{ backend: SyncBackend; readAt: number }>({
+    backend: 'off',
+    readAt: 0,
+  });
 
-  const runSync = useCallback((minIntervalMs = AUTO_SYNC_MIN_INTERVAL_MS) => {
+  const refreshSyncCadence = useCallback(async (): Promise<AutoSyncCadence> => {
+    const now = Date.now();
+    const cached = syncBackendCacheRef.current;
+    if (now - cached.readAt <= AUTO_SYNC_BACKEND_CACHE_TTL_MS) {
+      syncCadenceRef.current = getCadenceForBackend(cached.backend);
+      return syncCadenceRef.current;
+    }
+    const rawBackend = await AsyncStorage.getItem(SYNC_BACKEND_KEY);
+    const backend = resolveBackend(rawBackend);
+    syncBackendCacheRef.current = { backend, readAt: now };
+    syncCadenceRef.current = getCadenceForBackend(backend);
+    return syncCadenceRef.current;
+  }, []);
+
+  const runSync = useCallback((minIntervalMs = syncCadenceRef.current.minIntervalMs) => {
     if (!isActive.current) return;
     if (syncInFlight.current && appState.current !== 'active') {
       backgroundSyncPending.current = true;
@@ -113,7 +162,7 @@ function RootLayoutContent() {
       }
       if (syncPending.current && isActive.current) {
         // Avoid immediate back-to-back sync loops while user is actively editing.
-        runSync(AUTO_SYNC_MIN_INTERVAL_MS);
+        runSync(syncCadenceRef.current.minIntervalMs);
       }
     });
   }, []);
@@ -142,25 +191,33 @@ function RootLayoutContent() {
     };
   }, [router]);
 
-  const requestSync = useCallback((minIntervalMs = AUTO_SYNC_MIN_INTERVAL_MS) => {
+  const requestSync = useCallback((minIntervalMs?: number) => {
     syncPending.current = true;
-    runSync(minIntervalMs);
-  }, [runSync]);
+    if (typeof minIntervalMs === 'number') {
+      runSync(minIntervalMs);
+      return;
+    }
+    void refreshSyncCadence()
+      .then((cadence) => runSync(cadence.minIntervalMs))
+      .catch(logAppError);
+  }, [refreshSyncCadence, runSync]);
 
   // Auto-sync on data changes with debounce
   useEffect(() => {
     setupGlobalErrorLogging();
+    void refreshSyncCadence().catch(logAppError);
     const unsubscribe = useTaskStore.subscribe((state, prevState) => {
       if (state.lastDataChangeAt === prevState.lastDataChangeAt) return;
       // Debounce sync to batch frequent edits and avoid UI jank from constant sync churn.
+      const cadence = syncCadenceRef.current;
       const hadTimer = !!syncDebounceTimer.current;
       if (syncDebounceTimer.current) {
         clearTimeout(syncDebounceTimer.current);
       }
-      const debounceMs = hadTimer ? AUTO_SYNC_DEBOUNCE_CONTINUOUS_CHANGE_MS : AUTO_SYNC_DEBOUNCE_FIRST_CHANGE_MS;
+      const debounceMs = hadTimer ? cadence.debounceContinuousChangeMs : cadence.debounceFirstChangeMs;
       syncDebounceTimer.current = setTimeout(() => {
         if (!isActive.current) return;
-        requestSync(AUTO_SYNC_MIN_INTERVAL_MS);
+        requestSync();
       }, debounceMs);
     });
 
@@ -210,10 +267,14 @@ function RootLayoutContent() {
       const nextInactiveOrBackground = nextAppState === 'inactive' || nextAppState === 'background';
       if (wasInactiveOrBackground && nextAppState === 'active') {
         // Coming back to foreground - sync to get latest data
-        const now = Date.now();
-        if (now - lastAutoSyncAt.current > FOREGROUND_SYNC_MIN_INTERVAL_MS) {
-          requestSync(0);
-        }
+        void refreshSyncCadence()
+          .then((cadence) => {
+            const now = Date.now();
+            if (now - lastAutoSyncAt.current > cadence.foregroundMinIntervalMs) {
+              requestSync(0);
+            }
+          })
+          .catch(logAppError);
         updateAndroidWidgetFromStore().catch(logAppError);
         if (widgetRefreshTimer.current) {
           clearTimeout(widgetRefreshTimer.current);
