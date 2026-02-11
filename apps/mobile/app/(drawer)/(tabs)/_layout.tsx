@@ -21,8 +21,9 @@ function NativeTabBar({
   inactiveTint,
   tc,
   tabBarHeight,
-  tabBarBottomInset,
+  androidNavInset,
   iconLift,
+  iconVerticalOffset,
   openQuickCapture,
   defaultAutoRecord,
 }: BottomTabBarProps & {
@@ -30,8 +31,9 @@ function NativeTabBar({
   inactiveTint: string;
   tc: { cardBg: string; border: string; onTint: string; tint: string };
   tabBarHeight: number;
-  tabBarBottomInset: number;
+  androidNavInset: number;
   iconLift: number;
+  iconVerticalOffset: number;
   openQuickCapture: (options?: { initialValue?: string; initialProps?: Partial<Task>; autoRecord?: boolean }) => void;
   defaultAutoRecord: boolean;
 }) {
@@ -47,7 +49,7 @@ function NativeTabBar({
           backgroundColor: tc.cardBg,
           borderTopColor: tc.border,
           height: tabBarHeight,
-          paddingBottom: tabBarBottomInset,
+          paddingBottom: androidNavInset,
         },
       ]}
     >
@@ -76,9 +78,15 @@ function NativeTabBar({
               }}
               accessibilityRole="button"
               accessibilityLabel={defaultAutoRecord ? 'Audio capture' : 'Add task'}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.nativeTabItem, { paddingTop: iconLift }]}
             >
-              <View style={[styles.captureButtonInner, { backgroundColor: tc.tint }]}>
+              <View
+                style={[
+                  styles.captureButtonInner,
+                  { backgroundColor: tc.tint, transform: [{ translateY: iconVerticalOffset }] },
+                ]}
+              >
                 {defaultAutoRecord ? (
                   <Mic size={24} color={tc.onTint} strokeWidth={2.5} />
                 ) : (
@@ -121,9 +129,12 @@ function NativeTabBar({
             testID={options.tabBarButtonTestID}
             onPress={onPress}
             onLongPress={onLongPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.nativeTabItem, { paddingTop: iconLift }]}
           >
-            <View style={styles.nativeTabIconWrap}>{tabIcon}</View>
+            <View style={[styles.nativeTabIconWrap, { transform: [{ translateY: iconVerticalOffset }] }]}>
+              {tabIcon}
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -139,10 +150,9 @@ export default function TabLayout() {
   const androidNavInset = Platform.OS === 'android' && insets.bottom >= 20
     ? Math.max(0, insets.bottom - 12)
     : 0;
-  const iosBottomInset = Platform.OS === 'ios' ? Math.max(8, insets.bottom) : 0;
-  const tabBarBottomInset = androidNavInset + iosBottomInset;
-  const tabBarHeight = 58 + tabBarBottomInset;
+  const tabBarHeight = 58 + androidNavInset;
   const iconLift = Platform.OS === 'android' ? 6 : 0;
+  const iconVerticalOffset = Platform.OS === 'ios' ? -4 : 0;
   const [captureState, setCaptureState] = useState<{
     visible: boolean;
     initialValue?: string;
@@ -187,8 +197,9 @@ export default function TabLayout() {
             inactiveTint={inactiveTint}
             tc={{ cardBg: tc.cardBg, border: tc.border, onTint: tc.onTint, tint: tc.tint }}
             tabBarHeight={tabBarHeight}
-            tabBarBottomInset={tabBarBottomInset}
+            androidNavInset={androidNavInset}
             iconLift={iconLift}
+            iconVerticalOffset={iconVerticalOffset}
             openQuickCapture={openQuickCapture}
             defaultAutoRecord={defaultAutoRecord}
           />
