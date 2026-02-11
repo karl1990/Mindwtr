@@ -22,6 +22,11 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
 import { logError, logWarn, setupGlobalErrorLogging } from '../lib/app-log';
 
+const AUTO_SYNC_MIN_INTERVAL_MS = 30_000;
+const AUTO_SYNC_DEBOUNCE_FIRST_CHANGE_MS = 8_000;
+const AUTO_SYNC_DEBOUNCE_CONTINUOUS_CHANGE_MS = 15_000;
+const FOREGROUND_SYNC_MIN_INTERVAL_MS = 45_000;
+
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
 const logAppError = (error: unknown) => {
@@ -60,7 +65,7 @@ function RootLayoutContent() {
   const lastSyncErrorShown = useRef<string | null>(null);
   const lastSyncErrorAt = useRef(0);
 
-  const runSync = useCallback((minIntervalMs = 5_000) => {
+  const runSync = useCallback((minIntervalMs = AUTO_SYNC_MIN_INTERVAL_MS) => {
     if (!isActive.current) return;
     if (syncInFlight.current && appState.current !== 'active') {
       backgroundSyncPending.current = true;
@@ -107,7 +112,8 @@ function RootLayoutContent() {
         return;
       }
       if (syncPending.current && isActive.current) {
-        runSync(0);
+        // Avoid immediate back-to-back sync loops while user is actively editing.
+        runSync(AUTO_SYNC_MIN_INTERVAL_MS);
       }
     });
   }, []);
@@ -136,7 +142,7 @@ function RootLayoutContent() {
     };
   }, [router]);
 
-  const requestSync = useCallback((minIntervalMs = 5_000) => {
+  const requestSync = useCallback((minIntervalMs = AUTO_SYNC_MIN_INTERVAL_MS) => {
     syncPending.current = true;
     runSync(minIntervalMs);
   }, [runSync]);
@@ -146,15 +152,15 @@ function RootLayoutContent() {
     setupGlobalErrorLogging();
     const unsubscribe = useTaskStore.subscribe((state, prevState) => {
       if (state.lastDataChangeAt === prevState.lastDataChangeAt) return;
-      // Debounce sync: wait 5 seconds after last change
+      // Debounce sync to batch frequent edits and avoid UI jank from constant sync churn.
       const hadTimer = !!syncDebounceTimer.current;
       if (syncDebounceTimer.current) {
         clearTimeout(syncDebounceTimer.current);
       }
-      const debounceMs = hadTimer ? 5000 : 2000;
+      const debounceMs = hadTimer ? AUTO_SYNC_DEBOUNCE_CONTINUOUS_CHANGE_MS : AUTO_SYNC_DEBOUNCE_FIRST_CHANGE_MS;
       syncDebounceTimer.current = setTimeout(() => {
         if (!isActive.current) return;
-        requestSync(debounceMs);
+        requestSync(AUTO_SYNC_MIN_INTERVAL_MS);
       }, debounceMs);
     });
 
@@ -205,7 +211,7 @@ function RootLayoutContent() {
       if (wasInactiveOrBackground && nextAppState === 'active') {
         // Coming back to foreground - sync to get latest data
         const now = Date.now();
-        if (now - lastAutoSyncAt.current > 30_000) {
+        if (now - lastAutoSyncAt.current > FOREGROUND_SYNC_MIN_INTERVAL_MS) {
           requestSync(0);
         }
         updateAndroidWidgetFromStore().catch(logAppError);
