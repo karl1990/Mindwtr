@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     useTaskStore,
@@ -401,62 +402,64 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
         <GestureHandlerRootView
             style={[styles.modalContainer, { backgroundColor: tc.bg }]}
         >
-            <View style={[styles.header, { borderBottomColor: tc.border }]}>
-                <TouchableOpacity onPress={onClose}>
-                    <Text style={[styles.closeButton, { color: tc.text }]}>✕</Text>
-                </TouchableOpacity>
-                <View style={styles.headerCenter}>
-                    <Text style={[styles.headerTitle, { color: tc.text }]}>{t('dailyReview.title')}</Text>
-                    <Text style={[styles.headerStep, { color: tc.secondaryText }]}>
-                        {t('review.step')} {Math.max(1, currentIndex + 1)} {t('review.of')} {steps.length}
-                    </Text>
-                </View>
-                <View style={{ width: 28 }} />
-            </View>
-
-            <View style={[styles.progressTrack, { backgroundColor: tc.border }]}>
-                <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: tc.tint }]} />
-            </View>
-
-            <View style={styles.content}>{renderStep()}</View>
-
-            {currentStep !== 'intro' && currentStep !== 'complete' && (
-                <View style={[styles.footer, { borderTopColor: tc.border, backgroundColor: tc.cardBg }]}>
-                    <TouchableOpacity
-                        onPress={back}
-                        disabled={currentIndex === 0}
-                        style={[styles.footerButton, { backgroundColor: tc.filterBg, opacity: currentIndex === 0 ? 0.5 : 1 }]}
-                    >
-                        <Text style={[styles.footerButtonText, { color: tc.text }]}>{t('review.back')}</Text>
+            <SafeAreaView style={[styles.modalContainer, { backgroundColor: tc.bg }]} edges={['top']}>
+                <View style={[styles.header, { borderBottomColor: tc.border }]}>
+                    <TouchableOpacity onPress={onClose}>
+                        <Text style={[styles.closeButton, { color: tc.text }]}>✕</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={next} style={[styles.footerButton, { backgroundColor: tc.tint }]}>
-                        <Text style={styles.footerPrimaryText}>{t('review.nextStepBtn')}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.headerCenter}>
+                        <Text style={[styles.headerTitle, { color: tc.text }]}>{t('dailyReview.title')}</Text>
+                        <Text style={[styles.headerStep, { color: tc.secondaryText }]}>
+                            {t('review.step')} {Math.max(1, currentIndex + 1)} {t('review.of')} {steps.length}
+                        </Text>
+                    </View>
+                    <View style={{ width: 28 }} />
                 </View>
-            )}
-            <ErrorBoundary>
-                <InboxProcessingModal
-                    visible={showInboxProcessing}
-                    onClose={() => setShowInboxProcessing(false)}
-                />
-            </ErrorBoundary>
 
-            <ErrorBoundary>
-                <TaskEditModal
-                    visible={isTaskModalVisible}
-                    task={editingTask}
-                    onClose={closeTask}
-                    onSave={(taskId, updates) => {
-                        updateTask(taskId, updates);
-                        closeTask();
-                    }}
-                    defaultTab="view"
-                    onFocusMode={(taskId) => {
-                        closeTask();
-                        router.push(`/check-focus?id=${taskId}`);
-                    }}
-                />
-            </ErrorBoundary>
+                <View style={[styles.progressTrack, { backgroundColor: tc.border }]}>
+                    <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: tc.tint }]} />
+                </View>
+
+                <View style={styles.content}>{renderStep()}</View>
+
+                {currentStep !== 'intro' && currentStep !== 'complete' && (
+                    <View style={[styles.footer, { borderTopColor: tc.border, backgroundColor: tc.cardBg }]}>
+                        <TouchableOpacity
+                            onPress={back}
+                            disabled={currentIndex === 0}
+                            style={[styles.footerButton, { backgroundColor: tc.filterBg, opacity: currentIndex === 0 ? 0.5 : 1 }]}
+                        >
+                            <Text style={[styles.footerButtonText, { color: tc.text }]}>{t('review.back')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={next} style={[styles.footerButton, { backgroundColor: tc.tint }]}>
+                            <Text style={styles.footerPrimaryText}>{t('review.nextStepBtn')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+                <ErrorBoundary>
+                    <InboxProcessingModal
+                        visible={showInboxProcessing}
+                        onClose={() => setShowInboxProcessing(false)}
+                    />
+                </ErrorBoundary>
+
+                <ErrorBoundary>
+                    <TaskEditModal
+                        visible={isTaskModalVisible}
+                        task={editingTask}
+                        onClose={closeTask}
+                        onSave={(taskId, updates) => {
+                            updateTask(taskId, updates);
+                            closeTask();
+                        }}
+                        defaultTab="view"
+                        onFocusMode={(taskId) => {
+                            closeTask();
+                            router.push(`/check-focus?id=${taskId}`);
+                        }}
+                    />
+                </ErrorBoundary>
+            </SafeAreaView>
         </GestureHandlerRootView>
     );
 }

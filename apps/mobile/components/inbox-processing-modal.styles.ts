@@ -22,7 +22,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerClose: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
   },
   progressContainer: {
@@ -44,7 +44,8 @@ export const styles = StyleSheet.create({
     borderRadius: 2,
   },
   skipBtn: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
     color: '#3B82F6',
   },
   taskDisplay: {
@@ -65,11 +66,26 @@ export const styles = StyleSheet.create({
   },
   processingHeader: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 60,
+  },
+  headerActionButton: {
+    minWidth: 72,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  headerActionButtonLeft: {
+    alignItems: 'flex-start',
+  },
+  headerActionButtonRight: {
+    alignItems: 'flex-end',
+  },
+  headerActionSpacer: {
+    minWidth: 72,
   },
   loadingText: {
     fontSize: 14,
@@ -379,5 +395,16 @@ export const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  singlePageScroll: {
+    flex: 1,
+  },
+  singlePageContent: {
+    paddingBottom: 28,
+  },
+  singleSection: {
+    borderBottomWidth: 1,
+    paddingBottom: 18,
+    marginBottom: 18,
   },
 });
