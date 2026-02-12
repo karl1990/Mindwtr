@@ -162,11 +162,19 @@ export class SqliteAdapter {
     private async acquireFtsLock(): Promise<string | null> {
         const owner = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const now = Date.now();
+        const staleBefore = now - FTS_LOCK_TTL_MS;
         await this.client.run(
             'CREATE TABLE IF NOT EXISTS fts_lock (id INTEGER PRIMARY KEY, owner TEXT, acquiredAt INTEGER)'
         );
-        await this.client.run('DELETE FROM fts_lock WHERE acquiredAt < ?', [now - FTS_LOCK_TTL_MS]);
-        await this.client.run('INSERT OR IGNORE INTO fts_lock (id, owner, acquiredAt) VALUES (1, ?, ?)', [owner, now]);
+        await this.client.run(
+            `INSERT INTO fts_lock (id, owner, acquiredAt)
+             VALUES (1, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               owner = excluded.owner,
+               acquiredAt = excluded.acquiredAt
+             WHERE fts_lock.acquiredAt < ?`,
+            [owner, now, staleBefore]
+        );
         const row = await this.client.get<{ owner?: string }>('SELECT owner FROM fts_lock WHERE id = 1');
         return row?.owner === owner ? owner : null;
     }
