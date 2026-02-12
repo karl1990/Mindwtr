@@ -2,7 +2,7 @@
 name: "\U0001F41B Bug Report"
 about: Create a report to help us improve Mindwtr
 title: "[BUG]"
-labels: bug
+labels: bug,status:needs-triage
 assignees: ''
 
 ---
@@ -12,6 +12,7 @@ assignees: ''
 - [ ] Desktop (macOS)
 - [ ] Desktop (Windows)
 - [ ] Mobile (Android)
+- [ ] Mobile (iOS)
 
 ### ℹ️ Environment
 - **App Version:** (e.g. v0.1.0 or Commit Hash)
