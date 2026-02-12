@@ -809,6 +809,27 @@ describe('Sync Logic', () => {
             expect(saved!.tasks.some((task) => task.id === 'old-purged')).toBe(true);
         });
 
+        it('keeps freshly purged tombstones so deletion can sync', async () => {
+            let saved: AppData | null = null;
+            const freshPurgedTask = {
+                ...createMockTask('fresh-purged', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                purgedAt: '2026-01-01T00:00:00.000Z',
+            } as Task;
+
+            await performSyncCycle({
+                readLocal: async () => mockAppData([freshPurgedTask]),
+                readRemote: async () => null,
+                writeLocal: async (data) => {
+                    saved = data;
+                },
+                writeRemote: async () => undefined,
+                now: () => '2026-01-02T00:00:00.000Z',
+            });
+
+            expect(saved).not.toBeNull();
+            expect(saved!.tasks.some((task) => task.id === 'fresh-purged')).toBe(true);
+        });
+
         it('writes local before remote and surfaces remote failures', async () => {
             let wroteLocal = false;
             let wroteRemote = false;
