@@ -158,6 +158,43 @@ describeBun('SqliteAdapter', () => {
         expect(area.revBy).toBe('device-desktop');
     });
 
+    it('drops attachments with empty URIs when loading tasks', async () => {
+        const now = new Date().toISOString();
+        const data: AppData = {
+            tasks: [
+                {
+                    id: 'task-empty-uri',
+                    title: 'Task with invalid attachment',
+                    status: 'inbox',
+                    tags: [],
+                    contexts: [],
+                    attachments: [
+                        {
+                            id: 'att-empty',
+                            kind: 'file',
+                            title: 'empty',
+                            uri: '   ',
+                            createdAt: now,
+                            updatedAt: now,
+                        },
+                    ],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+
+        await adapter.saveData(data);
+        const loaded = await adapter.getData();
+
+        expect(loaded.tasks).toHaveLength(1);
+        expect(loaded.tasks[0].attachments).toBeUndefined();
+    });
+
     it('adds missing task columns on older schemas', async () => {
         db.exec(`
             CREATE TABLE tasks (
