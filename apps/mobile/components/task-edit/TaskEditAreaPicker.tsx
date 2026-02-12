@@ -85,7 +85,7 @@ export function TaskEditAreaPicker({
                     {!hasExactAreaMatch && areaQuery.trim() && (
                         <Pressable onPress={handleCreateArea} style={styles.pickerItem}>
                             <Text style={[styles.pickerItemText, { color: tc.tint }]}>
-                                + {t('projects.create')} &quot;{areaQuery.trim()}&quot;
+                                + {t('areas.create')} &quot;{areaQuery.trim()}&quot;
                             </Text>
                         </Pressable>
                     )}

@@ -227,19 +227,19 @@ export default function SearchScreen() {
         return Array.from(tokens).filter(Boolean).sort();
     }, [_allTasks]);
     const dueLabels: Record<typeof duePreset, string> = {
-        any: t('search.due.any') || 'Any',
-        overdue: t('search.due.overdue') || 'Overdue',
-        today: t('search.due.today') || 'Today',
-        tomorrow: t('search.due.tomorrow') || 'Tomorrow',
-        this_week: t('search.due.thisWeek') || 'This week',
-        next_week: t('search.due.nextWeek') || 'Next week',
-        none: t('search.due.none') || 'No due date',
+        any: t('search.due.any'),
+        overdue: t('search.due.overdue'),
+        today: t('search.due.today'),
+        tomorrow: t('search.due.tomorrow'),
+        this_week: t('search.due.thisWeek'),
+        next_week: t('search.due.nextWeek'),
+        none: t('search.due.none'),
     };
     const scopeLabels: Record<typeof scope, string> = {
-        all: t('search.scope.all') || 'All',
-        projects: t('search.scope.projects') || 'Projects only',
-        tasks: t('search.scope.tasks') || 'Tasks only',
-        project_tasks: t('search.scope.projectTasks') || 'Tasks in projects',
+        all: t('search.scope.all'),
+        projects: t('search.scope.projects'),
+        tasks: t('search.scope.tasks'),
+        project_tasks: t('search.scope.projectTasks'),
     };
     const toggleStatus = (status: TaskStatus) => {
         setSelectedStatuses((prev) => (
@@ -270,11 +270,11 @@ export default function SearchScreen() {
     });
     if (selectedArea !== 'all') {
         const label = selectedArea === 'none'
-            ? (t('taskEdit.noAreaOption') || 'No Area')
+            ? t('taskEdit.noAreaOption')
             : (areas.find((area) => area.id === selectedArea)?.name ?? selectedArea);
         activeChips.push({
             key: `area:${selectedArea}`,
-            label: `${t('taskEdit.areaLabel') || 'Area'}: ${label}`,
+            label: `${t('taskEdit.areaLabel')}: ${label}`,
             onPress: () => setSelectedArea('all'),
         });
     }
