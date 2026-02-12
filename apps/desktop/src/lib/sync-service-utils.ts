@@ -1,4 +1,11 @@
-import type { Attachment } from '@mindwtr/core';
+import {
+    getFileSyncDir,
+    isSyncFilePath,
+    normalizePath,
+    normalizeSyncBackend,
+    type Attachment,
+    type SyncBackend,
+} from '@mindwtr/core';
 
 export const ATTACHMENTS_DIR_NAME = 'attachments';
 
@@ -50,32 +57,12 @@ export const hashString = async (value: string): Promise<string> => {
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export const normalizePath = (input: string) => input.replace(/\\/g, '/').toLowerCase();
-
-export const isSyncFilePath = (path: string, syncFileName: string, legacySyncFileName: string) => {
-    const normalized = normalizePath(path);
-    return normalized.endsWith(`/${syncFileName}`) || normalized.endsWith(`/${legacySyncFileName}`);
-};
-
-export type SyncBackend = 'off' | 'file' | 'webdav' | 'cloud';
-
-export const normalizeSyncBackend = (raw: string | null): SyncBackend => {
-    if (raw === 'off' || raw === 'file' || raw === 'webdav' || raw === 'cloud') return raw;
-    return 'off';
-};
-
-export const getFileSyncDir = (
-    syncPath: string,
-    syncFileName: string,
-    legacySyncFileName: string
-): string => {
-    if (!syncPath) return '';
-    const trimmed = syncPath.replace(/[\\/]+$/, '');
-    if (isSyncFilePath(trimmed, syncFileName, legacySyncFileName)) {
-        const lastSlash = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
-        return lastSlash > -1 ? trimmed.slice(0, lastSlash) : '';
-    }
-    return trimmed;
+export {
+    getFileSyncDir,
+    isSyncFilePath,
+    normalizePath,
+    normalizeSyncBackend,
+    type SyncBackend,
 };
 
 export const stripFileScheme = (uri: string): string => {

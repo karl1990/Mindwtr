@@ -11,6 +11,7 @@
     "./store": "./src/store.ts",
     "./sync": "./src/sync.ts",
     "./sync-helpers": "./src/sync-helpers.ts",
+    "./sync-service-utils": "./src/sync-service-utils.ts",
     "./task-utils": "./src/task-utils.ts",
     "./contexts": "./src/contexts.ts",
     "./i18n": "./src/i18n.ts",

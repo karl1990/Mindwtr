@@ -1,3 +1,5 @@
+import { getFileSyncDir, isSyncFilePath as isCoreSyncFilePath, normalizeSyncBackend, type SyncBackend } from '@mindwtr/core';
+
 const SYNC_FILE_NAME = 'data.json';
 const LEGACY_SYNC_FILE_NAME = 'mindwtr-sync.json';
 const AI_KEY_PATTERNS = [
@@ -38,8 +40,6 @@ const sanitizeMessage = (value: string): string => {
   return result;
 };
 
-export type SyncBackend = 'file' | 'webdav' | 'cloud' | 'off';
-
 export const formatSyncErrorMessage = (error: unknown, backend: SyncBackend): string => {
   const raw = sanitizeMessage(String(error));
   if (backend !== 'webdav') return raw;
@@ -62,25 +62,10 @@ export const isLikelyOfflineSyncError = (errorOrMessage: unknown): boolean => {
   return OFFLINE_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 };
 
-export const isSyncFilePath = (path: string) =>
-  path.endsWith(`/${SYNC_FILE_NAME}`) || path.endsWith(`/${LEGACY_SYNC_FILE_NAME}`);
+export const isSyncFilePath = (path: string) => isCoreSyncFilePath(path, SYNC_FILE_NAME, LEGACY_SYNC_FILE_NAME);
 
 export const getFileSyncBaseDir = (syncPath: string) => {
-  const trimmed = syncPath.replace(/\/+$/, '');
-  if (isSyncFilePath(trimmed)) {
-    return trimmed.replace(/\/[^/]+$/, '');
-  }
-  return trimmed;
+  return getFileSyncDir(syncPath, SYNC_FILE_NAME, LEGACY_SYNC_FILE_NAME);
 };
 
-export const resolveBackend = (value: string | null): SyncBackend => {
-  switch (value) {
-    case 'webdav':
-    case 'cloud':
-    case 'off':
-    case 'file':
-      return value;
-    default:
-      return 'off';
-  }
-};
+export const resolveBackend = (value: string | null): SyncBackend => normalizeSyncBackend(value);

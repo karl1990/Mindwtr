@@ -4,6 +4,7 @@ export * from './store';
 export * from './sync';
 export * from './sync-helpers';
 export * from './sync-runtime-utils';
+export * from './sync-service-utils';
 export * from './task-utils';
 export * from './contexts';
 export * from './i18n';
