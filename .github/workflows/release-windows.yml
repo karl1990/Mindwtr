@@ -409,38 +409,87 @@ jobs:
             if ([string]::IsNullOrWhiteSpace($text)) { return $false }
             return $text -match '(?i)(\b50[0-9]\b|Gateway Timeout|Service unavailable|OriginTimeout|Azure Front Door|timed out|timeout|temporar(y|ily)|try again)'
           }
-
-          $maxRetries = 5
-          $delaySeconds = 30
-          $published = $false
-          $publishOutput = ''
-
-          for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
-            Write-Host "Publishing to Microsoft Store (attempt $attempt of $maxRetries)..."
+          $invokeMsstore = {
+            param(
+              [string[]]$args,
+              [int]$timeoutMs
+            )
             $psi = [System.Diagnostics.ProcessStartInfo]::new()
             $psi.FileName = 'msstore'
-            $psi.ArgumentList.Add('publish')
-            $psi.ArgumentList.Add($msix)
-            $psi.ArgumentList.Add('-id')
-            $psi.ArgumentList.Add($env:MS_STORE_APP_ID)
+            foreach ($arg in $args) {
+              $psi.ArgumentList.Add($arg)
+            }
             $psi.RedirectStandardOutput = $true
             $psi.RedirectStandardError = $true
             $psi.UseShellExecute = $false
             $process = [System.Diagnostics.Process]::Start($psi)
             $stdoutTask = $process.StandardOutput.ReadToEndAsync()
             $stderrTask = $process.StandardError.ReadToEndAsync()
-            if (-not $process.WaitForExit(900000)) {
+            if (-not $process.WaitForExit($timeoutMs)) {
               $process.Kill()
-              $publishOutput = "Publish timed out after 15 minutes"
-              $exitCode = 124
-            } else {
-              $stdout = $stdoutTask.GetAwaiter().GetResult()
-              $stderr = $stderrTask.GetAwaiter().GetResult()
-              $publishOutput = ($stdout + $stderr).Trim()
-              $exitCode = $process.ExitCode
+              return [pscustomobject]@{
+                ExitCode = 124
+                Output = "Command timed out after $([Math]::Round($timeoutMs / 60000.0, 2)) minutes"
+              }
+            }
+            $stdout = $stdoutTask.GetAwaiter().GetResult()
+            $stderr = $stderrTask.GetAwaiter().GetResult()
+            return [pscustomobject]@{
+              ExitCode = $process.ExitCode
+              Output = ($stdout + $stderr).Trim()
+            }
+          }
+
+          $maxRetries = 5
+          $delaySeconds = 30
+          $updated = $false
+          $updateOutput = ''
+
+          # Upload package to the existing draft submission so metadata and package are committed together.
+          for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+            Write-Host "Updating Microsoft Store draft submission package (attempt $attempt of $maxRetries)..."
+            $updateResult = & $invokeMsstore @('submission', 'update', $env:MS_STORE_APP_ID, $msix) 900000
+            $updateOutput = $updateResult.Output
+            if ($updateResult.ExitCode -eq 0) {
+              $updated = $true
+              break
             }
 
-            if ($exitCode -eq 0) {
+            if (& $isStoreBusy $updateOutput) {
+              Write-Warning "Store submission is already in certification/in-progress. Skipping publish."
+              exit 0
+            }
+
+            $statusRecheckOutput = & msstore submission status $env:MS_STORE_APP_ID 2>&1
+            if ($LASTEXITCODE -eq 0 -and (& $isStoreBusy ($statusRecheckOutput | Out-String))) {
+              Write-Warning "Store submission moved into certification/in-progress state. Skipping publish. Status: $statusRecheckOutput"
+              exit 0
+            }
+
+            if ((& $isTransientStoreError $updateOutput) -and $attempt -lt $maxRetries) {
+              Write-Warning "Transient Store API error detected while updating package. Retrying in $delaySeconds seconds..."
+              Start-Sleep -Seconds $delaySeconds
+              $delaySeconds = [Math]::Min($delaySeconds * 2, 240)
+              continue
+            }
+
+            break
+          }
+
+          if (-not $updated) {
+            throw "Store package update failed after $maxRetries attempts: $updateOutput"
+          }
+
+          $delaySeconds = 30
+          $published = $false
+          $publishOutput = ''
+
+          # Publish (commit) the same draft submission that now contains metadata + package updates.
+          for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+            Write-Host "Publishing Microsoft Store draft submission (attempt $attempt of $maxRetries)..."
+            $publishResult = & $invokeMsstore @('submission', 'publish', $env:MS_STORE_APP_ID) 900000
+            $publishOutput = $publishResult.Output
+            if ($publishResult.ExitCode -eq 0) {
               $published = $true
               break
             }
@@ -457,7 +506,7 @@ jobs:
             }
 
             if ((& $isTransientStoreError $publishOutput) -and $attempt -lt $maxRetries) {
-              Write-Warning "Transient Store API error detected. Retrying in $delaySeconds seconds..."
+              Write-Warning "Transient Store API error detected while publishing submission. Retrying in $delaySeconds seconds..."
               Start-Sleep -Seconds $delaySeconds
               $delaySeconds = [Math]::Min($delaySeconds * 2, 240)
               continue
@@ -467,7 +516,7 @@ jobs:
           }
 
           if (-not $published) {
-            throw "Store publish failed after $maxRetries attempts: $publishOutput"
+            throw "Store submission publish failed after $maxRetries attempts: $publishOutput"
           }
 
       - name: Collect Windows artifacts
