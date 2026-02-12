@@ -260,7 +260,7 @@ jobs:
             exit 1
           fi
 
-          xcrun altool --upload-app --type macos --file "$PKG_PATH" --username "$UPLOAD_APPLE_ID" --password "$UPLOAD_APPLE_PASSWORD"
+          xcrun iTMSTransporter -m upload -assetFile "$PKG_PATH" -u "$UPLOAD_APPLE_ID" -p "$UPLOAD_APPLE_PASSWORD" -v informational
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
