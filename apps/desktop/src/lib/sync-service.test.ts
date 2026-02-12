@@ -96,4 +96,33 @@ describe('SyncService orchestration', () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         expect(backendSpy).toHaveBeenCalledTimes(2);
     });
+
+    it('emits queued status updates while a sync is already in flight', async () => {
+        const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
+        backendSpy
+            .mockImplementationOnce(async () => {
+                await new Promise((resolve) => setTimeout(resolve, 25));
+                return 'off';
+            })
+            .mockResolvedValue('off');
+
+        const snapshots: Array<ReturnType<typeof SyncService.getSyncStatus>> = [];
+        const unsubscribe = SyncService.subscribeSyncStatus((status) => {
+            snapshots.push({ ...status });
+        });
+
+        const first = SyncService.performSync();
+        const second = SyncService.performSync();
+        await Promise.all([first, second]);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        unsubscribe();
+
+        expect(snapshots.some((status) => status.inFlight === true)).toBe(true);
+        expect(snapshots.some((status) => status.queued === true)).toBe(true);
+        expect(SyncService.getSyncStatus()).toMatchObject({
+            inFlight: false,
+            queued: false,
+            lastResult: 'success',
+        });
+    });
 });
