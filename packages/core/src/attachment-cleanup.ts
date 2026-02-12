@@ -38,7 +38,6 @@ export function findDeletedAttachmentsForFileCleanup(appData: AppData): Attachme
     const deleted = new Map<string, Attachment>();
 
     for (const task of appData.tasks) {
-        if (task.deletedAt) continue;
         for (const attachment of task.attachments || []) {
             if (!attachment.deletedAt) continue;
             deleted.set(attachment.id, attachment);
@@ -46,7 +45,6 @@ export function findDeletedAttachmentsForFileCleanup(appData: AppData): Attachme
     }
 
     for (const project of appData.projects) {
-        if (project.deletedAt) continue;
         for (const attachment of project.attachments || []) {
             if (!attachment.deletedAt) continue;
             deleted.set(attachment.id, attachment);

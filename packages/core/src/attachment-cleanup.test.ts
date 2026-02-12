@@ -139,7 +139,7 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
         expect(deleted.map((a) => a.id).sort()).toEqual(['a1', 'a2']);
     });
 
-    it('does not return deleted attachments from deleted parents', () => {
+    it('returns deleted attachments even when parents are deleted', () => {
         const data = buildData();
         data.tasks.push({
             id: 't1',
@@ -163,7 +163,7 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
         });
 
         const deleted = findDeletedAttachmentsForFileCleanup(data);
-        expect(deleted).toHaveLength(0);
+        expect(deleted.map((a) => a.id)).toEqual(['a1']);
     });
 });
 

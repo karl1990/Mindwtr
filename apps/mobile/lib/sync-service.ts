@@ -118,7 +118,6 @@ const findDeletedAttachmentsForFileCleanupLocal = (appData: AppData): Attachment
   const deleted = new Map<string, Attachment>();
 
   for (const task of appData.tasks) {
-    if (task.deletedAt) continue;
     for (const attachment of getAttachmentsArray(task.attachments)) {
       if (!attachment.deletedAt) continue;
       deleted.set(attachment.id, attachment);
@@ -126,7 +125,6 @@ const findDeletedAttachmentsForFileCleanupLocal = (appData: AppData): Attachment
   }
 
   for (const project of appData.projects) {
-    if (project.deletedAt) continue;
     for (const attachment of getAttachmentsArray(project.attachments)) {
       if (!attachment.deletedAt) continue;
       deleted.set(attachment.id, attachment);
