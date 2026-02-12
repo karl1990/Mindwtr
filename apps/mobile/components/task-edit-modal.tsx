@@ -1835,7 +1835,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             onChangeText={updateContextInput}
                             onFocus={() => setIsContextInputFocused(true)}
                             onBlur={commitContextDraft}
-                            placeholder="@home, @work"
+                            placeholder={t('taskEdit.contextsPlaceholder')}
                             autoCapitalize="none"
                             placeholderTextColor={tc.secondaryText}
                         />
@@ -1883,7 +1883,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             onChangeText={updateTagInput}
                             onFocus={() => setIsTagInputFocused(true)}
                             onBlur={commitTagDraft}
-                            placeholder="#urgent, #idea"
+                            placeholder={t('taskEdit.tagsPlaceholder')}
                             autoCapitalize="none"
                             placeholderTextColor={tc.secondaryText}
                         />
