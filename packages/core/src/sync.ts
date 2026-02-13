@@ -100,8 +100,13 @@ const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
 const isValidTimestamp = (value: unknown): value is string =>
     typeof value === 'string' && Number.isFinite(Date.parse(value));
 
-const normalizeRevisionMetadata = <T extends Record<string, unknown>>(item: T): T => {
-    const normalized = { ...item } as Record<string, unknown>;
+type RevisionMetadata = {
+    rev?: unknown;
+    revBy?: unknown;
+};
+
+const normalizeRevisionMetadata = <T extends RevisionMetadata>(item: T): T => {
+    const normalized = { ...item };
     const rawRev = normalized.rev;
     if (
         typeof rawRev !== 'number'
@@ -122,7 +127,7 @@ const normalizeRevisionMetadata = <T extends Record<string, unknown>>(item: T): 
     } else {
         delete normalized.revBy;
     }
-    return normalized as T;
+    return normalized;
 };
 
 const validateRevisionFields = (
