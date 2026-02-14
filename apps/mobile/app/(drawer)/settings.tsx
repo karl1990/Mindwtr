@@ -14,10 +14,10 @@ import {
     BackHandler,
     Platform,
     KeyboardAvoidingView,
+    LayoutAnimation,
     Modal,
     Pressable,
 } from 'react-native';
-import { HeaderBackButton, type HeaderBackButtonProps } from '@react-navigation/elements';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,7 +25,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { useNavigation, useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useTheme } from '../../contexts/theme-context';
 import { useLanguage, Language } from '../../contexts/language-context';
 
@@ -184,7 +184,6 @@ const isValidHttpUrl = (value: string): boolean => {
 
 export default function SettingsPage() {
     const navigation = useNavigation();
-    const router = useRouter();
     const { themeMode, setThemeMode } = useTheme();
     const { language, setLanguage, t } = useLanguage();
     const localize = (enText: string, zhText?: string) =>
@@ -220,6 +219,12 @@ export default function SettingsPage() {
     const [whisperDownloadError, setWhisperDownloadError] = useState('');
     const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
     const [speechOpen, setSpeechOpen] = useState(false);
+    const setCurrentScreenWithAnimation = useCallback((nextScreen: SettingsScreen) => {
+        if (Platform.OS === 'ios') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
+        setCurrentScreen(nextScreen);
+    }, []);
 
     const tc = useThemeColors();
     const insets = useSafeAreaInsets();
@@ -507,36 +512,31 @@ export default function SettingsPage() {
     const handleSettingsBack = useCallback(() => {
         if (currentScreen !== 'main') {
             if (currentScreen === 'gtd-time-estimates' || currentScreen === 'gtd-task-editor' || currentScreen === 'gtd-archive') {
-                setCurrentScreen('gtd');
+                setCurrentScreenWithAnimation('gtd');
             } else if (currentScreen === 'ai' || currentScreen === 'calendar') {
-                setCurrentScreen('advanced');
+                setCurrentScreenWithAnimation('advanced');
             } else {
-                setCurrentScreen('main');
+                setCurrentScreenWithAnimation('main');
             }
             return true;
         }
         return false;
-    }, [currentScreen]);
-
-    const handleHeaderBack = useCallback(() => {
-        if (handleSettingsBack()) return;
-        if (router.canGoBack()) {
-            router.back();
-        }
-    }, [handleSettingsBack, router]);
+    }, [currentScreen, setCurrentScreenWithAnimation]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerLeft: (props: HeaderBackButtonProps) => (
-                <HeaderBackButton
-                    {...props}
-                    onPress={handleHeaderBack}
-                />
-            ),
             headerBackTitleVisible: false,
             headerBackTitle: '',
         });
-    }, [navigation, handleHeaderBack]);
+    }, [navigation]);
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+            if (!handleSettingsBack()) return;
+            event.preventDefault();
+        });
+        return unsubscribe;
+    }, [navigation, handleSettingsBack]);
 
     // Handle Android hardware back button
     useEffect(() => {
@@ -2650,16 +2650,16 @@ export default function SettingsPage() {
                         {timeEstimatesEnabled && (
                             <MenuItem
                                 title={t('settings.timeEstimatePresets')}
-                                onPress={() => setCurrentScreen('gtd-time-estimates')}
+                                onPress={() => setCurrentScreenWithAnimation('gtd-time-estimates')}
                             />
                         )}
                         <MenuItem
                             title={t('settings.autoArchive')}
-                            onPress={() => setCurrentScreen('gtd-archive')}
+                            onPress={() => setCurrentScreenWithAnimation('gtd-archive')}
                         />
                         <MenuItem
                             title={t('settings.taskEditorLayout')}
-                            onPress={() => setCurrentScreen('gtd-task-editor')}
+                            onPress={() => setCurrentScreenWithAnimation('gtd-task-editor')}
                         />
                     </View>
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
@@ -3320,8 +3320,8 @@ export default function SettingsPage() {
                 <SubHeader title={t('settings.advanced')} />
                 <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                     <View style={[styles.menuCard, { backgroundColor: tc.cardBg }]}>
-                        <MenuItem title={t('settings.ai')} onPress={() => setCurrentScreen('ai')} />
-                        <MenuItem title={t('settings.calendar')} onPress={() => setCurrentScreen('calendar')} />
+                        <MenuItem title={t('settings.ai')} onPress={() => setCurrentScreenWithAnimation('ai')} />
+                        <MenuItem title={t('settings.calendar')} onPress={() => setCurrentScreenWithAnimation('calendar')} />
                     </View>
                 </ScrollView>
             </SafeAreaView>
@@ -4009,12 +4009,12 @@ export default function SettingsPage() {
         <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
             <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentStyle}>
                 <View style={[styles.menuCard, { backgroundColor: tc.cardBg, marginTop: 16 }]}>
-                    <MenuItem title={t('settings.general')} onPress={() => setCurrentScreen('general')} />
-                    <MenuItem title={t('settings.gtd')} onPress={() => setCurrentScreen('gtd')} />
-                    <MenuItem title={t('settings.notifications')} onPress={() => setCurrentScreen('notifications')} />
-                    <MenuItem title={t('settings.dataSync')} onPress={() => setCurrentScreen('sync')} />
-                    <MenuItem title={t('settings.advanced')} onPress={() => setCurrentScreen('advanced')} />
-                    <MenuItem title={t('settings.about')} onPress={() => setCurrentScreen('about')} showIndicator={hasUpdateBadge} />
+                    <MenuItem title={t('settings.general')} onPress={() => setCurrentScreenWithAnimation('general')} />
+                    <MenuItem title={t('settings.gtd')} onPress={() => setCurrentScreenWithAnimation('gtd')} />
+                    <MenuItem title={t('settings.notifications')} onPress={() => setCurrentScreenWithAnimation('notifications')} />
+                    <MenuItem title={t('settings.dataSync')} onPress={() => setCurrentScreenWithAnimation('sync')} />
+                    <MenuItem title={t('settings.advanced')} onPress={() => setCurrentScreenWithAnimation('advanced')} />
+                    <MenuItem title={t('settings.about')} onPress={() => setCurrentScreenWithAnimation('about')} showIndicator={hasUpdateBadge} />
                 </View>
             </ScrollView>
         </SafeAreaView>
