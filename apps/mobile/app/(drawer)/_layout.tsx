@@ -18,6 +18,23 @@ export default function AppLayout() {
         headerTitleAlign: 'center',
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
+        headerBackVisible: false,
+        headerLeft: ({ canGoBack, tintColor }) => {
+          if (!canGoBack) return null;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={8}
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+              }}
+              style={styles.plainBackButton}
+            >
+              <Ionicons color={tintColor ?? tc.text} name="chevron-back" size={24} />
+            </Pressable>
+          );
+        },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -37,20 +54,6 @@ export default function AppLayout() {
         options={{
           title: t('settings.title'),
           headerBackButtonMenuEnabled: false,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => {
-                if (router.canGoBack()) router.back();
-              }}
-              style={styles.plainBackButton}
-            >
-              <Ionicons color={tc.text} name="chevron-back" size={24} />
-            </Pressable>
-          ),
         }}
       />
       <Stack.Screen name="saved-search/[id]" options={{ title: t('search.title') }} />
