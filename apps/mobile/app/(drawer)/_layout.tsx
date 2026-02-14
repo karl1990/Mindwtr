@@ -1,11 +1,13 @@
-
-import { Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useRouter } from 'expo-router';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { useLanguage } from '../../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function AppLayout() {
   const tc = useThemeColors();
+  const router = useRouter();
   const { t } = useLanguage();
 
   return (
@@ -35,9 +37,32 @@ export default function AppLayout() {
         options={{
           title: t('settings.title'),
           headerBackButtonMenuEnabled: false,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={8}
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+              }}
+              style={styles.plainBackButton}
+            >
+              <Ionicons color={tc.text} name="chevron-back" size={24} />
+            </Pressable>
+          ),
         }}
       />
       <Stack.Screen name="saved-search/[id]" options={{ title: t('search.title') }} />
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  plainBackButton: {
+    backgroundColor: 'transparent',
+    marginLeft: 2,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+});
