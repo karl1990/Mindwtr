@@ -19,7 +19,8 @@ import {
 } from '@mindwtr/core';
 
 import { cn } from '../../lib/utils';
-import { Markdown } from '../Markdown';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { WeekdaySelector } from './TaskForm/WeekdaySelector';
 
 export type MonthlyRecurrenceInfo = {
@@ -220,7 +221,62 @@ export function TaskItemFieldRenderer({
                     </div>
                     {showDescriptionPreview ? (
                         <div className={cn("text-xs bg-muted/30 border border-border rounded px-2 py-2", isRtl && "text-right")} dir={resolvedDirection}>
-                            <Markdown markdown={editDescription || ''} />
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    a: ({ className, ...props }: any) => (
+                                        <a
+                                            className={cn("text-primary underline hover:text-primary/80", className)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            {...props}
+                                        />
+                                    ),
+                                    ul: ({ className, ...props }: any) => (
+                                        <ul className={cn("list-disc pl-4 py-1 space-y-0.5", className)} {...props} />
+                                    ),
+                                    ol: ({ className, ...props }: any) => (
+                                        <ol className={cn("list-decimal pl-4 py-1 space-y-0.5", className)} {...props} />
+                                    ),
+                                    li: ({ className, ...props }: any) => (
+                                        <li className={cn("pl-1", className)} {...props} />
+                                    ),
+                                    p: ({ className, children, ...props }: any) => (
+                                        <p className={cn("mb-1 last:mb-0 leading-relaxed", className)} {...props}>
+                                            {children}
+                                        </p>
+                                    ),
+                                    code: ({ className, ...props }: any) => (
+                                        <code className={cn("bg-muted px-1 py-0.5 rounded text-[0.9em] font-mono", className)} {...props} />
+                                    ),
+                                    pre: ({ className, ...props }: any) => (
+                                        <pre className={cn("bg-muted p-2 rounded-md overflow-x-auto my-1", className)} {...props} />
+                                    ),
+                                    blockquote: ({ className, ...props }: any) => (
+                                        <blockquote className={cn("border-l-2 border-primary/50 pl-3 italic my-1 text-muted-foreground/80", className)} {...props} />
+                                    ),
+                                    table: ({ className, ...props }: any) => (
+                                        <div className="overflow-x-auto my-2">
+                                            <table className={cn("min-w-full divide-y divide-border", className)} {...props} />
+                                        </div>
+                                    ),
+                                    th: ({ className, ...props }: any) => (
+                                        <th className={cn("px-2 py-1 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/50", className)} {...props} />
+                                    ),
+                                    td: ({ className, ...props }: any) => (
+                                        <td className={cn("px-2 py-1 text-sm border-b border-border/50", className)} {...props} />
+                                    ),
+                                    // Handle task lists (GFM)
+                                    input: ({ type, ...props }: any) => {
+                                        if (type === 'checkbox') {
+                                            return <input type="checkbox" className="mr-2 accent-primary" {...props} />;
+                                        }
+                                        return <input type={type} {...props} />;
+                                    }
+                                }}
+                            >
+                                {editDescription || ''}
+                            </ReactMarkdown>
                         </div>
                     ) : (
                         <textarea
@@ -232,7 +288,7 @@ export function TaskItemFieldRenderer({
                             dir={resolvedDirection}
                         />
                     )}
-                    </div>
+                </div>
             );
         case 'textDirection':
             return (
@@ -252,24 +308,24 @@ export function TaskItemFieldRenderer({
         case 'attachments':
             return (
                 <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs text-muted-foreground font-medium">{t('attachments.title')}</label>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={addFileAttachment}
-                                    className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
-                                >
-                                    <Paperclip className="w-3 h-3" />
-                                    {t('attachments.addFile')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={addLinkAttachment}
-                                    className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
-                                >
-                                    <Link2 className="w-3 h-3" />
-                                    {t('attachments.addLink')}
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs text-muted-foreground font-medium">{t('attachments.title')}</label>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={addFileAttachment}
+                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                            >
+                                <Paperclip className="w-3 h-3" />
+                                {t('attachments.addFile')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={addLinkAttachment}
+                                className="text-xs px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1"
+                            >
+                                <Link2 className="w-3 h-3" />
+                                {t('attachments.addLink')}
                             </button>
                         </div>
                     </div>
@@ -444,18 +500,18 @@ export function TaskItemFieldRenderer({
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.statusLabel')}</label>
                     <select
-                            value={editStatus}
-                            aria-label={t('task.aria.status')}
-                            onChange={(event) => setEditStatus(event.target.value as TaskStatus)}
-                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground w-full max-w-[min(18rem,40vw)]"
-                        >
-                            <option value="inbox">{t('status.inbox')}</option>
-                            <option value="next">{t('status.next')}</option>
+                        value={editStatus}
+                        aria-label={t('task.aria.status')}
+                        onChange={(event) => setEditStatus(event.target.value as TaskStatus)}
+                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground w-full max-w-[min(18rem,40vw)]"
+                    >
+                        <option value="inbox">{t('status.inbox')}</option>
+                        <option value="next">{t('status.next')}</option>
                         <option value="waiting">{t('status.waiting')}</option>
                         <option value="someday">{t('status.someday')}</option>
-                            {editStatus === 'reference' && (
-                                <option value="reference">{t('status.reference')}</option>
-                            )}
+                        {editStatus === 'reference' && (
+                            <option value="reference">{t('status.reference')}</option>
+                        )}
                         <option value="done">{t('status.done')}</option>
                     </select>
                 </div>
@@ -464,14 +520,14 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.priorityLabel')}</label>
-                        <select
-                            value={editPriority}
-                            aria-label={t('taskEdit.priorityLabel')}
-                            onChange={(e) => setEditPriority(e.target.value as TaskPriority | '')}
-                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-                        >
-                            <option value="">{t('common.none')}</option>
-                            <option value="low">{t('priority.low')}</option>
+                    <select
+                        value={editPriority}
+                        aria-label={t('taskEdit.priorityLabel')}
+                        onChange={(e) => setEditPriority(e.target.value as TaskPriority | '')}
+                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
+                    >
+                        <option value="">{t('common.none')}</option>
+                        <option value="low">{t('priority.low')}</option>
                         <option value="medium">{t('priority.medium')}</option>
                         <option value="high">{t('priority.high')}</option>
                         <option value="urgent">{t('priority.urgent')}</option>
@@ -482,47 +538,47 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1 w-full">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.recurrenceLabel')}</label>
-                        <select
-                            value={editRecurrence}
-                            aria-label={t('task.aria.recurrence')}
-                            onChange={(e) => {
-                                const value = e.target.value as RecurrenceRule | '';
-                                setEditRecurrence(value);
-                                if (value === 'weekly') {
-                                    const parsed = parseRRuleString(editRecurrenceRRule);
-                                    if (!editRecurrenceRRule || parsed.rule !== 'weekly') {
-                                        setEditRecurrenceRRule(buildRRuleString('weekly'));
-                                    }
+                    <select
+                        value={editRecurrence}
+                        aria-label={t('task.aria.recurrence')}
+                        onChange={(e) => {
+                            const value = e.target.value as RecurrenceRule | '';
+                            setEditRecurrence(value);
+                            if (value === 'weekly') {
+                                const parsed = parseRRuleString(editRecurrenceRRule);
+                                if (!editRecurrenceRRule || parsed.rule !== 'weekly') {
+                                    setEditRecurrenceRRule(buildRRuleString('weekly'));
                                 }
-                                if (value === 'monthly') {
-                                    const parsed = parseRRuleString(editRecurrenceRRule);
-                                    if (!editRecurrenceRRule || parsed.rule !== 'monthly') {
-                                        setEditRecurrenceRRule(buildRRuleString('monthly'));
-                                    }
+                            }
+                            if (value === 'monthly') {
+                                const parsed = parseRRuleString(editRecurrenceRRule);
+                                if (!editRecurrenceRRule || parsed.rule !== 'monthly') {
+                                    setEditRecurrenceRRule(buildRRuleString('monthly'));
                                 }
-                                if (!value) {
-                                    setEditRecurrenceRRule('');
-                                }
-                            }}
-                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
-                        >
-                            <option value="">{t('recurrence.none')}</option>
+                            }
+                            if (!value) {
+                                setEditRecurrenceRRule('');
+                            }
+                        }}
+                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                    >
+                        <option value="">{t('recurrence.none')}</option>
                         <option value="daily">{t('recurrence.daily')}</option>
                         <option value="weekly">{t('recurrence.weekly')}</option>
                         <option value="monthly">{t('recurrence.monthly')}</option>
                         <option value="yearly">{t('recurrence.yearly')}</option>
                     </select>
-                        {editRecurrence && (
-                            <label className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
-                                <input
-                                    type="checkbox"
-                                    checked={editRecurrenceStrategy === 'fluid'}
-                                    onChange={(e) => setEditRecurrenceStrategy(e.target.checked ? 'fluid' : 'strict')}
-                                    className="accent-primary"
-                                />
-                                {t('recurrence.afterCompletion')}
-                            </label>
-                        )}
+                    {editRecurrence && (
+                        <label className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
+                            <input
+                                type="checkbox"
+                                checked={editRecurrenceStrategy === 'fluid'}
+                                onChange={(e) => setEditRecurrenceStrategy(e.target.checked ? 'fluid' : 'strict')}
+                                className="accent-primary"
+                            />
+                            {t('recurrence.afterCompletion')}
+                        </label>
+                    )}
                     {editRecurrence === 'weekly' && (
                         <div className="pt-1">
                             <span className="text-[10px] text-muted-foreground">Repeat on</span>
@@ -570,14 +626,14 @@ export function TaskItemFieldRenderer({
             return (
                 <div className="flex flex-col gap-1 w-full">
                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.timeEstimateLabel')}</label>
-                        <select
-                            value={editTimeEstimate}
-                            aria-label={t('task.aria.timeEstimate')}
-                            onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
-                            className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
-                        >
-                            <option value="">{t('common.none')}</option>
-                            <option value="5min">5m</option>
+                    <select
+                        value={editTimeEstimate}
+                        aria-label={t('task.aria.timeEstimate')}
+                        onChange={(e) => setEditTimeEstimate(e.target.value as TimeEstimate | '')}
+                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                    >
+                        <option value="">{t('common.none')}</option>
+                        <option value="5min">5m</option>
                         <option value="10min">10m</option>
                         <option value="15min">15m</option>
                         <option value="30min">30m</option>
