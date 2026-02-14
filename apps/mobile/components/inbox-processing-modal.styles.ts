@@ -339,6 +339,22 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  tokenSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  tokenChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  suggestionChip: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   contextWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

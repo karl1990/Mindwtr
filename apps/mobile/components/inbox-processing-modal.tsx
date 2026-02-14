@@ -89,35 +89,84 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
   const contextSuggestionPool = useMemo(() => {
-    const counts = new Map<string, number>();
+    const usage = new Map<string, { count: number; lastUsedAt: number }>();
+    const ensureToken = (token: string) => {
+      if (!usage.has(token)) {
+        usage.set(token, { count: 0, lastUsedAt: 0 });
+      }
+      return usage.get(token)!;
+    };
     PRESET_CONTEXTS
       .filter((item) => item.startsWith('@'))
-      .forEach((item) => counts.set(item, (counts.get(item) || 0) + 1));
+      .forEach((item) => {
+        const entry = ensureToken(item);
+        entry.count += 1;
+      });
     tasks.forEach((task) => {
+      const taskUpdatedAt = safeParseDate(task.updatedAt)?.getTime()
+        ?? safeParseDate(task.createdAt)?.getTime()
+        ?? 0;
       (task.contexts ?? []).forEach((ctx) => {
         if (!ctx?.startsWith('@')) return;
-        counts.set(ctx, (counts.get(ctx) || 0) + 1);
+        const entry = ensureToken(ctx);
+        entry.count += 1;
+        if (taskUpdatedAt > entry.lastUsedAt) {
+          entry.lastUsedAt = taskUpdatedAt;
+        }
       });
     });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return Array.from(usage.entries())
+      .sort((a, b) => {
+        const aMeta = a[1];
+        const bMeta = b[1];
+        return bMeta.lastUsedAt - aMeta.lastUsedAt || bMeta.count - aMeta.count || a[0].localeCompare(b[0]);
+      })
       .map(([token]) => token);
   }, [tasks]);
   const tagSuggestionPool = useMemo(() => {
-    const counts = new Map<string, number>();
+    const usage = new Map<string, { count: number; lastUsedAt: number }>();
+    const ensureToken = (token: string) => {
+      if (!usage.has(token)) {
+        usage.set(token, { count: 0, lastUsedAt: 0 });
+      }
+      return usage.get(token)!;
+    };
     PRESET_TAGS
       .filter((item) => item.startsWith('#'))
-      .forEach((item) => counts.set(item, (counts.get(item) || 0) + 1));
+      .forEach((item) => {
+        const entry = ensureToken(item);
+        entry.count += 1;
+      });
     tasks.forEach((task) => {
+      const taskUpdatedAt = safeParseDate(task.updatedAt)?.getTime()
+        ?? safeParseDate(task.createdAt)?.getTime()
+        ?? 0;
       (task.tags ?? []).forEach((tag) => {
         if (!tag?.startsWith('#')) return;
-        counts.set(tag, (counts.get(tag) || 0) + 1);
+        const entry = ensureToken(tag);
+        entry.count += 1;
+        if (taskUpdatedAt > entry.lastUsedAt) {
+          entry.lastUsedAt = taskUpdatedAt;
+        }
       });
     });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return Array.from(usage.entries())
+      .sort((a, b) => {
+        const aMeta = a[1];
+        const bMeta = b[1];
+        return bMeta.lastUsedAt - aMeta.lastUsedAt || bMeta.count - aMeta.count || a[0].localeCompare(b[0]);
+      })
       .map(([token]) => token);
   }, [tasks]);
+  const suggestionTerms = useMemo(() => {
+    const raw = `${processingTitle} ${processingDescription} ${newContext}`.toLowerCase();
+    const parts = raw
+      .split(/[^a-z0-9@#]+/i)
+      .map((term) => term.trim())
+      .filter((term) => term.length >= 2)
+      .map((term) => term.replace(/^[@#]/, ''));
+    return Array.from(new Set(parts)).slice(0, 10);
+  }, [newContext, processingDescription, processingTitle]);
   const tokenDraft = newContext.trim();
   const tokenPrefix = tokenDraft.startsWith('#') ? '#' : tokenDraft.startsWith('@') ? '@' : '';
   const tokenQuery = tokenPrefix ? tokenDraft.slice(1).toLowerCase() : '';
@@ -131,6 +180,28 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
       .filter((item) => item.slice(1).toLowerCase().includes(normalizedQuery))
       .slice(0, MAX_TOKEN_SUGGESTIONS);
   }, [contextSuggestionPool, selectedContexts, selectedTags, tagSuggestionPool, tokenPrefix, tokenQuery]);
+  const contextCopilotSuggestions = useMemo(() => {
+    const selected = new Set(selectedContexts);
+    const candidates = contextSuggestionPool.filter((token) => !selected.has(token));
+    if (candidates.length === 0) return [];
+    const fromInput = candidates.filter((token) => {
+      const normalizedToken = token.slice(1).toLowerCase();
+      return suggestionTerms.some((term) => normalizedToken.includes(term));
+    });
+    const merged = [...fromInput, ...candidates.filter((token) => !fromInput.includes(token))];
+    return merged.slice(0, MAX_TOKEN_SUGGESTIONS);
+  }, [contextSuggestionPool, selectedContexts, suggestionTerms]);
+  const tagCopilotSuggestions = useMemo(() => {
+    const selected = new Set(selectedTags);
+    const candidates = tagSuggestionPool.filter((token) => !selected.has(token));
+    if (candidates.length === 0) return [];
+    const fromInput = candidates.filter((token) => {
+      const normalizedToken = token.slice(1).toLowerCase();
+      return suggestionTerms.some((term) => normalizedToken.includes(term));
+    });
+    const merged = [...fromInput, ...candidates.filter((token) => !fromInput.includes(token))];
+    return merged.slice(0, MAX_TOKEN_SUGGESTIONS);
+  }, [selectedTags, suggestionTerms, tagSuggestionPool]);
 
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return projects;
@@ -990,6 +1061,38 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                                 <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
                               </TouchableOpacity>
                             ))}
+                          </View>
+                        )}
+                        {contextCopilotSuggestions.length > 0 && (
+                          <View style={[styles.tokenSuggestionsContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                            <Text style={[styles.tokenSectionTitle, { color: tc.secondaryText }]}>Suggested contexts</Text>
+                            <View style={styles.tokenChipWrap}>
+                              {contextCopilotSuggestions.map((token) => (
+                                <TouchableOpacity
+                                  key={`ctx-${token}`}
+                                  style={[styles.suggestionChip, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
+                                  onPress={() => applyTokenSuggestion(token)}
+                                >
+                                  <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                        {tagCopilotSuggestions.length > 0 && (
+                          <View style={[styles.tokenSuggestionsContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                            <Text style={[styles.tokenSectionTitle, { color: tc.secondaryText }]}>Suggested tags</Text>
+                            <View style={styles.tokenChipWrap}>
+                              {tagCopilotSuggestions.map((token) => (
+                                <TouchableOpacity
+                                  key={`tag-${token}`}
+                                  style={[styles.suggestionChip, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
+                                  onPress={() => applyTokenSuggestion(token)}
+                                >
+                                  <Text style={[styles.tokenSuggestionText, { color: tc.text }]}>{token}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
                           </View>
                         )}
                       </View>
