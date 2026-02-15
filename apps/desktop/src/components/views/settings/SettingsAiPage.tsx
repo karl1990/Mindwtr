@@ -189,17 +189,19 @@ export function SettingsAiPage({
 
                             <div className="flex items-center justify-between gap-4">
                                 <div className="text-sm font-medium">{t.aiModel}</div>
-                                <select
+                                <input
+                                    type="text"
                                     value={aiModel}
                                     onChange={(e) => onUpdateAISettings({ model: e.target.value })}
-                                    className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                    list="ai-model-options"
+                                    className="min-w-[200px] text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/40"
                                 >
+                                </input>
+                                <datalist id="ai-model-options">
                                     {aiModelOptions.map((option) => (
-                                        <option key={option} value={option}>
-                                            {option}
-                                        </option>
+                                        <option key={option} value={option} />
                                     ))}
-                                </select>
+                                </datalist>
                             </div>
 
                             <div className="flex items-center justify-between gap-4">
@@ -207,17 +209,19 @@ export function SettingsAiPage({
                                     <div className="text-sm font-medium">{t.aiCopilotModel}</div>
                                     <div className="text-xs text-muted-foreground">{t.aiCopilotHint}</div>
                                 </div>
-                                <select
+                                <input
+                                    type="text"
                                     value={aiCopilotModel}
                                     onChange={(e) => onUpdateAISettings({ copilotModel: e.target.value })}
-                                    className="text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                    list="ai-copilot-model-options"
+                                    className="min-w-[200px] text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/40"
                                 >
+                                </input>
+                                <datalist id="ai-copilot-model-options">
                                     {aiCopilotOptions.map((option) => (
-                                        <option key={option} value={option}>
-                                            {option}
-                                        </option>
+                                        <option key={option} value={option} />
                                     ))}
-                                </select>
+                                </datalist>
                             </div>
 
                             {aiProvider === 'openai' && (
