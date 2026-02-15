@@ -76,6 +76,44 @@ describe('cloud server utils', () => {
         expect(invalidTimestamp.ok).toBe(false);
     });
 
+    test('accepts null optional timestamps in tasks, projects, sections, and areas', () => {
+     const iso = '2024-01-01T00:00:00.000Z';
+     const result = __cloudTestUtils.validateAppData({
+         tasks: [{
+             id: 't1',
+             title: 'Task',
+             status: 'inbox',
+             createdAt: iso,
+             updatedAt: iso,
+             deletedAt: null,
+         }],
+         projects: [{
+             id: 'p1',
+             title: 'Project',
+             status: 'active',
+             createdAt: iso,
+             updatedAt: iso,
+             deletedAt: null,
+         }],
+         sections: [{
+             id: 's1',
+             projectId: 'p1',
+             title: 'Section',
+             createdAt: iso,
+             updatedAt: iso,
+             deletedAt: null,
+         }],
+         areas: [{
+             id: 'a1',
+             name: 'Area',
+             createdAt: null,
+             updatedAt: null,
+             deletedAt: null,
+         }],
+     });
+     expect(result.ok).toBe(true);
+    });
+
     test('accepts only core task statuses', () => {
         expect(__cloudTestUtils.asStatus('reference')).toBe('reference');
         expect(__cloudTestUtils.asStatus('todo')).toBeNull();

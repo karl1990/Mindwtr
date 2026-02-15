@@ -237,7 +237,7 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
         if (!isValidIsoTimestamp(task.createdAt) || !isValidIsoTimestamp(task.updatedAt)) {
             return { ok: false, error: 'Invalid data: task createdAt/updatedAt must be valid ISO timestamps' };
         }
-        if (task.deletedAt !== undefined && !isValidIsoTimestamp(task.deletedAt)) {
+        if (task.deletedAt != null && !isValidIsoTimestamp(task.deletedAt)) {
             return { ok: false, error: 'Invalid data: task deletedAt must be a valid ISO timestamp when present' };
         }
     }
@@ -255,7 +255,7 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
         if (!isValidIsoTimestamp(project.createdAt) || !isValidIsoTimestamp(project.updatedAt)) {
             return { ok: false, error: 'Invalid data: project createdAt/updatedAt must be valid ISO timestamps' };
         }
-        if (project.deletedAt !== undefined && !isValidIsoTimestamp(project.deletedAt)) {
+        if (project.deletedAt != null && !isValidIsoTimestamp(project.deletedAt)) {
             return { ok: false, error: 'Invalid data: project deletedAt must be a valid ISO timestamp when present' };
         }
     }
@@ -268,7 +268,7 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
             if (!isValidIsoTimestamp(section.createdAt) || !isValidIsoTimestamp(section.updatedAt)) {
                 return { ok: false, error: 'Invalid data: section createdAt/updatedAt must be valid ISO timestamps' };
             }
-            if (section.deletedAt !== undefined && !isValidIsoTimestamp(section.deletedAt)) {
+            if (section.deletedAt != null && !isValidIsoTimestamp(section.deletedAt)) {
                 return { ok: false, error: 'Invalid data: section deletedAt must be a valid ISO timestamp when present' };
             }
         }
@@ -279,13 +279,13 @@ function validateAppData(value: unknown): { ok: true; data: Record<string, unkno
             if (!isRecord(area) || typeof area.id !== 'string' || typeof area.name !== 'string') {
                 return { ok: false, error: 'Invalid data: each area must be an object with string id and name' };
             }
-            if (area.createdAt !== undefined && !isValidIsoTimestamp(area.createdAt)) {
+            if (area.createdAt != null && !isValidIsoTimestamp(area.createdAt)) {
                 return { ok: false, error: 'Invalid data: area createdAt must be a valid ISO timestamp when present' };
             }
-            if (area.updatedAt !== undefined && !isValidIsoTimestamp(area.updatedAt)) {
+            if (area.updatedAt != null && !isValidIsoTimestamp(area.updatedAt)) {
                 return { ok: false, error: 'Invalid data: area updatedAt must be a valid ISO timestamp when present' };
             }
-            if (area.deletedAt !== undefined && !isValidIsoTimestamp(area.deletedAt)) {
+            if (area.deletedAt != null && !isValidIsoTimestamp(area.deletedAt)) {
                 return { ok: false, error: 'Invalid data: area deletedAt must be a valid ISO timestamp when present' };
             }
         }
