@@ -20,14 +20,6 @@ export function ReviewTaskList({
     onToggleSelect,
     t,
 }: ReviewTaskListProps) {
-    if (tasks.length === 0) {
-        return (
-            <div className="text-center py-12 text-muted-foreground">
-                <p>{t('review.noTasks')}</p>
-            </div>
-        );
-    }
-
     const shouldVirtualize = tasks.length > 100;
     const parentRef = useRef<HTMLDivElement>(null);
     const rowVirtualizer = useVirtualizer({
@@ -36,6 +28,14 @@ export function ReviewTaskList({
         estimateSize: () => 120,
         overscan: 6,
     });
+
+    if (tasks.length === 0) {
+        return (
+            <div className="text-center py-12 text-muted-foreground">
+                <p>{t('review.noTasks')}</p>
+            </div>
+        );
+    }
 
     if (!shouldVirtualize) {
         return (

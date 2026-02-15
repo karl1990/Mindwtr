@@ -158,7 +158,8 @@ export async function clearLog(): Promise<void> {
     } catch (error) {
         try {
             await remove(LOG_FILE, { baseDir: BaseDirectory.Data, recursive: false });
-        } catch (removeError) {
+        } catch (_removeError) {
+            return;
         }
     }
 }
