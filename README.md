@@ -34,9 +34,9 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
          height="56" />
   </a>
   <a href="https://apps.apple.com/app/mindwtr/id6758597144" target="_blank">
-    <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83"
+    <img src="https://img.shields.io/badge/App_Store-iOS-0A84FF?logo=apple&logoColor=white"
          align="center"
-         alt="Download on the App Store"
+         alt="App Store"
          style="height: 50px"
          height="50" />
   </a>
@@ -110,8 +110,7 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 - 📅 **Weekly Review** - Customizable weekly reminder
 
 ### Data & Sync
-- 📁 **File Sync** - Dropbox, Google Drive, Syncthing, etc.
-- 🌐 **WebDAV Sync** - Nextcloud, ownCloud, self-hosted
+- 🔄 **Sync Options** - See the wiki for supported backends and setup: https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync
 - 📤 **Export/Backup** - Export data to JSON
 - 🗓️ **External Calendars (ICS)** - View-only calendar overlay
 
@@ -220,7 +219,7 @@ scoop install mindwtr
 
 **Mac App Store (recommended):**
 <a href="https://apps.apple.com/app/mindwtr/id6758597144">
-  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-mac-app-store/black/en-us?size=250x83" alt="Download on the Mac App Store">
+  <img src="https://img.shields.io/badge/Mac_App_Store-Install-0A84FF?logo=apple&logoColor=white" alt="Mac App Store">
 </a>
 
 Install from the Mac App Store: [Mindwtr on Mac App Store](https://apps.apple.com/app/mindwtr/id6758597144).
@@ -247,7 +246,7 @@ Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/
 
 **iOS:**
 <a href="https://apps.apple.com/app/mindwtr/id6758597144">
-  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" alt="Download on the App Store">
+  <img src="https://img.shields.io/badge/App_Store-iOS-0A84FF?logo=apple&logoColor=white" alt="App Store">
 </a>
 
 Available on the App Store: [Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144).

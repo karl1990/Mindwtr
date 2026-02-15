@@ -67,6 +67,15 @@ type CheckForUpdatesOptions = {
     installSource?: InstallSource;
 };
 
+const isManagedInstallSource = (installSource: InstallSource): boolean => {
+    return (
+        installSource === 'mac-app-store'
+        || installSource === 'homebrew'
+        || installSource === 'winget'
+        || installSource === 'aur'
+    );
+};
+
 const getAssetNameFromUrl = (url: string): string => {
     try {
         const parsed = new URL(url);
@@ -346,6 +355,7 @@ const fetchSourceVersion = async (installSource: InstallSource): Promise<SourceV
 
 /**
  * Check for updates from install source first, then GitHub release fallback.
+ * Managed channels (App Store / package managers) stay on their own source.
  */
 export async function checkForUpdates(currentVersion: string, options: CheckForUpdatesOptions = {}): Promise<UpdateInfo> {
     const platform = detectPlatform();
@@ -385,7 +395,8 @@ export async function checkForUpdates(currentVersion: string, options: CheckForU
             latestVersion = cleanCurrentVersion;
         }
 
-        if (githubLatestVersion && compareVersions(githubLatestVersion, latestVersion) > 0) {
+        const allowGitHubOverride = !sourceResult || !isManagedInstallSource(installSource);
+        if (allowGitHubOverride && githubLatestVersion && compareVersions(githubLatestVersion, latestVersion) > 0) {
             latestVersion = githubLatestVersion;
             source = 'github-release';
             releaseUrl = githubRelease?.html_url || GITHUB_RELEASES_URL;
@@ -452,4 +463,4 @@ export async function verifyDownloadChecksum(downloadUrl: string, assets: Update
     return actual === expected ? 'verified' : 'mismatch';
 }
 
-export { GITHUB_RELEASES_URL, MS_STORE_URL };
+export { APP_STORE_LISTING_URL, GITHUB_RELEASES_URL, HOMEBREW_CASK_URL, MS_STORE_URL, WINGET_PACKAGE_URL };

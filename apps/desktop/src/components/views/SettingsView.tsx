@@ -23,14 +23,17 @@ import { reportError } from '../../lib/report-error';
 import { SyncService } from '../../lib/sync-service';
 import { clearLog, getLogPath } from '../../lib/app-log';
 import {
+    APP_STORE_LISTING_URL,
     checkForUpdates,
     compareVersions,
+    HOMEBREW_CASK_URL,
     normalizeInstallSource,
     type UpdateInfo,
     type InstallSource,
     GITHUB_RELEASES_URL,
     MS_STORE_URL,
     verifyDownloadChecksum,
+    WINGET_PACKAGE_URL,
 } from '../../lib/update-service';
 import { labelFallback, labelKeyOverrides, type SettingsLabels } from './settings/labels';
 import { SettingsUpdateModal } from './settings/SettingsUpdateModal';
@@ -519,6 +522,11 @@ export function SettingsView() {
             persistUpdateBadge(true, info.latestVersion);
             if (info.platform === 'linux' && linuxFlavor === 'arch') {
                 setDownloadNotice(t.downloadAURHint);
+            } else if (
+                info.platform === 'macos'
+                && (installSource === 'direct' || installSource === 'github-release' || installSource === 'unknown')
+            ) {
+                setDownloadNotice('Recommended on macOS: brew update && brew upgrade --cask mindwtr');
             } else {
                 setDownloadNotice(null);
             }
@@ -540,18 +548,25 @@ export function SettingsView() {
             return;
         }
         if (installSource === 'mac-app-store') {
-            const opened = await openLink(updateInfo?.releaseUrl || 'https://apps.apple.com/app/mindwtr/id6758597144');
+            const opened = await openLink(APP_STORE_LISTING_URL);
             setDownloadNotice(opened ? 'Update via App Store.' : t.downloadFailed);
             return;
         }
         if (installSource === 'homebrew') {
-            await openLink(updateInfo?.releaseUrl || 'https://formulae.brew.sh/cask/mindwtr');
+            await openLink(HOMEBREW_CASK_URL);
             setDownloadNotice('Update via Homebrew: brew update && brew upgrade --cask mindwtr');
             return;
         }
         if (installSource === 'winget') {
-            await openLink(updateInfo?.releaseUrl || 'https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/dongdongbh/Mindwtr');
+            await openLink(WINGET_PACKAGE_URL);
             setDownloadNotice('Update via winget: winget upgrade --id dongdongbh.Mindwtr --exact');
+            return;
+        }
+        if (updateInfo?.platform === 'macos') {
+            const opened = await openLink(HOMEBREW_CASK_URL);
+            setDownloadNotice(opened
+                ? 'Recommended on macOS: brew update && brew upgrade --cask mindwtr'
+                : t.downloadFailed);
             return;
         }
         if (updateInfo?.platform === 'linux' && linuxFlavor === 'arch') {
@@ -658,8 +673,7 @@ export function SettingsView() {
         }
 
         if (updateInfo.platform === 'macos') {
-            const asset = findAsset([/\.dmg$/i, /\.app\.tar\.gz$/i]);
-            return asset ? { label: '.dmg', url: asset.url } : null;
+            return { label: 'Homebrew (recommended)', url: HOMEBREW_CASK_URL };
         }
 
         if (updateInfo.platform === 'linux') {

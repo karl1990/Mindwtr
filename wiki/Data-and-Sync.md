@@ -39,12 +39,22 @@ Data is stored in a local SQLite database, with a JSON sync/backup file:
 
 ## Sync Backends
 
-Mindwtr supports three sync backends:
+Mindwtr directly supports three sync backends:
+
+- **File Sync**: a user-selected folder/file (`data.json` + `attachments/`)
+- **WebDAV**: any compatible WebDAV endpoint
+- **Mindwtr Cloud (Self-Hosted)**: your own `apps/cloud` endpoint
+
+### Direct vs indirect provider support
+
+- **Directly supported providers/protocols**: WebDAV servers and the Mindwtr self-hosted endpoint.
+- **Indirectly supported providers**: iCloud Drive, Dropbox, Google Drive, OneDrive, Syncthing, network shares.
+- **Important**: iCloud is not a native backend in Mindwtr. It can work through **File Sync** when your OS/file picker gives Mindwtr a writable folder.
 
 **Quick guidance:**
 - **Syncthing**: device-to-device file sync. Best on the same LAN/subnet. For remote sync, use a Syncthing relay or a mesh VPN (Nebula/Tailscale).
 - **WebDAV**: use a provider that supports WebDAV (e.g., Nextcloud, ownCloud, Fastmail, self-hosted).
-- **Dropbox/Google Drive**: no native WebDAV; on Android, use a bridge app to keep a local folder synced for file sync.
+- **Dropbox/Google Drive/OneDrive/iCloud Drive**: use File Sync (and Android bridge apps when needed).
 
 ## Sync Recommendations
 

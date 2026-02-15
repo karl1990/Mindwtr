@@ -25,6 +25,15 @@ const ATTACHMENT_CLEANUP_BATCH_LIMIT = 25;
 const SYNC_CONFIG_CACHE_TTL_MS = 30_000;
 const SYNC_FILE_NAME = 'data.json';
 const syncConfigCache = new Map<string, { value: string | null; readAt: number }>();
+const IOS_TEMP_INBOX_PATH_PATTERN = /\/tmp\/[^/\s]*-Inbox\//i;
+
+const decodeUriSafe = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
 
 const logSyncWarning = (message: string, error?: unknown) => {
   const extra = error ? { error: sanitizeLogMessage(error instanceof Error ? error.message : String(error)) } : undefined;
@@ -197,6 +206,9 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         fileSyncPath = syncPathOverride || await getCachedConfigValue(SYNC_PATH_KEY);
         if (!fileSyncPath) {
           return { success: true };
+        }
+        if (fileSyncPath.startsWith('file://') && IOS_TEMP_INBOX_PATH_PATTERN.test(decodeUriSafe(fileSyncPath))) {
+          throw new Error('Selected iOS sync file is in a temporary Inbox location and is read-only. Re-select a folder in Settings -> Data & Sync.');
         }
         if (fileSyncPath.startsWith('content://')) {
           try {

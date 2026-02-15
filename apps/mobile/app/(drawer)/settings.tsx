@@ -1288,6 +1288,17 @@ export default function SettingsPage() {
             }
         } catch (error) {
             logSettingsError(error);
+            const message = String(error);
+            if (/temporary Inbox location|re-select a folder in Settings -> Data & Sync|Cannot access the selected sync file/i.test(message)) {
+                Alert.alert(
+                    localize('Sync folder access expired', '同步目录访问已失效'),
+                    localize(
+                        'The selected iOS sync file is in a temporary read-only location. Please go to Settings → Data & Sync → Select Folder and pick a writable iCloud Drive folder.',
+                        '当前 iOS 同步文件位于临时只读目录。请前往「设置 → 数据与同步 → 选择文件夹」，重新选择可写的 iCloud Drive 文件夹。'
+                    )
+                );
+                return;
+            }
             Alert.alert(localize('Error', '错误'), localize('Sync failed', '同步失败'));
         } finally {
             setIsSyncing(false);

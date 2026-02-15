@@ -10,6 +10,8 @@ const AI_KEY_PATTERNS = [
 ];
 const TOKEN_PATTERN = /(password|pass|token|access_token|api_key|apikey|authorization|username|user|secret|session|cookie)=([^\s&]+)/gi;
 const AUTH_HEADER_PATTERN = /(Authorization:\s*)(Basic|Bearer)\s+[A-Za-z0-9+\/=._-]+/gi;
+const READONLY_ERROR_PATTERN = /isn't writable|not writable|read-only|read only|permission denied|EACCES/i;
+const IOS_TEMP_INBOX_PATTERN = /\/tmp\/[^/\s]*-Inbox\//i;
 const OFFLINE_ERROR_PATTERNS = [
   /network request failed/i,
   /internet connection appears to be offline/i,
@@ -42,6 +44,12 @@ const sanitizeMessage = (value: string): string => {
 
 export const formatSyncErrorMessage = (error: unknown, backend: SyncBackend): string => {
   const raw = sanitizeMessage(String(error));
+  if (backend === 'file') {
+    if (IOS_TEMP_INBOX_PATTERN.test(raw) && READONLY_ERROR_PATTERN.test(raw)) {
+      return 'Selected iOS sync file is in a temporary Inbox location and is read-only. Re-select a folder in Settings -> Data & Sync.';
+    }
+    return raw;
+  }
   if (backend !== 'webdav') return raw;
 
   const status = typeof error === 'object' && error !== null && 'status' in error

@@ -34,9 +34,9 @@
          height="56" />
   </a>
   <a href="https://apps.apple.com/app/mindwtr/id6758597144" target="_blank">
-    <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83"
+    <img src="https://img.shields.io/badge/App_Store-iOS-0A84FF?logo=apple&logoColor=white"
          align="center"
-         alt="Download on the App Store"
+         alt="App Store"
          style="height: 50px"
          height="50" />
   </a>
@@ -110,8 +110,7 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - 📅 **每周回顾** - 可定制的每周提醒
 
 ### 数据与同步
-- 📁 **文件同步** - Dropbox、Google Drive、Syncthing 等
-- 🌐 **WebDAV 同步** - Nextcloud、ownCloud、自建
+- 🔄 **同步选项** - 支持后端与配置方式请见 Wiki：https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync
 - 📤 **导出/备份** - 导出 JSON 数据
 - 🗓️ **外部日历（ICS）** - 只读日历叠加
 
@@ -220,7 +219,7 @@ scoop install mindwtr
 
 **Mac App Store（推荐）：**
 <a href="https://apps.apple.com/app/mindwtr/id6758597144">
-  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-mac-app-store/black/zh-cn?size=250x83" alt="Download on the Mac App Store">
+  <img src="https://img.shields.io/badge/Mac_App_Store-Install-0A84FF?logo=apple&logoColor=white" alt="Mac App Store">
 </a>
 
 通过 Mac App Store 安装：[Mindwtr（Mac App Store）](https://apps.apple.com/app/mindwtr/id6758597144)。
@@ -247,7 +246,7 @@ brew install --cask mindwtr
 
 **iOS：**
 <a href="https://apps.apple.com/app/mindwtr/id6758597144">
-  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83" alt="Download on the App Store">
+  <img src="https://img.shields.io/badge/App_Store-iOS-0A84FF?logo=apple&logoColor=white" alt="App Store">
 </a>
 
 已上线 App Store：[Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144)。

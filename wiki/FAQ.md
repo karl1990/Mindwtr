@@ -21,6 +21,14 @@ https://github.com/dongdongbh/Mindwtr/issues
 
 If you have a feature request, please open an issue and describe the workflow you’re trying to support.
 
+### Where should I report bugs or request features?
+
+Please use GitHub Issues instead of email so reports stay trackable and searchable:
+https://github.com/dongdongbh/Mindwtr/issues
+
+If Mindwtr is useful to you, support options are listed here:
+https://github.com/dongdongbh/Mindwtr?tab=readme-ov-file#hearts-contributing--support
+
 ### Can I open multiple windows?
 
 Not currently. The desktop app is single-window to keep the local-first SQLite data model safe and consistent. Multi-window support is a common request, but not available yet.
@@ -60,6 +68,10 @@ See [[Data and Sync]] for details.
 ### Is there cloud sync?
 
 Mindwtr supports File Sync, WebDAV, and optional Cloud Sync. See [[Data and Sync]].
+
+### Does Mindwtr support iCloud sync directly?
+
+Not as a native backend. iCloud Drive can still work indirectly via **File Sync** if you select a writable iCloud folder in the OS file picker. See [[Data and Sync]] for setup details.
 
 ### How do I sync with OneDrive (especially on Android)?
 

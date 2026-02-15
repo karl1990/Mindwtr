@@ -7,7 +7,7 @@
 ## 1. Data Collection and Storage
 **We do not collect, store, or transmit your personal data.**
 * **Local Storage:** All data entered into Mindwtr (tasks, projects, notes) is stored locally on your device's internal storage or in a user-designated file (e.g., JSON/SQLite database).
-* **No Cloud Sync:** Mindwtr does not operate its own sync servers. If you choose to sync data between devices, you do so using your own third-party tools (e.g., Dropbox, iCloud, Syncthing), and that data handling is subject to those providers' policies.
+* **No Hosted Cloud Sync:** Mindwtr does not run a hosted sync service. Supported sync backends are File Sync, WebDAV, and self-hosted sync. If you choose to sync via third-party providers (e.g., iCloud Drive, Dropbox, Syncthing), they work indirectly through File Sync and are subject to those providers' policies.
 
 ## 2. Third-Party Services
 The application does not use third-party analytics services (like Google Analytics or Firebase) to track user behavior.
