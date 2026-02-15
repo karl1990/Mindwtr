@@ -437,11 +437,25 @@ jobs:
           fi
 
           VERSION="${{ steps.version.outputs.version }}"
+          run_bump_cask_pr() {
+            brew bump-cask-pr mindwtr --version "$VERSION" --verbose --no-browse 2>&1
+          }
+
           set +e
-          OUTPUT="$(brew bump-cask-pr mindwtr --version "$VERSION" --verbose --no-browse 2>&1)"
+          OUTPUT="$(run_bump_cask_pr)"
           STATUS=$?
           set -e
           echo "$OUTPUT"
+
+          if [ "$STATUS" -ne 0 ] && echo "$OUTPUT" | grep -Fqi "Tap homebrew/cask already tapped"; then
+            echo "Homebrew cask tap conflict detected; retrying once after untap."
+            brew untap homebrew/cask >/dev/null 2>&1 || true
+            set +e
+            OUTPUT="$(run_bump_cask_pr)"
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
+          fi
 
           if [ "$STATUS" -ne 0 ]; then
             if echo "$OUTPUT" | grep -Eiq "already (at version|up[ -]?to[ -]?date)|no changes"; then
