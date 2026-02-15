@@ -18,8 +18,10 @@ const mockOpenAiSuccess = () =>
         { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
 
+const originalFetch = globalThis.fetch;
+
 afterEach(() => {
-    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
 });
 
 describe('openai provider auth behavior', () => {
@@ -39,7 +41,7 @@ describe('openai provider auth behavior', () => {
 
     it('allows empty API key for custom OpenAI-compatible endpoints', async () => {
         const fetchMock = vi.fn(async () => mockOpenAiSuccess());
-        vi.stubGlobal('fetch', fetchMock);
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
 
         const provider = createOpenAIProvider({
             provider: 'openai',
