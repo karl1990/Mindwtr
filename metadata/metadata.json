@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 提升了多设备同步冲突安全性与确定性合并行为。\n• 优化了移动端收件箱处理与任务编辑流程，交互更清晰、更高效。\n• 在同步/运行时路径（含锁竞争与离线处理）方面提升了可靠性与性能。\n• 扩展了同步与分区流程的自动化测试覆盖。",
+        "ReleaseNotes": "• 稳定了 iOS 设置与菜单页面的返回导航与边缘滑动手势。\n• 提升了多设备同步安全性与确定性合并正确性。\n• 新增通过自定义 Base URL 接入本地 OpenAI 兼容 AI 端点支持。\n• 强化 MCP 自动化可靠性：事务写入与 FTS 搜索。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Improved sync conflict safety and deterministic merge behavior across devices.\n• Improved mobile inbox processing and task editing flows with clearer, faster interactions.\n• Better reliability and performance across sync/runtime paths, including locking and offline handling.\n• Expanded automated coverage for sync and section workflows.",
+        "ReleaseNotes": "• Stabilized iOS back navigation and edge-swipe behavior across settings and drawer screens.\n• Improved cross-device sync safety and deterministic merge correctness.\n• Added support for local OpenAI-compatible AI endpoints via custom base URL.\n• Strengthened MCP automation reliability with transactional writes and FTS-backed search.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Se mejoró la seguridad de conflictos de sync y el comportamiento de merge determinístico entre dispositivos.\n• Se mejoraron los flujos de bandeja y edición de tareas en móvil para interacciones más claras y rápidas.\n• Mejoras de fiabilidad y rendimiento en rutas de sync/runtime, incluido bloqueo y manejo offline.\n• Se amplió la cobertura automatizada para flujos de sync y secciones.",
+        "ReleaseNotes": "• Se estabilizo la navegacion atras y edge-swipe en iOS en pantallas de ajustes y menu.\n• Se mejoro la seguridad de sync entre dispositivos y la correccion deterministica de merges.\n• Se agrego soporte para endpoints AI locales compatibles con OpenAI mediante URL base personalizada.\n• Se reforzo la fiabilidad de automatizacion MCP con escrituras transaccionales y busqueda FTS.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
