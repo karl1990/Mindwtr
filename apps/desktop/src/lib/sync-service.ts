@@ -1263,8 +1263,8 @@ export class SyncService {
     /**
      * Set the sync path in the backend
      */
-    static async setSyncPath(path: string): Promise<{ success: boolean; path: string }> {
-        if (!isTauriRuntimeEnv()) return { success: false, path: '' };
+    static async setSyncPath(path: string): Promise<{ success: boolean; path: string; error?: string }> {
+        if (!isTauriRuntimeEnv()) return { success: false, path: '', error: 'Desktop runtime is required for file sync.' };
         try {
             const result = await tauriInvoke<{ success: boolean; path: string }>('set_sync_path', { syncPath: path });
             if (result?.success) {
@@ -1273,7 +1273,8 @@ export class SyncService {
             return result;
         } catch (error) {
             reportError('Failed to set sync path', error);
-            return { success: false, path: '' };
+            const message = error instanceof Error ? error.message : String(error);
+            return { success: false, path: '', error: message };
         }
     }
 

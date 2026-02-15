@@ -25,6 +25,17 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
     const [cloudToken, setCloudToken] = useState('');
     const showToast = useUiStore((state) => state.showToast);
 
+    const formatSyncPathError = useCallback((message?: string): string => {
+        const normalized = (message || '').toLowerCase();
+        if (normalized.includes('must be a directory')) {
+            return 'Select a folder for sync, not a backup JSON file.';
+        }
+        if (normalized.includes('permission denied') || normalized.includes('operation not permitted')) {
+            return 'Mindwtr cannot access this folder. Choose a folder you own, then try again.';
+        }
+        return message || 'Failed to save sync folder.';
+    }, []);
+
     useEffect(() => {
         const unsubscribe = SyncService.subscribeSyncStatus(setSyncStatus);
         SyncService.getSyncPath()
@@ -66,9 +77,14 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
         if (!syncPath.trim()) return;
         const result = await SyncService.setSyncPath(syncPath.trim());
         if (result.success) {
+            setSyncError(null);
             showSaved();
+            return;
         }
-    }, [showSaved, syncPath]);
+        const message = formatSyncPathError(result.error);
+        setSyncError(message);
+        showToast(message, 'error');
+    }, [formatSyncPathError, showSaved, showToast, syncPath]);
 
     const handleChangeSyncLocation = useCallback(async () => {
         try {
@@ -85,14 +101,19 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
                 setSyncPath(selected);
                 const result = await SyncService.setSyncPath(selected);
                 if (result.success) {
+                    setSyncError(null);
                     showSaved();
+                    return;
                 }
+                const message = formatSyncPathError(result.error);
+                setSyncError(message);
+                showToast(message, 'error');
             }
         } catch (error) {
             setSyncError('Failed to change sync location.');
             void logError(error, { scope: 'sync', step: 'changeLocation' });
         }
-    }, [isTauri, selectSyncFolderTitle, showSaved]);
+    }, [formatSyncPathError, isTauri, selectSyncFolderTitle, showSaved, showToast]);
 
     const handleSetSyncBackend = useCallback(async (backend: SyncBackend) => {
         setSyncBackend(backend);
@@ -148,7 +169,13 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
             if (syncBackend === 'file') {
                 const path = syncPath.trim();
                 if (path) {
-                    await SyncService.setSyncPath(path);
+                    const setPathResult = await SyncService.setSyncPath(path);
+                    if (!setPathResult.success) {
+                        const message = formatSyncPathError(setPathResult.error);
+                        setSyncError(message);
+                        showToast(message, 'error');
+                        return;
+                    }
                 }
             }
 
@@ -163,7 +190,7 @@ export const useSyncSettings = ({ isTauri, showSaved, selectSyncFolderTitle }: U
             setSyncError(String(error));
             showToast(String(error), 'error');
         }
-    }, [cloudUrl, handleSaveCloud, handleSaveWebDav, showToast, syncBackend, syncPath, webdavUrl]);
+    }, [cloudUrl, formatSyncPathError, handleSaveCloud, handleSaveWebDav, showToast, syncBackend, syncPath, webdavUrl]);
 
     return {
         syncPath,

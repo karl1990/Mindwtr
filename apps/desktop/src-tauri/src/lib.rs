@@ -2176,7 +2176,10 @@ fn normalize_sync_dir(input: &str) -> PathBuf {
     let path = PathBuf::from(input);
     let legacy_name = format!("{}-sync.json", APP_NAME);
     if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-        if name == DATA_FILE_NAME || name == legacy_name {
+        if name == DATA_FILE_NAME
+            || name == legacy_name
+            || name.to_ascii_lowercase().ends_with(".json")
+        {
             return path.parent().unwrap_or(&path).to_path_buf();
         }
     }
@@ -2489,13 +2492,49 @@ fn open_path(path: String) -> Result<bool, String> {
 #[tauri::command]
 fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let sync_path_str = get_sync_path(app)?;
-    let sync_file = PathBuf::from(&sync_path_str).join(DATA_FILE_NAME);
-    let backup_file = PathBuf::from(&sync_path_str).join(format!("{}.bak", DATA_FILE_NAME));
+    let sync_dir = PathBuf::from(&sync_path_str);
+    let sync_file = sync_dir.join(DATA_FILE_NAME);
+    let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
+
+    let find_seed_backup_file = |dir: &Path| -> Option<PathBuf> {
+        let mut latest: Option<(SystemTime, PathBuf)> = None;
+        let entries = fs::read_dir(dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let lower = name.to_ascii_lowercase();
+            if !(lower.starts_with("mindwtr-backup-") || lower.starts_with("data-backup-")) {
+                continue;
+            }
+            if !lower.ends_with(".json") {
+                continue;
+            }
+            let modified = fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(UNIX_EPOCH);
+            match &latest {
+                Some((latest_modified, _)) if &modified <= latest_modified => {}
+                _ => latest = Some((modified, path)),
+            }
+        }
+        latest.map(|(_, path)| path)
+    };
     
     if !sync_file.exists() {
         let legacy_sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
         if legacy_sync_file.exists() {
             let content = fs::read_to_string(&legacy_sync_file).map_err(|e| e.to_string())?;
+            return parse_json_relaxed(&content)
+                .map(normalize_sync_value)
+                .map_err(|e| e.to_string());
+        }
+        if let Some(seed_file) = find_seed_backup_file(&sync_dir) {
+            let content = fs::read_to_string(&seed_file).map_err(|e| e.to_string())?;
             return parse_json_relaxed(&content)
                 .map(normalize_sync_value)
                 .map_err(|e| e.to_string());
