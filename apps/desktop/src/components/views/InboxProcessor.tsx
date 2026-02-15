@@ -49,6 +49,7 @@ export function InboxProcessor({
     const [nextActionDraft, setNextActionDraft] = useState('');
     const [customContext, setCustomContext] = useState('');
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+    const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
     const [scheduleDate, setScheduleDate] = useState('');
     const [scheduleTime, setScheduleTime] = useState('');
     const [scheduleTimeDraft, setScheduleTimeDraft] = useState('');
@@ -81,6 +82,10 @@ export function InboxProcessor({
         const query = projectSearch.trim().toLowerCase();
         return projects.some((project) => project.title.toLowerCase() === query);
     }, [projects, projectSearch]);
+    const activeAreas = useMemo(
+        () => areas.filter((area) => !area.deletedAt).sort((a, b) => a.order - b.order),
+        [areas],
+    );
 
     const inboxCount = useMemo(() => (
         tasks.filter((task) => {
@@ -114,6 +119,7 @@ export function InboxProcessor({
         setNextActionDraft('');
         setCustomContext('');
         setSelectedProjectId(null);
+        setSelectedAreaId(null);
         setScheduleDate('');
         setScheduleTime('');
         setScheduleTimeDraft('');
@@ -134,6 +140,7 @@ export function InboxProcessor({
         setProjectTitleDraft(task.title);
         setNextActionDraft('');
         setSelectedProjectId(task.projectId ?? null);
+        setSelectedAreaId(task.projectId ? null : (task.areaId ?? null));
         const parsedStart = task.startTime ? safeParseDate(task.startTime) : null;
         const dateValue = parsedStart ? safeFormatDate(parsedStart, 'yyyy-MM-dd') : '';
         const timeValue = parsedStart && task.startTime && hasTimeComponent(task.startTime)
@@ -386,6 +393,7 @@ export function InboxProcessor({
                 contexts: selectedContexts,
                 tags: selectedTags,
                 projectId: projectId || undefined,
+                areaId: projectId ? undefined : (selectedAreaId || undefined),
                 ...(scheduleEnabled && scheduleDate
                     ? { startTime: scheduleTime ? `${scheduleDate}T${scheduleTime}` : scheduleDate }
                     : {}),
@@ -479,6 +487,7 @@ export function InboxProcessor({
                 projectSearch={projectSearch}
                 setProjectSearch={setProjectSearch}
                 projects={projects}
+                areas={activeAreas}
                 filteredProjects={filteredProjects}
                 addProject={addProject}
                 handleSetProject={handleSetProject}
@@ -488,6 +497,8 @@ export function InboxProcessor({
                 showProjectInRefine={projectFirst}
                 selectedProjectId={selectedProjectId}
                 setSelectedProjectId={setSelectedProjectId}
+                selectedAreaId={selectedAreaId}
+                setSelectedAreaId={setSelectedAreaId}
                 scheduleDate={scheduleDate}
                 scheduleTimeDraft={scheduleTimeDraft}
                 setScheduleDate={handleScheduleDateChange}

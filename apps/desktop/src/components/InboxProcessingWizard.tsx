@@ -52,6 +52,7 @@ type InboxProcessingWizardProps = {
     projectSearch: string;
     setProjectSearch: (value: string) => void;
     projects: Project[];
+    areas: Area[];
     filteredProjects: Project[];
     addProject: (title: string, color: string) => Promise<Project | null>;
     handleSetProject: (projectId: string | null) => void;
@@ -61,6 +62,8 @@ type InboxProcessingWizardProps = {
     showProjectInRefine: boolean;
     selectedProjectId: string | null;
     setSelectedProjectId: (value: string | null) => void;
+    selectedAreaId: string | null;
+    setSelectedAreaId: (value: string | null) => void;
     scheduleDate: string;
     scheduleTimeDraft: string;
     setScheduleDate: (value: string) => void;
@@ -115,6 +118,7 @@ export function InboxProcessingWizard({
     projectSearch,
     setProjectSearch,
     projects,
+    areas,
     filteredProjects,
     addProject,
     handleSetProject,
@@ -124,6 +128,8 @@ export function InboxProcessingWizard({
     showProjectInRefine,
     selectedProjectId,
     setSelectedProjectId,
+    selectedAreaId,
+    setSelectedAreaId,
     scheduleDate,
     scheduleTimeDraft,
     setScheduleDate,
@@ -227,7 +233,13 @@ export function InboxProcessingWizard({
                                 <ProjectSelector
                                     projects={projects}
                                     value={selectedProjectId ?? ''}
-                                    onChange={(value) => setSelectedProjectId(value || null)}
+                                    onChange={(value) => {
+                                        const nextProjectId = value || null;
+                                        setSelectedProjectId(nextProjectId);
+                                        if (nextProjectId) {
+                                            setSelectedAreaId(null);
+                                        }
+                                    }}
                                     onCreateProject={async (title) => {
                                         const created = await addProject(title, '#94a3b8');
                                         return created?.id ?? null;
@@ -235,6 +247,23 @@ export function InboxProcessingWizard({
                                     placeholder={t('process.project')}
                                     noProjectLabel={t('process.noProject')}
                                 />
+                            </div>
+                        )}
+                        {showProjectInRefine && !selectedProjectId && (
+                            <div className="space-y-1">
+                                <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
+                                <select
+                                    value={selectedAreaId ?? ''}
+                                    onChange={(event) => setSelectedAreaId(event.target.value || null)}
+                                    className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                                >
+                                    <option value="">{t('projects.noArea')}</option>
+                                    {areas.map((area) => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         )}
                     </div>
@@ -550,6 +579,21 @@ export function InboxProcessingWizard({
                         </div>
                     ) : (
                         <>
+                            <div className="space-y-1">
+                                <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
+                                <select
+                                    value={selectedAreaId ?? ''}
+                                    onChange={(event) => setSelectedAreaId(event.target.value || null)}
+                                    className="w-full bg-card border border-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                                >
+                                    <option value="">{t('projects.noArea')}</option>
+                                    {areas.map((area) => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="space-y-2">
                                 <input
                                     value={projectSearch}
