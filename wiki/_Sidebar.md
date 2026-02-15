@@ -48,6 +48,7 @@
 * [[Architecture]]
 * [[Core API]]
 * [[Deployment Guide]]
+* [[Testing Strategy]]
 * [[Performance Guide]]
 * [[Contributing]]
 
