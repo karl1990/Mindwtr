@@ -646,7 +646,11 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
 
             case 'calendar':
                 return (
-                    <View style={styles.stepContent}>
+                    <ScrollView
+                        style={styles.stepContent}
+                        contentContainerStyle={styles.calendarStepContent}
+                        showsVerticalScrollIndicator
+                    >
                         <Text style={[styles.stepTitle, { color: tc.text }]}>
                             📅 {labels.calendar}
                         </Text>
@@ -661,7 +665,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                             <Text style={[styles.calendarColumnTitle, { color: tc.secondaryText }]}>{labels.calendarTasks}</Text>
                             {renderCalendarTaskList(calendarReviewItems)}
                         </View>
-                    </View>
+                    </ScrollView>
                 );
 
             case 'waiting':
@@ -916,6 +920,9 @@ const styles = StyleSheet.create({
     },
     stepContent: {
         flex: 1,
+    },
+    calendarStepContent: {
+        paddingBottom: 20,
     },
     stepTitle: {
         fontSize: 24,
