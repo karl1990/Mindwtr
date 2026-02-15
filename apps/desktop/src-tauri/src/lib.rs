@@ -2229,6 +2229,10 @@ fn webdav_get_json(app: tauri::AppHandle) -> Result<Value, String> {
         .send()
         .map_err(|e| format!("WebDAV request failed: {e}"))?;
 
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(Value::Null);
+    }
+  
     if !response.status().is_success() {
         return Err(format!("WebDAV error: {}", response.status()));
     }
