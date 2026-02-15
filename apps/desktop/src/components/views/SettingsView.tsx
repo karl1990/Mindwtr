@@ -1023,8 +1023,8 @@ export function SettingsView() {
     return (
         <ErrorBoundary>
             <div className="h-full overflow-y-auto">
-            <div className="mx-auto max-w-6xl p-8">
-                <div className="grid grid-cols-12 gap-6">
+            <div className="h-full px-4 py-3">
+                <div className="mx-auto flex h-full w-full max-w-[calc(12rem+920px+1.5rem)] flex-col gap-6 lg:flex-row">
                     <SettingsSidebar
                         title={t.title}
                         subtitle={t.subtitle}
@@ -1033,7 +1033,7 @@ export function SettingsView() {
                         onSelect={(id) => setPage(id as SettingsPage)}
                     />
 
-                    <main className="col-span-12 lg:col-span-8 xl:col-span-9">
+                    <main className="min-w-0 flex-1 lg:max-w-[920px]">
                         <div className="space-y-6">
                             <header className="flex items-start justify-between gap-4">
                                 <div>

@@ -74,6 +74,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     const fullWidthViews = new Set([
         'board',
         'projects',
+        'settings',
     ]);
     const isFullWidthView = fullWidthViews.has(currentView);
 

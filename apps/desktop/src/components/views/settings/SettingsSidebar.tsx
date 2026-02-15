@@ -37,7 +37,7 @@ export function SettingsSidebar({ title, subtitle, items, activeId, onSelect, se
     }, [items, search]);
 
     return (
-        <aside className="col-span-12 lg:col-span-4 xl:col-span-3 space-y-4">
+        <aside className="w-full lg:w-48 xl:w-52 shrink-0 space-y-4">
             <div>
                 <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
