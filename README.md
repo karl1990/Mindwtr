@@ -287,7 +287,6 @@ You can help in several ways:
 ## Roadmap
 
 - 📦 Add to Flathub
-- 🤖 Add to F-Droid
 - 📱 Improve iOS experience
 - ✉️ Email to Inbox
 
