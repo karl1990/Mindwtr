@@ -189,6 +189,7 @@ const BASE_TASK_COLUMNS = [
 ];
 
 const taskColumnsCache = new WeakMap<DbClient, { hasOrderNum: boolean; selectColumns: string[] }>();
+const tasksFtsCache = new WeakMap<DbClient, boolean>();
 
 const getTaskColumns = (db: DbClient) => {
   const cached = taskColumnsCache.get(db);
@@ -206,6 +207,34 @@ const getTaskColumns = (db: DbClient) => {
     taskColumnsCache.set(db, fallback);
     return fallback;
   }
+};
+
+const hasTasksFts = (db: DbClient): boolean => {
+  const cached = tasksFtsCache.get(db);
+  if (cached !== undefined) return cached;
+  try {
+    const rows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tasks_fts'").all();
+    const hasFts = rows.some((row: any) => row?.name === 'tasks_fts');
+    tasksFtsCache.set(db, hasFts);
+    return hasFts;
+  } catch {
+    tasksFtsCache.set(db, false);
+    return false;
+  }
+};
+
+const buildTasksFtsQuery = (search: string): string | null => {
+  const cleaned = String(search || '')
+    .replace(/[^\p{L}\p{N}#@]+/gu, ' ')
+    .trim();
+  if (!cleaned) return null;
+  const reservedTokens = new Set(['AND', 'OR', 'NOT', 'NEAR']);
+  const tokens = cleaned
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((token) => !reservedTokens.has(token.toUpperCase()));
+  if (tokens.length === 0) return null;
+  return tokens.map((token) => `${token}*`).join(' ');
 };
 
 function mapTaskRow(row: any): TaskRow {
@@ -254,11 +283,17 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
     params.push(input.projectId);
   }
   if (input.search) {
-    where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
-    // Escape SQL wildcards (%, _, \) in search input
-    const escaped = input.search.replace(/[\\%_]/g, '\\$&');
-    const pattern = `%${escaped}%`;
-    params.push(pattern, pattern);
+    const ftsQuery = buildTasksFtsQuery(input.search);
+    if (ftsQuery && hasTasksFts(db)) {
+      where.push("id IN (SELECT id FROM tasks_fts WHERE tasks_fts MATCH ?)");
+      params.push(ftsQuery);
+    } else {
+      where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
+      // Escape SQL wildcards (%, _, \) in search input
+      const escaped = input.search.replace(/[\\%_]/g, '\\$&');
+      const pattern = `%${escaped}%`;
+      params.push(pattern, pattern);
+    }
   }
   if (input.dueDateFrom) {
     where.push('dueDate >= ?');
