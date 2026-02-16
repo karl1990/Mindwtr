@@ -2,6 +2,7 @@ import type { AIProviderId, AIReasoningEffort, AppData } from '@mindwtr/core';
 
 import { useState } from 'react';
 import { cn } from '../../../lib/utils';
+import { ConfirmModal } from '../../ConfirmModal';
 
 type Labels = {
     aiEnable: string;
@@ -15,6 +16,10 @@ type Labels = {
     aiBaseUrlHint: string;
     aiCopilotModel: string;
     aiCopilotHint: string;
+    aiConsentTitle: string;
+    aiConsentDescription: string;
+    aiConsentCancel: string;
+    aiConsentAgree: string;
     aiReasoning: string;
     aiReasoningHint: string;
     aiEffortLow: string;
@@ -135,10 +140,25 @@ export function SettingsAiPage({
 }: SettingsAiPageProps) {
     const [aiOpen, setAiOpen] = useState(false);
     const [speechOpen, setSpeechOpen] = useState(false);
+    const [showAiConsentModal, setShowAiConsentModal] = useState(false);
+    const selectedProviderLabel = aiProvider === 'gemini'
+        ? t.aiProviderGemini
+        : aiProvider === 'anthropic'
+            ? t.aiProviderAnthropic
+            : t.aiProviderOpenAI;
+    const aiConsentDescription = t.aiConsentDescription.replace('{provider}', selectedProviderLabel);
+    const handleAiToggle = () => {
+        if (aiEnabled) {
+            onUpdateAISettings({ enabled: false });
+            return;
+        }
+        setShowAiConsentModal(true);
+    };
 
     return (
-        <div className="space-y-6">
-            <div className="bg-card border border-border rounded-lg">
+        <>
+            <div className="space-y-6">
+                <div className="bg-card border border-border rounded-lg">
                 <div className="p-4 flex items-center justify-between gap-4">
                     <button
                         type="button"
@@ -156,7 +176,7 @@ export function SettingsAiPage({
                         type="button"
                         role="switch"
                         aria-checked={aiEnabled}
-                        onClick={() => onUpdateAISettings({ enabled: !aiEnabled })}
+                        onClick={handleAiToggle}
                         className={cn(
                             "relative inline-flex h-5 w-9 items-center rounded-full border transition-colors",
                             aiEnabled ? "bg-primary border-primary" : "bg-muted/50 border-border"
@@ -503,6 +523,19 @@ export function SettingsAiPage({
                     </div>
                 )}
             </div>
-        </div>
+            </div>
+            <ConfirmModal
+                isOpen={showAiConsentModal}
+                title={t.aiConsentTitle}
+                description={aiConsentDescription}
+                confirmLabel={t.aiConsentAgree}
+                cancelLabel={t.aiConsentCancel}
+                onConfirm={() => {
+                    onUpdateAISettings({ enabled: true });
+                    setShowAiConsentModal(false);
+                }}
+                onCancel={() => setShowAiConsentModal(false)}
+            />
+        </>
     );
 }

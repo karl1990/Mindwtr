@@ -603,8 +603,8 @@ export default function SettingsPage() {
         const policyUrl = getAIProviderPolicyUrl(provider);
         const title = localize('Enable AI features?', '启用 AI 功能？');
         const message = localize(
-            `To use AI assistant, your task text and optional notes will be sent directly to ${providerLabel} using your API key. No data is sent to Mindwtr servers. Provider privacy policy: ${policyUrl}. Do you want to continue?`,
-            `要使用 AI 助手，任务文本和可选备注会通过你的 API Key 直接发送到 ${providerLabel}。数据不会发送到 Mindwtr 服务器。服务商隐私政策：${policyUrl}。是否继续？`
+            `To use AI assistant, your task text and optional notes will be sent directly to ${providerLabel} using your API key. Mindwtr does not collect this data. Provider privacy policy: ${policyUrl}. Do you want to continue?`,
+            `要使用 AI 助手，任务文本和可选备注会通过你的 API Key 直接发送到 ${providerLabel}。Mindwtr 不会收集这些数据。服务商隐私政策：${policyUrl}。是否继续？`
         );
 
         return await new Promise<boolean>((resolve) => {

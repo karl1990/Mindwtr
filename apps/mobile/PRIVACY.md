@@ -20,7 +20,7 @@ Mindwtr provides optional AI assistant features using a **Bring Your Own Key (BY
 * **Who receives the data:** Your selected AI provider (for example OpenAI, Google Gemini, or Anthropic).
 * **How data is sent:** Directly from your device to that provider using your API key.
 * **User permission:** AI transmission only occurs after you enable AI and accept the in-app consent prompt.
-* **Mindwtr developer access:** We do not proxy these AI requests, and we do not collect or store this AI request content on Mindwtr servers.
+* **Mindwtr developer access:** We do not proxy these AI requests, and we do not collect or store this AI request content.
 
 ## 4. Crash Reporting
 The application does not automatically send crash reports to external servers. Any logs generated are stored locally on your device for debugging purposes only.
