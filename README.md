@@ -281,12 +281,16 @@ You can help in several ways:
 4. **Report bugs and request features:** Open issues on [GitHub Issues](https://github.com/dongdongbh/Mindwtr/issues).
 5. **Join the community chat:** Come to [Discord](https://discord.gg/ahhFxuDBb4).
 6. **Contribute code/docs:** Open a pull request and follow the [contribution guide](docs/CONTRIBUTING.md) and commit conventions.
-7. **Sponsor the project:** Support ongoing development via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
+7. **Pick and build:** Community members are welcome to pick any item in the [Roadmap](#roadmap) or any open issue and submit a PR.
+8. **Sponsor the project:** Support ongoing development via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
 
 ## Roadmap
 
 - 📦 Add to Flathub
 - 📱 Improve iOS experience
+- 🗣️ iOS Reminders Inbox import (Siri capture -> Mindwtr Inbox)
+- ⚡ iOS Shortcuts + URL scheme quick capture
+- 🧩 iOS Home Screen widget
 - 🔗 Obsidian integration (task deep links)
 - ✉️ Email to Inbox
 
