@@ -802,7 +802,7 @@ jobs:
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
-      - name: Update .SRCINFO
+      - name: Update checksums and .SRCINFO
         shell: bash
         working-directory: aur-mindwtr
         run: |
@@ -816,9 +816,24 @@ jobs:
             archlinux:latest \
             bash -lc '
               set -euo pipefail
-              pacman -Sy --noconfirm --needed base-devel git
+              pacman -Sy --noconfirm --needed base-devel git pacman-contrib
               getent group "$HOST_GID" >/dev/null 2>&1 || groupadd -g "$HOST_GID" builder
               id -u builder >/dev/null 2>&1 || useradd -m -u "$HOST_UID" -g "$HOST_GID" builder
+              if command -v updpkgsums >/dev/null 2>&1; then
+                su builder -c "updpkgsums"
+              else
+                # Fallback path if updpkgsums is unavailable.
+                su builder -c "makepkg -g > /tmp/makepkg-sums.txt"
+                awk "
+                  /^[_[:alnum:]]*sums=\\(/ { in_sums=1; next }
+                  in_sums && /^\\)/ { in_sums=0; next }
+                  !in_sums { print }
+                " /aur/PKGBUILD > /tmp/PKGBUILD.nosums
+                {
+                  cat /tmp/PKGBUILD.nosums
+                  cat /tmp/makepkg-sums.txt
+                } > /aur/PKGBUILD
+              fi
               su builder -c "makepkg --printsrcinfo > /aur/.SRCINFO"
             '
 
