@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 稳定了 iOS 设置与菜单页面的返回导航与边缘滑动手势。\n• 提升了多设备同步安全性与确定性合并正确性。\n• 新增通过自定义 Base URL 接入本地 OpenAI 兼容 AI 端点支持。\n• 强化 MCP 自动化可靠性：事务写入与 FTS 搜索。",
+        "ReleaseNotes": "• 稳定了 iOS 在键盘与安全区敏感页面中的编辑与导航体验。\n• 提升了跨设备同步安全性，强化云端附件校验并修复并发竞态问题。\n• 在启用 AI 功能时增加了额外的同意与隐私保护措施。\n• 优化了 Android 批量操作反馈与任务编辑响应流畅度。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Stabilized iOS back navigation and edge-swipe behavior across settings and drawer screens.\n• Improved cross-device sync safety and deterministic merge correctness.\n• Added support for local OpenAI-compatible AI endpoints via custom base URL.\n• Strengthened MCP automation reliability with transactional writes and FTS-backed search.",
+        "ReleaseNotes": "• Stabilized iOS task editing and navigation behavior across keyboard/safe-area heavy screens.\n• Improved cross-device sync safety with stronger cloud attachment validation and race-condition fixes.\n• Added additional consent/privacy safeguards when enabling AI features.\n• Improved Android workflow polish with better bulk action feedback and task-edit responsiveness.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -130,7 +130,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Se estabilizo la navegacion atras y edge-swipe en iOS en pantallas de ajustes y menu.\n• Se mejoro la seguridad de sync entre dispositivos y la correccion deterministica de merges.\n• Se agrego soporte para endpoints AI locales compatibles con OpenAI mediante URL base personalizada.\n• Se reforzo la fiabilidad de automatizacion MCP con escrituras transaccionales y busqueda FTS.",
+        "ReleaseNotes": "• Se estabilizo la edicion y navegacion en iOS en pantallas sensibles a teclado/safe-area.\n• Se mejoro la seguridad de sync entre dispositivos con validacion mas fuerte de adjuntos cloud y correcciones de carrera.\n• Se agregaron salvaguardas adicionales de consentimiento/privacidad al habilitar funciones de IA.\n• Mejoras de fluidez en Android para acciones masivas y respuesta del editor de tareas.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",

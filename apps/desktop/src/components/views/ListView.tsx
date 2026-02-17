@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, Folder } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useTaskStore, TaskPriority, TimeEstimate, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject, extractWaitingPerson } from '@mindwtr/core';
+import { useTaskStore, TaskPriority, TimeEstimate, DEFAULT_AREA_COLOR, sortTasksBy, parseQuickAdd, matchesHierarchicalToken, safeParseDate, isTaskInActiveProject, extractWaitingPerson } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
 import { TaskItem } from '../TaskItem';
@@ -593,7 +593,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             const finalTitle = parsedTitle || newTaskTitle;
             const initialProps: Partial<Task> = { ...props };
             if (!initialProps.projectId && projectTitle) {
-                const created = await addProject(projectTitle, '#94a3b8');
+                const created = await addProject(projectTitle, DEFAULT_AREA_COLOR);
                 if (!created) return;
                 initialProps.projectId = created.id;
             }
@@ -818,7 +818,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                                 <span
                                                     className="h-2 w-2 rounded-full"
-                                                    style={{ backgroundColor: projectArea.color || '#94a3b8' }}
+                                                    style={{ backgroundColor: projectArea.color || DEFAULT_AREA_COLOR }}
                                                 />
                                                 {projectArea.name}
                                             </span>
@@ -915,7 +915,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
                     t={t}
                     dense={isCompact}
                     onCreateProject={async (title) => {
-                        const created = await addProject(title, '#94a3b8');
+                        const created = await addProject(title, DEFAULT_AREA_COLOR);
                         return created?.id ?? null;
                     }}
                     onChange={(next) => {

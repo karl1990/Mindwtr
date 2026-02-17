@@ -10,6 +10,71 @@ on:
         description: 'Release tag (e.g., v0.2.3)'
         required: true
         type: string
+      run_linux:
+        description: 'Run Linux release job'
+        required: false
+        type: boolean
+        default: false
+      run_macos:
+        description: 'Run macOS release job'
+        required: false
+        type: boolean
+        default: false
+      run_windows:
+        description: 'Run Windows release job'
+        required: false
+        type: boolean
+        default: false
+      run_android:
+        description: 'Run Android release job'
+        required: false
+        type: boolean
+        default: false
+      run_android_foss:
+        description: 'Run Android FOSS release job'
+        required: false
+        type: boolean
+        default: false
+      run_ios_appstore:
+        description: 'Run iOS App Store release job'
+        required: false
+        type: boolean
+        default: false
+      run_macos_appstore:
+        description: 'Run macOS App Store release job'
+        required: false
+        type: boolean
+        default: false
+      run_update_packages:
+        description: 'Run Homebrew/Scoop update job'
+        required: false
+        type: boolean
+        default: false
+      run_bump_official_cask:
+        description: 'Run official Homebrew cask bump job'
+        required: false
+        type: boolean
+        default: false
+      run_update_linux_repos:
+        description: 'Run Linux repo publish job'
+        required: false
+        type: boolean
+        default: false
+      run_publish_chocolatey:
+        description: 'Run Chocolatey publish job'
+        required: false
+        type: boolean
+        default: false
+      run_update_aur:
+        description: 'Run AUR binary package update job'
+        required: false
+        type: boolean
+        default: false
+      run_update_aur_source:
+        description: 'Run AUR source package update job'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,26 +82,32 @@ concurrency:
 
 jobs:
   linux:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_linux }}
     uses: ./.github/workflows/release-linux.yml
     secrets: inherit
 
   macos:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_macos }}
     uses: ./.github/workflows/release-macos.yml
     secrets: inherit
 
   windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_windows }}
     uses: ./.github/workflows/release-windows.yml
     secrets: inherit
 
   android:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_android }}
     uses: ./.github/workflows/release-android.yml
     secrets: inherit
 
   android-foss:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_android_foss }}
     uses: ./.github/workflows/release-android-foss.yml
     secrets: inherit
 
   ios-appstore:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_ios_appstore }}
     uses: ./.github/workflows/release-ios-appstore.yml
     with:
       upload: true
@@ -45,6 +116,7 @@ jobs:
     secrets: inherit
 
   macos-appstore:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_macos_appstore }}
     uses: ./.github/workflows/release-macos-appstore.yml
     with:
       upload: true
@@ -53,6 +125,7 @@ jobs:
     secrets: inherit
 
   release:
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.run_linux && inputs.run_macos && inputs.run_windows && inputs.run_android && inputs.run_android_foss) }}
     needs: [linux, macos, windows, android, android-foss]
     runs-on: ubuntu-latest
     name: Create Release
@@ -146,7 +219,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success'
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_packages && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout release repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -272,15 +345,20 @@ jobs:
           PackageVersion: ${VERSION}
           InstallerLocale: en-US
           InstallerType: nullsoft
+          Scope: user
           InstallModes:
             - interactive
             - silent
+            - silentWithProgress
+          InstallerSwitches:
+            Silent: /S /CURRENTUSER
+            SilentWithProgress: /S /CURRENTUSER
           UpgradeBehavior: install
           Commands:
             - mindwtr
           Dependencies:
             PackageDependencies:
-              - PackageIdentifier: Microsoft.VCRedist.2015+.x64
+              - PackageIdentifier: Microsoft.EdgeWebView2Runtime
           ProductCode: Mindwtr
           ReleaseDate: ${RELEASE_DATE}
           AppsAndFeaturesEntries:
@@ -409,7 +487,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_bump_official_cask && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout release repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -489,11 +567,13 @@ jobs:
 
   update-linux-repos:
     needs: release
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success'
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_linux_repos && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
+    permissions:
+      contents: write
     uses: ./.github/workflows/publish-repo.yml
     secrets: inherit
     with:
-      tag: ${{ github.ref_name }}
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
   publish-chocolatey:
     needs: release
@@ -502,7 +582,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-') && vars.CHOCOLATEY_PUBLISH_ENABLED == 'true'
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success' && !contains(github.ref, '-')) || (github.event_name == 'workflow_dispatch' && inputs.run_publish_chocolatey && (needs.release.result == 'success' || needs.release.result == 'skipped'))) && vars.CHOCOLATEY_PUBLISH_ENABLED == 'true' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -511,8 +591,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
+          $inputTag = "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           $env:GITHUB_EVENT_INPUTS_TAG = "${{ github.event.inputs.tag }}"
-          $lines = & scripts/ci/resolve-release-version.ps1 -InputTag "${{ github.ref_name }}"
+          $lines = & scripts/ci/resolve-release-version.ps1 -InputTag $inputTag
           foreach ($line in $lines) {
             $line >> $env:GITHUB_OUTPUT
           }
@@ -625,14 +706,21 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success'
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GITHUB_EVENT_INPUTS_TAG: ${{ github.event.inputs.tag }}
+        run: scripts/ci/resolve-release-version.sh "$INPUT_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Update PKGBUILD version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${{ steps.version.outputs.version }}
           echo "Updating PKGBUILD to version $VERSION"
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" aur/PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" aur/PKGBUILD
@@ -665,8 +753,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success'
+    if: ${{ always() && ((startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && needs.release.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.run_update_aur_source && (needs.release.result == 'success' || needs.release.result == 'skipped'))) }}
     steps:
+      - name: Checkout release repo
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: source
+
       - name: Configure SSH for AUR
         shell: bash
         env:
@@ -693,11 +786,18 @@ jobs:
         shell: bash
         run: git clone ssh://aur@aur.archlinux.org/mindwtr.git aur-mindwtr
 
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GITHUB_EVENT_INPUTS_TAG: ${{ github.event.inputs.tag }}
+        run: source/scripts/ci/resolve-release-version.sh "$INPUT_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Update PKGBUILD version
         shell: bash
         working-directory: aur-mindwtr
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${{ steps.version.outputs.version }}
           echo "Updating mindwtr PKGBUILD to version $VERSION"
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
@@ -706,11 +806,21 @@ jobs:
         shell: bash
         working-directory: aur-mindwtr
         run: |
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
           docker run --rm \
+            -e HOST_UID="$HOST_UID" \
+            -e HOST_GID="$HOST_GID" \
             -v "$PWD:/aur" \
             -w /aur \
             archlinux:latest \
-            bash -lc "pacman -Sy --noconfirm --needed base-devel git && useradd -m builder && chown -R builder:builder /aur && su builder -c 'makepkg --printsrcinfo > .SRCINFO'"
+            bash -lc '
+              set -euo pipefail
+              pacman -Sy --noconfirm --needed base-devel git
+              getent group "$HOST_GID" >/dev/null 2>&1 || groupadd -g "$HOST_GID" builder
+              id -u builder >/dev/null 2>&1 || useradd -m -u "$HOST_UID" -g "$HOST_GID" builder
+              su builder -c "makepkg --printsrcinfo > /aur/.SRCINFO"
+            '
 
       - name: Commit and push changes
         shell: bash
@@ -726,5 +836,5 @@ jobs:
           git config user.name "${AUR_USERNAME:-mindwtr-bot}"
           git config user.email "${AUR_EMAIL:-actions@github.com}"
           git add PKGBUILD .SRCINFO
-          git commit -m "Update to ${GITHUB_REF#refs/tags/}"
+          git commit -m "Update to ${{ steps.version.outputs.tag }}"
           git push origin HEAD

@@ -21,3 +21,4 @@ Recommended pages:
 - Cloud Backend Development Guide
 - Cloud API Reference
 - Cloud Deployment Checklist
+- Cloud Deployment

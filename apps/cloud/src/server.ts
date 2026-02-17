@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, realpathSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, realpathSync, lstatSync, renameSync } from 'fs';
 import { createHash } from 'crypto';
-import { dirname, join, resolve, sep } from 'path';
+import { basename, dirname, join, resolve, sep } from 'path';
 import {
     applyTaskUpdates,
     generateUUID,
@@ -71,18 +71,39 @@ const MAX_ITEMS_PER_COLLECTION = Number.isFinite(maxItemsPerCollectionValue) && 
     ? Math.floor(maxItemsPerCollectionValue)
     : 50_000;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
+const ATTACHMENT_PATH_MAX_DECODE_PASSES = 3;
+const BEARER_TOKEN_PATTERN = /^[\x21-\x7E]{8,512}$/;
+
+function decodeAttachmentPath(rawPath: string): string | null {
+    let decoded = rawPath;
+    for (let i = 0; i < ATTACHMENT_PATH_MAX_DECODE_PASSES; i += 1) {
+        let next = '';
+        try {
+            next = decodeURIComponent(decoded);
+        } catch {
+            return null;
+        }
+        if (next === decoded) {
+            return next;
+        }
+        decoded = next;
+    }
+    try {
+        const next = decodeURIComponent(decoded);
+        if (next !== decoded) return null;
+    } catch {
+        return null;
+    }
+    return decoded;
+}
 
 function isPathWithinRoot(pathValue: string, rootPath: string): boolean {
     return pathValue === rootPath || pathValue.startsWith(`${rootPath}${sep}`);
 }
 
 function normalizeAttachmentRelativePath(rawPath: string): string | null {
-    let decoded = '';
-    try {
-        decoded = decodeURIComponent(rawPath);
-    } catch {
-        return null;
-    }
+    const decoded = decodeAttachmentPath(rawPath);
+    if (!decoded) return null;
     if (!decoded || !ATTACHMENT_PATH_ALLOWLIST.test(decoded)) {
         return null;
     }
@@ -105,6 +126,51 @@ function resolveAttachmentPath(dataDir: string, key: string, rawPath: string): {
     const filePath = resolve(join(rootRealPath, relativePath));
     if (!isPathWithinRoot(filePath, rootRealPath)) return null;
     return { rootRealPath, filePath };
+}
+
+function writeAttachmentFileSafely(rootRealPath: string, filePath: string, body: Uint8Array): boolean {
+    mkdirSync(dirname(filePath), { recursive: true });
+    const parentRealPath = realpathSync(dirname(filePath));
+    if (!isPathWithinRoot(parentRealPath, rootRealPath)) {
+        return false;
+    }
+
+    const safeFilePath = join(parentRealPath, basename(filePath));
+    if (existsSync(safeFilePath)) {
+        const stat = lstatSync(safeFilePath);
+        if (stat.isSymbolicLink()) {
+            return false;
+        }
+        const realFilePath = realpathSync(safeFilePath);
+        if (!isPathWithinRoot(realFilePath, rootRealPath)) {
+            return false;
+        }
+    }
+
+    const tempPath = join(
+        parentRealPath,
+        `.mindwtr-upload-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
+    );
+    let tempExists = false;
+    try {
+        writeFileSync(tempPath, body, { flag: 'wx', mode: 0o600 });
+        tempExists = true;
+        const tempRealPath = realpathSync(tempPath);
+        if (!isPathWithinRoot(tempRealPath, rootRealPath)) {
+            return false;
+        }
+        renameSync(tempPath, safeFilePath);
+        tempExists = false;
+        return true;
+    } finally {
+        if (tempExists && existsSync(tempPath)) {
+            try {
+                unlinkSync(tempPath);
+            } catch {
+                // Best-effort cleanup for temp files.
+            }
+        }
+    }
 }
 
 const shutdown = (signal: string) => {
@@ -148,7 +214,10 @@ function errorResponse(message: string, status = 400) {
 function getToken(req: Request): string | null {
     const auth = req.headers.get('authorization') || '';
     const match = auth.match(/^Bearer\s+(.+)$/i);
-    return match ? match[1].trim() : null;
+    if (!match) return null;
+    const token = match[1].trim();
+    if (!BEARER_TOKEN_PATTERN.test(token)) return null;
+    return token;
 }
 
 function tokenToKey(token: string): string {
@@ -685,8 +754,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 if (!token) return errorResponse('Unauthorized', 401);
                 if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
                 const key = tokenToKey(token);
+                const dataRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const now = Date.now();
-                const state = rateLimits.get(key);
+                const state = rateLimits.get(dataRateKey);
                 if (state && now < state.resetAt) {
                     state.count += 1;
                     if (state.count > maxPerWindow) {
@@ -697,7 +767,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         );
                     }
                 } else {
-                    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
+                    rateLimits.set(dataRateKey, { count: 1, resetAt: now + windowMs });
                 }
                 const filePath = join(dataDir, `${key}.json`);
 
@@ -789,18 +859,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     if (body.length > maxAttachmentBytes) {
                         return errorResponse('Payload too large', 413);
                     }
-                    mkdirSync(dirname(filePath), { recursive: true });
-                    const parentRealPath = realpathSync(dirname(filePath));
-                    if (!isPathWithinRoot(parentRealPath, rootRealPath)) {
-                        return errorResponse('Invalid attachment path', 400);
-                    }
-                    if (existsSync(filePath)) {
-                        const realFilePath = realpathSync(filePath);
-                        if (!isPathWithinRoot(realFilePath, rootRealPath)) {
-                            return errorResponse('Invalid attachment path', 400);
-                        }
-                    }
-                    writeFileSync(filePath, body);
+                    const wrote = writeAttachmentFileSafely(rootRealPath, filePath, body);
+                    if (!wrote) return errorResponse('Invalid attachment path', 400);
                     return jsonResponse({ ok: true });
                 }
 

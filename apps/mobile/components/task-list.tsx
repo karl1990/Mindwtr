@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, RefreshControl, ScrollView, Modal, Pressable, Alert } from 'react-native';
+import { View, TextInput, FlatList, StyleSheet, TouchableOpacity, Text, RefreshControl, ScrollView, Modal, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import {
   useTaskStore,
@@ -13,6 +13,7 @@ import {
   createAIProvider,
   type AIProviderId,
   type TaskSortBy,
+  DEFAULT_PROJECT_COLOR,
 } from '@mindwtr/core';
 
 import { TaskEditModal } from './task-edit-modal';
@@ -69,6 +70,7 @@ function TaskListComponent({
   const addProject = useTaskStore((state) => state.addProject);
   const updateTask = useTaskStore((state) => state.updateTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
+  const restoreTask = useTaskStore((state) => state.restoreTask);
   const fetchData = useTaskStore((state) => state.fetchData);
   const batchMoveTasks = useTaskStore((state) => state.batchMoveTasks);
   const batchDeleteTasks = useTaskStore((state) => state.batchDeleteTasks);
@@ -91,6 +93,8 @@ function TaskListComponent({
   const [tagModalVisible, setTagModalVisible] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkActionLabel, setBulkActionLabel] = useState('');
   const [inputSelection, setInputSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [typeaheadOpen, setTypeaheadOpen] = useState(false);
   const [typeaheadIndex, setTypeaheadIndex] = useState(0);
@@ -179,6 +183,10 @@ function TaskListComponent({
     | { type: 'section'; id: string; title: string; count: number; muted?: boolean }
     | { type: 'task'; task: Task };
 
+  const LIST_CONTENT_VERTICAL_PADDING = 12;
+  const ESTIMATED_SECTION_HEIGHT = 32;
+  const ESTIMATED_TASK_HEIGHT = 86;
+
   const listItems = useMemo<ListItem[]>(() => {
     if (statusFilter === 'reference' && !projectId) {
       const activeAreas = [...areas].filter((area) => !area.deletedAt).sort((a, b) => {
@@ -258,6 +266,42 @@ function TaskListComponent({
     }
     return items;
   }, [areas, orderedTasks, projectById, projectId, projectSections, statusFilter, t]);
+  const itemHeightsRef = useRef<Record<string, number>>({});
+  const [itemLayoutVersion, setItemLayoutVersion] = useState(0);
+  const getListItemKey = useCallback((item: ListItem) => (
+    item.type === 'section' ? `section-${item.id}` : item.task.id
+  ), []);
+  const estimateItemHeight = useCallback((item: ListItem) => (
+    item.type === 'section' ? ESTIMATED_SECTION_HEIGHT : ESTIMATED_TASK_HEIGHT
+  ), []);
+  const registerItemHeight = useCallback((itemKey: string, height: number) => {
+    const rounded = Math.round(height);
+    if (!Number.isFinite(rounded) || rounded <= 0) return;
+    if (itemHeightsRef.current[itemKey] === rounded) return;
+    itemHeightsRef.current[itemKey] = rounded;
+    setItemLayoutVersion((prev) => prev + 1);
+  }, []);
+  const itemLayouts = useMemo(() => {
+    let offset = LIST_CONTENT_VERTICAL_PADDING;
+    return listItems.map((item) => {
+      const key = getListItemKey(item);
+      const length = itemHeightsRef.current[key] ?? estimateItemHeight(item);
+      const layout = { length, offset };
+      offset += length;
+      return layout;
+    });
+  }, [estimateItemHeight, getListItemKey, itemLayoutVersion, listItems]);
+  const getItemLayout = useCallback((_: ArrayLike<ListItem> | null | undefined, index: number) => {
+    const measured = itemLayouts[index];
+    if (measured) {
+      return { index, length: measured.length, offset: measured.offset };
+    }
+    return {
+      index,
+      length: ESTIMATED_TASK_HEIGHT,
+      offset: LIST_CONTENT_VERTICAL_PADDING + (ESTIMATED_TASK_HEIGHT * index),
+    };
+  }, [itemLayouts]);
 
   const contextOptions = useMemo(() => {
     const taskContexts = tasks.flatMap((task) => task.contexts || []);
@@ -421,7 +465,7 @@ function TaskListComponent({
     if (!props.status) initialProps.status = defaultStatus;
     if (!props.projectId && projectId) initialProps.projectId = projectId;
     if (!initialProps.projectId && projectTitle) {
-      const created = await addProject(projectTitle, '#94a3b8');
+      const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
       if (!created) return;
       initialProps.projectId = created.id;
     }
@@ -449,7 +493,7 @@ function TaskListComponent({
     if (option.kind === 'create') {
       const title = option.value.trim();
       if (title) {
-        await addProject(title, '#94a3b8');
+        await addProject(title, DEFAULT_PROJECT_COLOR);
       }
     }
     if (trigger.type === 'project') {
@@ -486,6 +530,17 @@ function TaskListComponent({
     setSelectionMode(false);
     setMultiSelectedIds(new Set());
   }, []);
+  const runBulkAction = useCallback(async (label: string, action: () => Promise<void>) => {
+    if (bulkActionLoading) return;
+    setBulkActionLabel(label);
+    setBulkActionLoading(true);
+    try {
+      await action();
+    } finally {
+      setBulkActionLoading(false);
+      setBulkActionLabel('');
+    }
+  }, [bulkActionLoading]);
 
   const toggleMultiSelect = useCallback((taskId: string) => {
     if (!selectionMode) setSelectionMode(true);
@@ -498,14 +553,16 @@ function TaskListComponent({
   }, [selectionMode]);
 
   const handleBatchMove = useCallback(async (newStatus: TaskStatus) => {
-    if (!hasSelection) return;
-    await batchMoveTasks(selectedIdsArray, newStatus);
-    exitSelectionMode();
-    Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
-  }, [batchMoveTasks, selectedIdsArray, hasSelection, exitSelectionMode, t]);
+    if (!hasSelection || bulkActionLoading) return;
+    await runBulkAction(t('bulk.moveTo'), async () => {
+      await batchMoveTasks(selectedIdsArray, newStatus);
+      exitSelectionMode();
+      Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+    });
+  }, [batchMoveTasks, selectedIdsArray, hasSelection, exitSelectionMode, t, bulkActionLoading, runBulkAction]);
 
   const handleBatchDelete = useCallback(async () => {
-    if (!hasSelection) return;
+    if (!hasSelection || bulkActionLoading) return;
     Alert.alert(
       t('bulk.confirmDeleteTitle') || t('common.delete'),
       t('bulk.confirmDeleteBody') || t('list.confirmBatchDelete'),
@@ -515,30 +572,52 @@ function TaskListComponent({
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            await batchDeleteTasks(selectedIdsArray);
-            exitSelectionMode();
-            Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+            const deletedIds = [...selectedIdsArray];
+            await runBulkAction(t('common.delete'), async () => {
+              await batchDeleteTasks(deletedIds);
+              exitSelectionMode();
+              Alert.alert(
+                t('common.done'),
+                `${deletedIds.length} ${t('common.tasks')}`,
+                [
+                  {
+                    text: t('trash.restoreToInbox') === 'trash.restoreToInbox' ? 'Restore' : t('trash.restoreToInbox'),
+                    onPress: () => {
+                      deletedIds.forEach((id) => {
+                        void restoreTask(id);
+                      });
+                    },
+                  },
+                  {
+                    text: t('common.cancel'),
+                    style: 'cancel',
+                  },
+                ]
+              );
+            });
           },
         },
       ]
     );
-  }, [batchDeleteTasks, selectedIdsArray, hasSelection, exitSelectionMode, t]);
+  }, [batchDeleteTasks, selectedIdsArray, hasSelection, exitSelectionMode, t, bulkActionLoading, restoreTask, runBulkAction]);
 
   const handleBatchAddTag = useCallback(async () => {
     const input = tagInput.trim();
-    if (!hasSelection || !input) return;
+    if (!hasSelection || !input || bulkActionLoading) return;
     const tag = input.startsWith('#') ? input : `#${input}`;
-    await batchUpdateTasks(selectedIdsArray.map((id) => {
-      const task = tasksById[id];
-      const existingTags = task?.tags || [];
-      const nextTags = Array.from(new Set([...existingTags, tag]));
-      return { id, updates: { tags: nextTags } };
-    }));
-    setTagInput('');
-    setTagModalVisible(false);
-    exitSelectionMode();
-    Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
-  }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode, t]);
+    await runBulkAction(t('bulk.addTag'), async () => {
+      await batchUpdateTasks(selectedIdsArray.map((id) => {
+        const task = tasksById[id];
+        const existingTags = task?.tags || [];
+        const nextTags = Array.from(new Set([...existingTags, tag]));
+        return { id, updates: { tags: nextTags } };
+      }));
+      setTagInput('');
+      setTagModalVisible(false);
+      exitSelectionMode();
+      Alert.alert(t('common.done'), `${selectedIdsArray.length} ${t('common.tasks')}`);
+    });
+  }, [batchUpdateTasks, selectedIdsArray, tasksById, tagInput, hasSelection, exitSelectionMode, t, bulkActionLoading, runBulkAction]);
 
   const sortOptions: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
   const hideStatusBadgeForList = statusFilter === 'next' || statusFilter === 'waiting';
@@ -574,9 +653,13 @@ function TaskListComponent({
   ]);
 
   const renderListItem = useCallback(({ item }: { item: ListItem }) => {
+    const itemKey = getListItemKey(item);
     if (item.type === 'section') {
       return (
-        <View style={styles.sectionHeader}>
+        <View
+          style={styles.sectionHeader}
+          onLayout={(event) => registerItemHeight(itemKey, event.nativeEvent.layout.height)}
+        >
           <Text style={[styles.sectionTitle, { color: item.muted ? themeColorsMemo.secondaryText : themeColorsMemo.text }]}>
             {item.title}
           </Text>
@@ -586,9 +669,12 @@ function TaskListComponent({
         </View>
       );
     }
-    return renderTask({ item: item.task });
-  }, [renderTask, themeColorsMemo.secondaryText, themeColorsMemo.text]);
-
+    return (
+      <View onLayout={(event) => registerItemHeight(itemKey, event.nativeEvent.layout.height)}>
+        {renderTask({ item: item.task })}
+      </View>
+    );
+  }, [getListItemKey, registerItemHeight, renderTask, themeColorsMemo.secondaryText, themeColorsMemo.text]);
   return (
     <View style={[styles.container, { backgroundColor: themeColorsMemo.bg }]}>
       {showHeader ? (
@@ -638,16 +724,26 @@ function TaskListComponent({
 
       {enableBulkActions && selectionMode && (
         <View style={[styles.bulkBar, { backgroundColor: themeColors.cardBg, borderBottomColor: themeColors.border }]}>
-          <Text style={[styles.bulkCount, { color: themeColors.secondaryText }]}>
-            {selectedIdsArray.length} {t('bulk.selected')}
-          </Text>
+          <View style={styles.bulkStatusRow}>
+            <Text style={[styles.bulkCount, { color: themeColors.secondaryText }]}>
+              {selectedIdsArray.length} {t('bulk.selected')}
+            </Text>
+            {bulkActionLoading && (
+              <View style={styles.bulkLoadingRow}>
+                <ActivityIndicator size="small" color={themeColors.tint} />
+                <Text style={[styles.bulkLoadingText, { color: themeColors.secondaryText }]}>
+                  {bulkActionLabel || t('common.loading')}
+                </Text>
+              </View>
+            )}
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bulkMoveRow}>
             {(['inbox', 'next', 'waiting', 'someday', 'reference', 'done'] as TaskStatus[]).map((status) => (
               <TouchableOpacity
                 key={status}
                 onPress={() => handleBatchMove(status)}
-                disabled={!hasSelection}
-                style={[styles.bulkMoveButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+                disabled={!hasSelection || bulkActionLoading}
+                style={[styles.bulkMoveButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection && !bulkActionLoading ? 1 : 0.5 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('bulk.moveTo')} ${t(`status.${status}`)}`}
               >
@@ -658,8 +754,8 @@ function TaskListComponent({
           <View style={styles.bulkActions}>
             <TouchableOpacity
               onPress={() => setTagModalVisible(true)}
-              disabled={!hasSelection}
-              style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+              disabled={!hasSelection || bulkActionLoading}
+              style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection && !bulkActionLoading ? 1 : 0.5 }]}
               accessibilityRole="button"
               accessibilityLabel={t('bulk.addTag')}
             >
@@ -667,8 +763,8 @@ function TaskListComponent({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleBatchDelete}
-              disabled={!hasSelection}
-              style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection ? 1 : 0.5 }]}
+              disabled={!hasSelection || bulkActionLoading}
+              style={[styles.bulkActionButton, { backgroundColor: themeColors.filterBg, opacity: hasSelection && !bulkActionLoading ? 1 : 0.5 }]}
               accessibilityRole="button"
               accessibilityLabel={t('bulk.delete')}
             >
@@ -796,7 +892,7 @@ function TaskListComponent({
           keyExtractor={(item) => (item.type === 'section' ? `section-${item.id}` : item.task.id)}
           style={styles.list}
           contentContainerStyle={listContentStyle}
-          getItemLayout={undefined}
+          getItemLayout={getItemLayout}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={5}
@@ -979,6 +1075,21 @@ const styles = StyleSheet.create({
   bulkCount: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  bulkStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bulkLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bulkLoadingText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   bulkMoveRow: {
     gap: 6,

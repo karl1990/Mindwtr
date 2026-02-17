@@ -1,4 +1,4 @@
-import { parseQuickAdd as parseQuickAddCore, type Project as CoreProject } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, parseQuickAdd as parseQuickAddCore, type Project as CoreProject } from '@mindwtr/core';
 import type { DbClient } from './db.js';
 import { parseJson } from './db.js';
 
@@ -341,7 +341,7 @@ export function listProjects(db: DbClient): Project[] {
     id: row.id,
     title: row.title,
     status: row.status,
-    color: row.color ?? '#94a3b8',
+    color: row.color ?? DEFAULT_PROJECT_COLOR,
     orderNum: row.orderNum ?? undefined,
     tagIds: parseJson(row.tagIds, []),
     isSequential: row.isSequential === 1,

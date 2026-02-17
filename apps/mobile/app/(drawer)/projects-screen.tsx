@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView, SectionList, Dimensions, Platform, Keyboard, ActionSheetIOS } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Area, Attachment, generateUUID, getAttachmentDisplayTitle, normalizeLinkAttachmentInput, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
+import { Area, Attachment, DEFAULT_PROJECT_COLOR, generateUUID, getAttachmentDisplayTitle, normalizeLinkAttachmentInput, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
 import { Trash2 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -353,7 +353,7 @@ export default function ProjectsScreen() {
           ? selectedAreaFilter
           : undefined;
       const areaColor = inferredAreaId ? areaById.get(inferredAreaId)?.color : undefined;
-      addProject(newProjectTitle, areaColor || '#94a3b8', {
+      addProject(newProjectTitle, areaColor || DEFAULT_PROJECT_COLOR, {
         areaId: inferredAreaId,
       });
       setNewProjectTitle('');

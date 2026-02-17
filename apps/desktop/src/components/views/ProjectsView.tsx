@@ -80,7 +80,7 @@ export function ProjectsView() {
     const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
     const [showAreaManager, setShowAreaManager] = useState(false);
     const [newAreaName, setNewAreaName] = useState('');
-    const [newAreaColor, setNewAreaColor] = useState('#94a3b8');
+    const [newAreaColor, setNewAreaColor] = useState(DEFAULT_AREA_COLOR);
     const [showQuickAreaPrompt, setShowQuickAreaPrompt] = useState(false);
     const [pendingAreaAssignProjectId, setPendingAreaAssignProjectId] = useState<string | null>(null);
     const [showSectionPrompt, setShowSectionPrompt] = useState(false);
@@ -238,7 +238,7 @@ export function ProjectsView() {
             const areaColor = resolvedAreaId ? areaById.get(resolvedAreaId)?.color : undefined;
             await addProject(
                 newProjectTitle,
-                areaColor || '#94a3b8',
+                areaColor || DEFAULT_AREA_COLOR,
                 resolvedAreaId ? { areaId: resolvedAreaId } : undefined
             );
             setNewProjectTitle('');
@@ -710,7 +710,7 @@ export function ProjectsView() {
             if (!props.status) initialProps.status = 'next';
             if (!props.projectId) initialProps.projectId = selectedProject.id;
             if (!initialProps.projectId && projectTitle) {
-                const created = await addProject(projectTitle, '#94a3b8');
+                const created = await addProject(projectTitle, DEFAULT_AREA_COLOR);
                 if (!created) return;
                 initialProps.projectId = created.id;
             }
@@ -859,7 +859,7 @@ export function ProjectsView() {
                                         projects={projects}
                                         contexts={allContexts}
                                         onCreateProject={async (title) => {
-                                            const created = await addProject(title, '#94a3b8');
+                                            const created = await addProject(title, DEFAULT_AREA_COLOR);
                                             return created?.id ?? null;
                                         }}
                                     />
@@ -872,6 +872,7 @@ export function ProjectsView() {
                                             <button
                                                 type="button"
                                                 onClick={handleAddSection}
+                                                aria-label={t('projects.addSection')}
                                                 className="inline-flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
                                             >
                                                 <Plus className="h-3.5 w-3.5" />

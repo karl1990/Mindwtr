@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { parseQuickAdd, safeFormatDate, safeParseDate, type Attachment, type Task, type TaskPriority, generateUUID, PRESET_CONTEXTS, useTaskStore } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, parseQuickAdd, safeFormatDate, safeParseDate, type Attachment, type Task, type TaskPriority, generateUUID, PRESET_CONTEXTS, useTaskStore } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,6 +111,7 @@ export function QuickCaptureSheet({
   const [priority, setPriority] = useState<TaskPriority | null>(null);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [addAnother, setAddAnother] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [recording, setRecording] = useState<RecordingState | null>(null);
   const [recordingBusy, setRecordingBusy] = useState(false);
   const [recordingReady, setRecordingReady] = useState(false);
@@ -189,7 +190,7 @@ export function QuickCaptureSheet({
       Keyboard.dismiss();
       return;
     }
-    const created = await addProject(title, '#94a3b8');
+    const created = await addProject(title, DEFAULT_PROJECT_COLOR);
     if (!created) return;
     setProjectId(created.id);
     setShowProjectPicker(false);
@@ -222,6 +223,22 @@ export function QuickCaptureSheet({
     const handle = setTimeout(() => inputRef.current?.focus(), 120);
     return () => clearTimeout(handle);
   }, [autoRecord, visible, initialProps, initialValue]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+    const showListener = Keyboard.addListener('keyboardDidShow', (event) => {
+      const nextHeight = event.endCoordinates?.height ?? 0;
+      setKeyboardHeight(nextHeight);
+    });
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+      setKeyboardHeight(0);
+    };
+  }, [visible]);
 
   useEffect(() => {
     if (prioritiesEnabled) return;
@@ -381,7 +398,7 @@ export function QuickCaptureSheet({
     if (!initialPropsMerged.status) initialPropsMerged.status = 'inbox';
 
     if (!initialPropsMerged.projectId && projectTitle) {
-      const created = await addProject(projectTitle, '#94a3b8');
+      const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
       if (!created) return { title: finalTitle, props: initialPropsMerged };
       initialPropsMerged.projectId = created.id;
     }
@@ -481,7 +498,7 @@ export function QuickCaptureSheet({
         if (match) {
           updates.projectId = match.id;
         } else {
-          const created = await addProjectNow(trimmed, '#94a3b8');
+          const created = await addProjectNow(trimmed, DEFAULT_PROJECT_COLOR);
           if (!created) return;
           updates.projectId = created.id;
         }
@@ -1058,7 +1075,17 @@ export function QuickCaptureSheet({
         keyboardVerticalOffset={0}
         style={styles.keyboardAvoiding}
       >
-        <View style={[styles.sheet, { backgroundColor: tc.cardBg, paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: tc.cardBg,
+              paddingBottom:
+                Math.max(20, insets.bottom + 12)
+                + (Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0),
+            },
+          ]}
+        >
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: tc.text }]}>{t('nav.addTask')}</Text>
             <TouchableOpacity onPress={handleClose} accessibilityLabel={t('common.close')}>

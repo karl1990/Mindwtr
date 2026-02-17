@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard } from 'react-native';
+import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Attachment,
@@ -30,6 +30,7 @@ import {
     normalizeLinkAttachmentInput,
     validateAttachmentForUpload,
     parseQuickAdd,
+    DEFAULT_PROJECT_COLOR,
 } from '@mindwtr/core';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -105,6 +106,14 @@ const isReleasedAudioPlayerError = (error: unknown): boolean => {
         || message.includes('cannot be cast to type expo.modules.audio.audioplayer')
     );
 };
+const isValidLinkUri = (value: string): boolean => {
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol.length > 0;
+    } catch {
+        return false;
+    }
+};
 const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
     inbox: 'Inbox',
     next: 'Next',
@@ -115,6 +124,11 @@ const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
     archived: 'Archived',
 };
 const QUICK_TOKEN_LIMIT = 6;
+const DEFAULT_CONTEXT_SUGGESTIONS = ['@home', '@work', '@errands', '@computer', '@phone'];
+const getInitialWindowWidth = (): number => {
+    const width = Dimensions?.get?.('window')?.width;
+    return Number.isFinite(width) && width > 0 ? Math.round(width) : 1;
+};
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'status',
@@ -152,7 +166,7 @@ const DEFAULT_TASK_EDITOR_VISIBLE: TaskEditorFieldId[] = [
 
 type TaskEditTab = 'task' | 'view';
 
-export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, defaultTab }: TaskEditModalProps) {
+function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defaultTab }: TaskEditModalProps) {
     const {
         tasks,
         projects,
@@ -233,8 +247,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
             .map(([tag]) => tag);
 
         // Add default tags if we don't have enough history
-        const defaults = ['@home', '@work', '@errands', '@computer', '@phone'];
-        const unique = new Set([...sorted, ...defaults]);
+        const unique = new Set([...sorted, ...DEFAULT_CONTEXT_SUGGESTIONS]);
 
         return Array.from(unique).slice(0, MAX_SUGGESTED_TAGS);
     }, [tasks]);
@@ -519,7 +532,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         let resolvedProjectId = parsedProps.projectId;
         if (!resolvedProjectId && projectTitle) {
             try {
-                const created = await addProject(projectTitle, '#94a3b8');
+                const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
                 resolvedProjectId = created?.id;
             } catch (error) {
                 logTaskError('Failed to create project from quick add', error);
@@ -785,7 +798,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
 
     const confirmAddLink = () => {
         const normalized = normalizeLinkAttachmentInput(linkInput);
-        if (!normalized.uri) return;
+        if (!normalized.uri || !isValidLinkUri(normalized.uri)) {
+            Alert.alert(t('attachments.title'), t('attachments.invalidLink'));
+            return;
+        }
         const now = new Date().toISOString();
         const attachment: Attachment = {
             id: generateUUID(),
@@ -1479,13 +1495,14 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         setEditTab(mode);
     }, []);
 
-    const [containerWidth, setContainerWidth] = useState(0);
+    const [containerWidth, setContainerWidth] = useState(getInitialWindowWidth);
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef<ScrollView | null>(null);
-    const [scrollTaskFormToEnd, setScrollTaskFormToEnd] = useState<(() => void) | null>(null);
-    const registerScrollTaskFormToEnd = useCallback((handler: (() => void) | null) => {
+    const [scrollTaskFormToEnd, setScrollTaskFormToEnd] = useState<((targetInput?: number | string) => void) | null>(null);
+    const registerScrollTaskFormToEnd = useCallback((handler: ((targetInput?: number | string) => void) | null) => {
         setScrollTaskFormToEnd(() => handler);
     }, []);
+    const lastFocusedInputRef = useRef<number | string | undefined>(undefined);
 
     const scrollToTab = useCallback((mode: TaskEditTab, animated = true) => {
         if (!containerWidth) return;
@@ -1500,15 +1517,54 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         }
         node?.getNode?.()?.scrollTo?.({ x, animated });
     }, [containerWidth]);
+    const alignPagerToActiveTab = useCallback(() => {
+        if (!visible || !containerWidth) return;
+        requestAnimationFrame(() => {
+            scrollToTab(editTab, false);
+        });
+    }, [containerWidth, editTab, scrollToTab, visible]);
     const swipeStartX = useRef(0);
     const swipeThreshold = containerWidth ? Math.max(32, containerWidth * 0.1) : 32;
 
     useEffect(() => {
         if (!visible || !containerWidth) return;
-        const targetX = editTab === 'task' ? 0 : containerWidth;
-        scrollX.setValue(targetX);
         scrollToTab(editTab, false);
-    }, [containerWidth, editTab, scrollToTab, task?.id, visible, scrollX]);
+    }, [containerWidth, editTab, scrollToTab, task?.id, visible]);
+
+    useEffect(() => {
+        if (!visible || !containerWidth) return;
+        const alignmentTimer = setTimeout(() => {
+            scrollToTab(editTab, false);
+        }, 90);
+        return () => clearTimeout(alignmentTimer);
+    }, [containerWidth, editTab, scrollToTab, task?.id, visible]);
+
+    useEffect(() => {
+        if (!visible) return;
+        if (typeof Keyboard?.addListener !== 'function') return;
+        const handleKeyboardShow = () => {
+            alignPagerToActiveTab();
+            if (lastFocusedInputRef.current !== undefined) {
+                scrollTaskFormToEnd?.(lastFocusedInputRef.current);
+            }
+        };
+        const handleKeyboardHide = () => {
+            alignPagerToActiveTab();
+        };
+        const showListener = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
+        const hideListener = Keyboard.addListener('keyboardDidHide', handleKeyboardHide);
+        return () => {
+            showListener.remove();
+            hideListener.remove();
+        };
+    }, [alignPagerToActiveTab, scrollTaskFormToEnd, visible]);
+
+    const handleInputFocus = useCallback((targetInput?: number | string) => {
+        lastFocusedInputRef.current = targetInput;
+        setTimeout(() => {
+            scrollTaskFormToEnd?.(targetInput);
+        }, 140);
+    }, [scrollTaskFormToEnd]);
 
     const handleTabPress = (mode: TaskEditTab) => {
         setModeTab(mode);
@@ -1905,7 +1961,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             style={[styles.input, inputStyle]}
                             value={contextInputDraft}
                             onChangeText={updateContextInput}
-                            onFocus={() => setIsContextInputFocused(true)}
+                            onFocus={(event) => {
+                                setIsContextInputFocused(true);
+                                handleInputFocus(event.nativeEvent.target);
+                            }}
                             onBlur={commitContextDraft}
                             onSubmitEditing={() => {
                                 commitContextDraft();
@@ -1959,7 +2018,10 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             style={[styles.input, inputStyle]}
                             value={tagInputDraft}
                             onChangeText={updateTagInput}
-                            onFocus={() => setIsTagInputFocused(true)}
+                            onFocus={(event) => {
+                                setIsTagInputFocused(true);
+                                handleInputFocus(event.nativeEvent.target);
+                            }}
                             onBlur={commitTagDraft}
                             onSubmitEditing={() => {
                                 commitTagDraft();
@@ -2348,6 +2410,9 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             <TextInput
                                 style={[styles.input, styles.textArea, inputStyle, textDirectionStyle]}
                                 value={descriptionDraft}
+                                onFocus={(event) => {
+                                    handleInputFocus(event.nativeEvent.target);
+                                }}
                                 onChangeText={(text) => {
                                     setDescriptionDraft(text);
                                     descriptionDraftRef.current = text;
@@ -2468,11 +2533,8 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                                             item.isCompleted && styles.completedText,
                                         ]}
                                         value={item.title}
-                                        onFocus={() => {
-                                            if (Platform.OS !== 'android') return;
-                                            setTimeout(() => {
-                                                scrollTaskFormToEnd?.();
-                                            }, 120);
+                                        onFocus={(event) => {
+                                            handleInputFocus(event.nativeEvent.target);
                                         }}
                                         onChangeText={(text) => {
                                             const newChecklist = (editedTask.checklist || []).map((item, i) =>
@@ -2563,14 +2625,19 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
 
                 <View
                     style={styles.tabContent}
-                    onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+                    onLayout={(event) => {
+                        const nextWidth = Math.round(event.nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== containerWidth) {
+                            setContainerWidth(nextWidth);
+                        }
+                    }}
                 >
                     <Animated.ScrollView
                         ref={scrollRef}
                         horizontal
                         pagingEnabled
                         scrollEnabled
-                        snapToInterval={containerWidth || 1}
+                        snapToInterval={containerWidth}
                         snapToAlignment="start"
                         decelerationRate="fast"
                         disableIntervalMomentum
@@ -2582,17 +2649,13 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         }}
                         onScrollEndDrag={(event) => {
                             if (!containerWidth) return;
-                            const velocityX = event.nativeEvent.velocity?.x ?? 0;
-                            if (Math.abs(velocityX) > 0.05) return;
                             const offsetX = event.nativeEvent.contentOffset.x;
                             const deltaX = offsetX - swipeStartX.current;
-                            if (Math.abs(deltaX) >= swipeThreshold) {
-                                const target = deltaX > 0 ? 'view' : 'task';
-                                scrollToTab(target);
-                                setModeTab(target);
-                                return;
-                            }
-                            scrollToTab(editTab);
+                            const target = Math.abs(deltaX) >= swipeThreshold
+                                ? (deltaX > 0 ? 'view' : 'task')
+                                : (offsetX >= containerWidth * 0.5 ? 'view' : 'task');
+                            scrollToTab(target);
+                            setModeTab(target);
                         }}
                         onScroll={Animated.event(
                             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -2601,7 +2664,12 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                         onMomentumScrollEnd={(event) => {
                             if (!containerWidth) return;
                             const offsetX = event.nativeEvent.contentOffset.x;
-                            setModeTab(offsetX >= containerWidth * 0.5 ? 'view' : 'task');
+                            const target = offsetX >= containerWidth * 0.5 ? 'view' : 'task';
+                            setModeTab(target);
+                            const targetX = target === 'task' ? 0 : containerWidth;
+                            if (Math.abs(offsetX - targetX) > 1) {
+                                scrollToTab(target, false);
+                            }
                         }}
                     >
                         <TaskEditFormTab
@@ -2888,7 +2956,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                             sectionId: projectId && prev.projectId === projectId ? prev.sectionId : undefined,
                         }));
                     }}
-                    onCreateProject={(title) => addProject(title, '#94a3b8')}
+                    onCreateProject={(title) => addProject(title, DEFAULT_PROJECT_COLOR)}
                 />
 
                 <TaskEditSectionPicker
@@ -2913,7 +2981,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
                     onSelectArea={(areaId) => {
                         setEditedTask(prev => ({ ...prev, areaId, projectId: undefined, sectionId: undefined }));
                     }}
-                    onCreateArea={(name) => addArea(name, { color: '#94a3b8' })}
+                    onCreateArea={(name) => addArea(name, { color: DEFAULT_PROJECT_COLOR })}
                 />
 
                 {aiModal && (
@@ -2929,3 +2997,15 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         </Modal>
     );
 }
+
+const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModalProps): boolean => (
+    prev.visible === next.visible
+    && prev.task === next.task
+    && prev.onClose === next.onClose
+    && prev.onSave === next.onSave
+    && prev.onFocusMode === next.onFocusMode
+    && prev.defaultTab === next.defaultTab
+);
+
+export const TaskEditModal = React.memo(TaskEditModalInner, areTaskEditModalPropsEqual);
+TaskEditModal.displayName = 'TaskEditModal';

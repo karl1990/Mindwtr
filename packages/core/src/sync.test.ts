@@ -476,6 +476,26 @@ describe('Sync Logic', () => {
             expect(result.stats.tasks.conflictIds).toContain('1');
         });
 
+        it('does not count conflict when only purgedAt differs', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                rev: 7,
+                revBy: 'device-a',
+                purgedAt: '2023-01-03T00:00:00.000Z',
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                rev: 7,
+                revBy: 'device-a',
+            } satisfies Task;
+
+            const result = mergeAppDataWithStats(mockAppData([localTask]), mockAppData([incomingTask]));
+
+            expect(result.data.tasks).toHaveLength(1);
+            expect(result.stats.tasks.conflicts).toBe(0);
+            expect(result.stats.tasks.conflictIds).toHaveLength(0);
+        });
+
         it('resolves equal revision/timestamp conflicts consistently across sync direction', () => {
             const localTask = {
                 ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
@@ -567,6 +587,27 @@ describe('Sync Logic', () => {
 
             expect(merged.tasks).toHaveLength(1);
             expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:04:00.000Z');
+        });
+
+        it('treats empty updatedAt as older than a valid epoch timestamp', () => {
+            const local = mockAppData([], [
+                {
+                    ...createMockProject('p1', ''),
+                    title: 'Zulu',
+                },
+            ]);
+            const incoming = mockAppData([], [
+                {
+                    ...createMockProject('p1', '1970-01-01T00:00:00.000Z'),
+                    title: 'Alpha',
+                },
+            ]);
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.projects).toHaveLength(1);
+            expect(merged.projects[0].title).toBe('Alpha');
+            expect(merged.projects[0].updatedAt).toBe('1970-01-01T00:00:00.000Z');
         });
 
         it('normalizes invalid createdAt without rewriting updatedAt', () => {

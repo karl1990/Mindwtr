@@ -281,13 +281,17 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
 4. **报告问题与提出需求：** 在 [GitHub Issues](https://github.com/dongdongbh/Mindwtr/issues) 提交 Bug 和功能建议。
 5. **加入社区讨论：** 欢迎加入 [Discord](https://discord.gg/ahhFxuDBb4)。
 6. **贡献代码或文档：** 提交 PR，并遵循[贡献指南](docs/CONTRIBUTING.md)和提交规范。
-7. **赞助项目：** 可通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持持续开发。
+7. **认领并实现：** 欢迎社区成员从[路线图](#路线图)或任何开放 issue 中认领条目并提交 PR。
+8. **赞助项目：** 可通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持持续开发。
 
 ## 路线图
 
 - 📦 上架 Flathub
 - 🤖 上架 F-Droid
 - 📱 持续优化 iOS 体验
+- 🗣️ iOS 提醒事项收件箱导入（Siri 收集 -> Mindwtr 收件箱）
+- ⚡ iOS 快捷指令 + URL Scheme 快速收集
+- 🧩 iOS 主屏幕小组件
 - 🔗 与 Obsidian 集成（任务深度链接）
 - ✉️ 邮件添加到收件箱
 
