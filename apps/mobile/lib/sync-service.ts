@@ -176,25 +176,25 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         throw new Error('Sync paused: offline state detected');
       }
     };
-    if (backend === 'webdav' || backend === 'cloud') {
-      try {
-        networkSubscription = Network.addNetworkStateListener((state) => {
-          const isConnected = state.isConnected ?? false;
-          const isInternetReachable = state.isInternetReachable ?? isConnected;
-          const isAirplaneModeEnabled = (() => {
-            const value = (state as { isAirplaneModeEnabled?: unknown }).isAirplaneModeEnabled;
-            return typeof value === 'boolean' ? value : false;
-          })();
-          if (isAirplaneModeEnabled || !isInternetReachable) {
-            networkWentOffline = true;
-            requestAbortController.abort();
-          }
-        });
-      } catch (error) {
-        logSyncWarning('Failed to subscribe to network state during sync', error);
-      }
-    }
     try {
+      if (backend === 'webdav' || backend === 'cloud') {
+        try {
+          networkSubscription = Network.addNetworkStateListener((state) => {
+            const isConnected = state.isConnected ?? false;
+            const isInternetReachable = state.isInternetReachable ?? isConnected;
+            const isAirplaneModeEnabled = (() => {
+              const value = (state as { isAirplaneModeEnabled?: unknown }).isAirplaneModeEnabled;
+              return typeof value === 'boolean' ? value : false;
+            })();
+            if (isAirplaneModeEnabled || !isInternetReachable) {
+              networkWentOffline = true;
+              requestAbortController.abort();
+            }
+          });
+        } catch (error) {
+          logSyncWarning('Failed to subscribe to network state during sync', error);
+        }
+      }
       let webdavConfig: { url: string; username: string; password: string } | null = null;
       let cloudConfig: { url: string; token: string } | null = null;
       let fileSyncPath: string | null = null;
