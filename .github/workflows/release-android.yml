@@ -120,7 +120,7 @@ jobs:
           scripts/ci/resolve-release-version.sh "$INPUT_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Build Android APK + AAB (local EAS)
-        timeout-minutes: 35
+        timeout-minutes: 60
         run: |
           VERSION=${{ steps.version.outputs.version }}
           cd apps/mobile

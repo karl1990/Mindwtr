@@ -10,6 +10,41 @@ on:
         description: 'Release tag (e.g., v0.2.3)'
         required: true
         type: string
+      run_linux:
+        description: 'Run Linux release job'
+        required: false
+        type: boolean
+        default: true
+      run_macos:
+        description: 'Run macOS release job'
+        required: false
+        type: boolean
+        default: true
+      run_windows:
+        description: 'Run Windows release job'
+        required: false
+        type: boolean
+        default: true
+      run_android:
+        description: 'Run Android release job'
+        required: false
+        type: boolean
+        default: true
+      run_android_foss:
+        description: 'Run Android FOSS release job'
+        required: false
+        type: boolean
+        default: true
+      run_ios_appstore:
+        description: 'Run iOS App Store release job'
+        required: false
+        type: boolean
+        default: true
+      run_macos_appstore:
+        description: 'Run macOS App Store release job'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,26 +52,32 @@ concurrency:
 
 jobs:
   linux:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_linux }}
     uses: ./.github/workflows/release-linux.yml
     secrets: inherit
 
   macos:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_macos }}
     uses: ./.github/workflows/release-macos.yml
     secrets: inherit
 
   windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_windows }}
     uses: ./.github/workflows/release-windows.yml
     secrets: inherit
 
   android:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_android }}
     uses: ./.github/workflows/release-android.yml
     secrets: inherit
 
   android-foss:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_android_foss }}
     uses: ./.github/workflows/release-android-foss.yml
     secrets: inherit
 
   ios-appstore:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_ios_appstore }}
     uses: ./.github/workflows/release-ios-appstore.yml
     with:
       upload: true
@@ -45,6 +86,7 @@ jobs:
     secrets: inherit
 
   macos-appstore:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_macos_appstore }}
     uses: ./.github/workflows/release-macos-appstore.yml
     with:
       upload: true
@@ -53,6 +95,7 @@ jobs:
     secrets: inherit
 
   release:
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.run_linux && inputs.run_macos && inputs.run_windows && inputs.run_android && inputs.run_android_foss) }}
     needs: [linux, macos, windows, android, android-foss]
     runs-on: ubuntu-latest
     name: Create Release
