@@ -111,6 +111,7 @@ export function QuickCaptureSheet({
   const [priority, setPriority] = useState<TaskPriority | null>(null);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [addAnother, setAddAnother] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [recording, setRecording] = useState<RecordingState | null>(null);
   const [recordingBusy, setRecordingBusy] = useState(false);
   const [recordingReady, setRecordingReady] = useState(false);
@@ -222,6 +223,22 @@ export function QuickCaptureSheet({
     const handle = setTimeout(() => inputRef.current?.focus(), 120);
     return () => clearTimeout(handle);
   }, [autoRecord, visible, initialProps, initialValue]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+    const showListener = Keyboard.addListener('keyboardDidShow', (event) => {
+      const nextHeight = event.endCoordinates?.height ?? 0;
+      setKeyboardHeight(nextHeight);
+    });
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+      setKeyboardHeight(0);
+    };
+  }, [visible]);
 
   useEffect(() => {
     if (prioritiesEnabled) return;
@@ -1058,7 +1075,17 @@ export function QuickCaptureSheet({
         keyboardVerticalOffset={0}
         style={styles.keyboardAvoiding}
       >
-        <View style={[styles.sheet, { backgroundColor: tc.cardBg, paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: tc.cardBg,
+              paddingBottom:
+                Math.max(20, insets.bottom + 12)
+                + (Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0),
+            },
+          ]}
+        >
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: tc.text }]}>{t('nav.addTask')}</Text>
             <TouchableOpacity onPress={handleClose} accessibilityLabel={t('common.close')}>
