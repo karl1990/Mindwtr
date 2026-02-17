@@ -252,6 +252,21 @@ export interface AppData {
                 offlineModelPath?: string;
             };
         };
+        emailCapture?: {
+            enabled?: boolean;
+            server?: string;
+            port?: number;
+            useTls?: boolean;
+            username?: string;
+            folder?: string;
+            pollIntervalMinutes?: number;
+            archiveAction?: 'move' | 'read' | 'delete';
+            archiveFolder?: string;
+            lastPollAt?: string;
+            lastPollError?: string;
+            lastPollTaskCount?: number;
+            tagNewTasks?: string;
+        };
         savedSearches?: SavedSearch[];
         sidebarCollapsed?: boolean;
         taskSortBy?: TaskSortBy;

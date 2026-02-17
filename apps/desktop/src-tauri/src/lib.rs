@@ -36,6 +36,7 @@ const KEYRING_CLOUD_TOKEN: &str = "cloud_token";
 const KEYRING_AI_OPENAI: &str = "ai_key_openai";
 const KEYRING_AI_ANTHROPIC: &str = "ai_key_anthropic";
 const KEYRING_AI_GEMINI: &str = "ai_key_gemini";
+const KEYRING_IMAP_PASSWORD: &str = "imap_password";
 #[cfg(target_os = "macos")]
 const MENU_HELP_DOCS_ID: &str = "help_docs";
 #[cfg(target_os = "macos")]
@@ -288,6 +289,222 @@ struct AudioCaptureResult {
 #[tauri::command]
 fn consume_quick_add_pending(state: tauri::State<'_, QuickAddPending>) -> bool {
     state.0.swap(false, Ordering::SeqCst)
+}
+
+// ── IMAP Email Capture ────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FetchedEmail {
+    message_id: String,
+    subject: String,
+    from: String,
+    body_text: String,
+    date: Option<String>,
+    uid: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImapConnectParams {
+    server: String,
+    port: u16,
+    use_tls: bool,
+    username: String,
+}
+
+/// Helper: open an IMAP session (TLS or plain) and run a closure on it.
+fn with_imap_session<F, R>(params: &ImapConnectParams, password: &str, timeout_secs: u64, f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut dyn ImapOps) -> Result<R, String>,
+{
+    use std::net::TcpStream;
+    let addr = format!("{}:{}", params.server, params.port);
+    let tcp = TcpStream::connect(&addr)
+        .map_err(|e| format!("Connection failed: {e}"))?;
+    tcp.set_read_timeout(Some(Duration::from_secs(timeout_secs)))
+        .map_err(|e| format!("Set timeout failed: {e}"))?;
+
+    if params.use_tls {
+        let tls_connector = native_tls::TlsConnector::new()
+            .map_err(|e| format!("TLS setup failed: {e}"))?;
+        let tls_stream = tls_connector.connect(&params.server, tcp)
+            .map_err(|e| format!("TLS handshake failed: {e}"))?;
+        let mut client = imap::Client::new(tls_stream);
+        client.read_greeting()
+            .map_err(|e| format!("Server greeting failed: {e}"))?;
+        let mut session = client
+            .login(&params.username, password)
+            .map_err(|e| format!("Login failed: {}", e.0))?;
+        let result = f(&mut session);
+        let _ = session.logout();
+        result
+    } else {
+        let mut client = imap::Client::new(tcp);
+        client.read_greeting()
+            .map_err(|e| format!("Server greeting failed: {e}"))?;
+        let mut session = client
+            .login(&params.username, password)
+            .map_err(|e| format!("Login failed: {}", e.0))?;
+        let result = f(&mut session);
+        let _ = session.logout();
+        result
+    }
+}
+
+/// Trait to abstract over imap::Session<TlsStream> and imap::Session<TcpStream>.
+trait ImapOps {
+    fn list_folders(&mut self) -> Result<Vec<String>, String>;
+    fn fetch_unseen(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String>;
+    fn archive(&mut self, folder: &str, uids: &[u32], action: &str, archive_folder: Option<&str>) -> Result<u32, String>;
+}
+
+impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
+    fn list_folders(&mut self) -> Result<Vec<String>, String> {
+        let mailboxes = self.list(None, Some("*"))
+            .map_err(|e| format!("List folders failed: {e}"))?;
+        Ok(mailboxes.iter().map(|m| m.name().to_string()).collect())
+    }
+
+    fn fetch_unseen(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String> {
+        self.select(folder).map_err(|e| format!("Select folder failed: {e}"))?;
+
+        let uids = self.uid_search("UNSEEN")
+            .map_err(|e| format!("Search failed: {e}"))?;
+        if uids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut uid_list: Vec<u32> = uids.into_iter().collect();
+        uid_list.sort();
+        uid_list.truncate(limit);
+
+        let uid_set = uid_list.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let messages = self.uid_fetch(&uid_set, "(UID RFC822)")
+            .map_err(|e| format!("Fetch failed: {e}"))?;
+
+        let mut emails = Vec::new();
+        for msg in messages.iter() {
+            let uid = msg.uid.unwrap_or(0);
+            let body_bytes = msg.body().unwrap_or_default();
+            let parsed = mailparse::parse_mail(body_bytes)
+                .map_err(|e| format!("Parse email failed: {e}"))?;
+
+            let headers = &parsed.headers;
+            let subject = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("subject"))
+                .map(|h| h.get_value())
+                .unwrap_or_default();
+            let from = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("from"))
+                .map(|h| h.get_value())
+                .unwrap_or_default();
+            let date = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("date"))
+                .map(|h| h.get_value());
+            let message_id = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("message-id"))
+                .map(|h| h.get_value())
+                .unwrap_or_else(|| format!("uid-{uid}"));
+
+            let body_text = imap_extract_body_text(&parsed);
+
+            emails.push(FetchedEmail {
+                message_id,
+                subject,
+                from,
+                body_text,
+                date,
+                uid,
+            });
+        }
+        Ok(emails)
+    }
+
+    fn archive(&mut self, folder: &str, uids: &[u32], action: &str, archive_folder: Option<&str>) -> Result<u32, String> {
+        self.select(folder).map_err(|e| format!("Select folder failed: {e}"))?;
+        if uids.is_empty() {
+            return Ok(0);
+        }
+
+        let uid_set = uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let count = uids.len() as u32;
+
+        match action {
+            "move" => {
+                let dest = archive_folder.unwrap_or("Archive");
+                self.uid_mv(&uid_set, dest)
+                    .map_err(|e| format!("Move failed: {e}"))?;
+            }
+            "read" => {
+                self.uid_store(&uid_set, "+FLAGS (\\Seen)")
+                    .map_err(|e| format!("Flag as read failed: {e}"))?;
+            }
+            "delete" => {
+                self.uid_store(&uid_set, "+FLAGS (\\Deleted)")
+                    .map_err(|e| format!("Delete flag failed: {e}"))?;
+                self.expunge()
+                    .map_err(|e| format!("Expunge failed: {e}"))?;
+            }
+            _ => return Ok(0),
+        }
+        Ok(count)
+    }
+}
+
+fn imap_extract_body_text(parsed: &mailparse::ParsedMail) -> String {
+    if parsed.subparts.is_empty() {
+        return parsed.get_body().unwrap_or_default().trim().to_string();
+    }
+    // For multipart, prefer text/plain.
+    for part in &parsed.subparts {
+        if let Some(ct) = part.headers.iter().find(|h| h.get_key().eq_ignore_ascii_case("content-type")) {
+            if ct.get_value().to_lowercase().starts_with("text/plain") {
+                return part.get_body().unwrap_or_default().trim().to_string();
+            }
+        }
+    }
+    parsed.subparts.first()
+        .and_then(|p| p.get_body().ok())
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+#[tauri::command]
+fn imap_test_connection(app: tauri::AppHandle, params: ImapConnectParams) -> Result<Vec<String>, String> {
+    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+        .ok_or_else(|| "IMAP password not configured".to_string())?;
+    with_imap_session(&params, &password, 15, |session| session.list_folders())
+}
+
+#[tauri::command]
+fn imap_fetch_emails(
+    app: tauri::AppHandle,
+    params: ImapConnectParams,
+    folder: String,
+    max_count: Option<u32>,
+) -> Result<Vec<FetchedEmail>, String> {
+    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+        .ok_or_else(|| "IMAP password not configured".to_string())?;
+    let limit = max_count.unwrap_or(50) as usize;
+    with_imap_session(&params, &password, 30, |session| session.fetch_unseen(&folder, limit))
+}
+
+#[tauri::command]
+fn imap_archive_emails(
+    app: tauri::AppHandle,
+    params: ImapConnectParams,
+    folder: String,
+    uids: Vec<u32>,
+    action: String,
+    archive_folder: Option<String>,
+) -> Result<u32, String> {
+    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+        .ok_or_else(|| "IMAP password not configured".to_string())?;
+    with_imap_session(&params, &password, 30, |session| {
+        session.archive(&folder, &uids, &action, archive_folder.as_deref())
+    })
 }
 
 #[tauri::command]
@@ -2388,6 +2605,16 @@ fn get_webdav_password(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_imap_password(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?.unwrap_or_default())
+}
+
+#[tauri::command]
+fn set_imap_password(app: tauri::AppHandle, value: Option<String>) -> Result<(), String> {
+    set_keyring_secret(&app, KEYRING_IMAP_PASSWORD, value)
+}
+
+#[tauri::command]
 fn get_cloud_config(app: tauri::AppHandle) -> Result<Value, String> {
     let mut config = read_config(&app);
     let mut token = get_keyring_secret(&app, KEYRING_CLOUD_TOKEN)?;
@@ -2844,6 +3071,11 @@ pub fn run() {
             set_sync_backend,
             get_webdav_config,
             get_webdav_password,
+            get_imap_password,
+            set_imap_password,
+            imap_test_connection,
+            imap_fetch_emails,
+            imap_archive_emails,
             set_webdav_config,
             webdav_get_json,
             webdav_put_json,

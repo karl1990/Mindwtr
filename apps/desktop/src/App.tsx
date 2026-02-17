@@ -20,6 +20,7 @@ import { KeybindingProvider } from './contexts/keybinding-context';
 import { QuickAddModal } from './components/QuickAddModal';
 import { CloseBehaviorModal } from './components/CloseBehaviorModal';
 import { startDesktopNotifications, stopDesktopNotifications } from './lib/notification-service';
+import { startEmailPolling, stopEmailPolling } from './lib/email-polling-service';
 import { SyncService } from './lib/sync-service';
 import { isFlatpakRuntime, isTauriRuntime } from './lib/runtime';
 import { logError } from './lib/app-log';
@@ -151,6 +152,7 @@ function App() {
         if (isTauriRuntime()) {
             startDesktopNotifications().catch((error) => reportError('Notifications failed', error));
             SyncService.startFileWatcher().catch((error) => reportError('File watcher failed', error));
+            startEmailPolling();
         }
 
         isActiveRef.current = true;
@@ -265,6 +267,7 @@ function App() {
                 clearTimeout(initialSyncTimerRef.current);
             }
             stopDesktopNotifications();
+            stopEmailPolling();
             SyncService.stopFileWatcher().catch((error) => reportError('File watcher failed', error));
         };
     }, [fetchData, setError]);

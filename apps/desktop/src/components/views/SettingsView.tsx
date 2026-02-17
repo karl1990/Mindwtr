@@ -6,6 +6,7 @@ import {
     Database,
     Info,
     ListChecks,
+    Mail,
     Monitor,
     Sparkles,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ import { SettingsUpdateModal } from './settings/SettingsUpdateModal';
 import { SettingsSidebar } from './settings/SettingsSidebar';
 import { useAiSettings } from './settings/useAiSettings';
 import { useCalendarSettings } from './settings/useCalendarSettings';
+import { useEmailSettings } from './settings/useEmailSettings';
 import { useSyncSettings } from './settings/useSyncSettings';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
@@ -47,7 +49,7 @@ import { THEME_STORAGE_KEY, applyThemeMode, coerceDesktopThemeMode, mapSyncedThe
 
 type ThemeMode = DesktopThemeMode;
 type DensityMode = 'comfortable' | 'compact';
-type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'calendar' | 'ai' | 'about';
+type SettingsPage = 'main' | 'gtd' | 'notifications' | 'sync' | 'calendar' | 'ai' | 'email' | 'about';
 type LinuxDistroInfo = { id?: string; id_like?: string[] };
 
 const SettingsMainPage = lazy(() => import('./settings/SettingsMainPage').then((m) => ({ default: m.SettingsMainPage })));
@@ -56,6 +58,7 @@ const SettingsAiPage = lazy(() => import('./settings/SettingsAiPage').then((m) =
 const SettingsNotificationsPage = lazy(() => import('./settings/SettingsNotificationsPage').then((m) => ({ default: m.SettingsNotificationsPage })));
 const SettingsCalendarPage = lazy(() => import('./settings/SettingsCalendarPage').then((m) => ({ default: m.SettingsCalendarPage })));
 const SettingsSyncPage = lazy(() => import('./settings/SettingsSyncPage').then((m) => ({ default: m.SettingsSyncPage })));
+const SettingsEmailPage = lazy(() => import('./settings/SettingsEmailPage').then((m) => ({ default: m.SettingsEmailPage })));
 const SettingsAboutPage = lazy(() => import('./settings/SettingsAboutPage').then((m) => ({ default: m.SettingsAboutPage })));
 
 const UPDATE_BADGE_AVAILABLE_KEY = 'mindwtr-update-available';
@@ -228,6 +231,34 @@ export function SettingsView() {
         showSaved,
         enabled: true,
     });
+    const {
+        enabled: emailEnabled,
+        server: emailServer,
+        port: emailPort,
+        useTls: emailUseTls,
+        username: emailUsername,
+        password: emailPassword,
+        passwordLoaded: emailPasswordLoaded,
+        folder: emailFolder,
+        pollIntervalMinutes: emailPollInterval,
+        archiveAction: emailArchiveAction,
+        archiveFolder: emailArchiveFolder,
+        tagNewTasks: emailTagNewTasks,
+        lastPollAt: emailLastPollAt,
+        lastPollError: emailLastPollError,
+        lastPollTaskCount: emailLastPollTaskCount,
+        testStatus: emailTestStatus,
+        testError: emailTestError,
+        availableFolders: emailAvailableFolders,
+        fetchStatus: emailFetchStatus,
+        fetchError: emailFetchError,
+        fetchCount: emailFetchCount,
+        onUpdateEmailSettings,
+        onPasswordChange: onEmailPasswordChange,
+        onTestConnection: onEmailTestConnection,
+        onFetchNow: onEmailFetchNow,
+    } = useEmailSettings({ settings, updateSettings, showSaved });
+
     const selectSyncFolderTitle = useMemo(() => {
         const key = 'settings.selectSyncFolderTitle';
         const translated = translate(key);
@@ -762,6 +793,8 @@ export function SettingsView() {
                 return t.sync;
             case 'calendar':
                 return t.calendar;
+            case 'email':
+                return t.email;
             case 'about':
                 return t.about;
             default:
@@ -783,6 +816,7 @@ export function SettingsView() {
         { id: 'sync', icon: Database, label: t.sync, keywords: ['file sync', 'WebDAV', 'cloud', 'sync now', 'attachments', 'diagnostics', 'logging'] },
         { id: 'ai', icon: Sparkles, label: t.ai, keywords: ['OpenAI', 'Gemini', 'Anthropic', 'API key', 'speech', 'whisper', 'copilot', 'model'] },
         { id: 'calendar', icon: CalendarDays, label: t.calendar, keywords: ['external calendar', 'iCal', 'subscription', 'URL'] },
+        { id: 'email', icon: Mail, label: t.email, keywords: ['email', 'IMAP', 'email capture', 'mail'] },
         { id: 'about', icon: Info, label: t.about, badge: hasUpdateBadge, badgeLabel: t.updateAvailable, keywords: ['version', 'update', 'license', 'sponsor'] },
     ], [hasUpdateBadge, t]);
 
@@ -961,6 +995,39 @@ export function SettingsView() {
 
         if (page === 'calendar') {
             return <CalendarPage />;
+        }
+
+        if (page === 'email') {
+            return (
+                <SettingsEmailPage
+                    t={t}
+                    enabled={emailEnabled}
+                    server={emailServer}
+                    port={emailPort}
+                    useTls={emailUseTls}
+                    username={emailUsername}
+                    password={emailPassword}
+                    passwordLoaded={emailPasswordLoaded}
+                    folder={emailFolder}
+                    pollIntervalMinutes={emailPollInterval}
+                    archiveAction={emailArchiveAction}
+                    archiveFolder={emailArchiveFolder}
+                    tagNewTasks={emailTagNewTasks}
+                    lastPollAt={emailLastPollAt}
+                    lastPollError={emailLastPollError}
+                    lastPollTaskCount={emailLastPollTaskCount}
+                    testStatus={emailTestStatus}
+                    testError={emailTestError}
+                    availableFolders={emailAvailableFolders}
+                    fetchStatus={emailFetchStatus}
+                    fetchError={emailFetchError}
+                    fetchCount={emailFetchCount}
+                    onUpdateEmailSettings={onUpdateEmailSettings}
+                    onPasswordChange={onEmailPasswordChange}
+                    onTestConnection={onEmailTestConnection}
+                    onFetchNow={onEmailFetchNow}
+                />
+            );
         }
 
         if (page === 'sync') {
