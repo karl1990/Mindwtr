@@ -85,4 +85,15 @@ describe('TaskItem', () => {
         expect(root).toBeTruthy();
         expect(root?.className).toContain('ring-inset');
     });
+
+    it('includes archived in the task status selector', () => {
+        const { getByLabelText } = render(
+            <LanguageProvider>
+                <TaskItem task={mockTask} />
+            </LanguageProvider>
+        );
+        const statusSelect = getByLabelText('task.aria.status') as HTMLSelectElement;
+        const archivedOption = Array.from(statusSelect.options).find((option) => option.value === 'archived');
+        expect(archivedOption).toBeTruthy();
+    });
 });

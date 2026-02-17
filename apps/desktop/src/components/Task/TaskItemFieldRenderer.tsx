@@ -407,6 +407,7 @@ export function TaskItemFieldRenderer({
                             <option value="reference">{t('status.reference')}</option>
                         )}
                         <option value="done">{t('status.done')}</option>
+                        <option value="archived">{t('status.archived')}</option>
                     </select>
                 </div>
             );
