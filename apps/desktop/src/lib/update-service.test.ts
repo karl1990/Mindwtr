@@ -93,4 +93,56 @@ describe('update-service channel selection', () => {
         expect(result.latestVersion).toBe('1.1.0');
         expect(result.sourceFallback).toBe(false);
     });
+
+    it('checks mindwtr AUR package for source installs', async () => {
+        const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (/aur\.archlinux\.org\/rpc\/\?v=5&type=info&arg%5B%5D=mindwtr(?:$|&)/.test(url)) {
+                return jsonResponse({ results: [{ Version: '1.2.0-2' }] });
+            }
+            if (url.includes('api.github.com/repos/dongdongbh/Mindwtr/releases/latest')) {
+                return jsonResponse({
+                    tag_name: 'v1.9.0',
+                    html_url: 'https://github.com/dongdongbh/Mindwtr/releases/tag/v1.9.0',
+                    body: 'latest notes',
+                    assets: [],
+                });
+            }
+            return jsonResponse({}, 404);
+        });
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const result = await checkForUpdates('1.0.0', { installSource: 'aur-source' });
+
+        expect(result.hasUpdate).toBe(true);
+        expect(result.source).toBe('aur');
+        expect(result.releaseUrl).toBe('https://aur.archlinux.org/packages/mindwtr');
+        expect(result.latestVersion).toBe('1.2.0');
+    });
+
+    it('checks mindwtr-bin AUR package for binary installs', async () => {
+        const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (/aur\.archlinux\.org\/rpc\/\?v=5&type=info&arg%5B%5D=mindwtr-bin(?:$|&)/.test(url)) {
+                return jsonResponse({ results: [{ Version: '1.3.0-1' }] });
+            }
+            if (url.includes('api.github.com/repos/dongdongbh/Mindwtr/releases/latest')) {
+                return jsonResponse({
+                    tag_name: 'v1.9.0',
+                    html_url: 'https://github.com/dongdongbh/Mindwtr/releases/tag/v1.9.0',
+                    body: 'latest notes',
+                    assets: [],
+                });
+            }
+            return jsonResponse({}, 404);
+        });
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const result = await checkForUpdates('1.0.0', { installSource: 'aur-bin' });
+
+        expect(result.hasUpdate).toBe(true);
+        expect(result.source).toBe('aur');
+        expect(result.releaseUrl).toBe('https://aur.archlinux.org/packages/mindwtr-bin');
+        expect(result.latestVersion).toBe('1.3.0');
+    });
 });

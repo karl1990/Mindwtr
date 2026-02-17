@@ -639,7 +639,13 @@ export function SettingsView() {
 
     const getLinuxPostDownloadNotice = useCallback((): string => {
         if (linuxFlavor === 'arch') {
-            return `${t.downloadAURHint}: yay -Syu mindwtr-bin / paru -Syu mindwtr-bin`;
+            if (installSource === 'aur-source') {
+                return `${t.downloadAURHint}: yay -Syu mindwtr / paru -Syu mindwtr`;
+            }
+            if (installSource === 'aur-bin') {
+                return `${t.downloadAURHint}: yay -Syu mindwtr-bin / paru -Syu mindwtr-bin`;
+            }
+            return `${t.downloadAURHint}: yay -Syu mindwtr / paru -Syu mindwtr`;
         }
         if (linuxFlavor === 'debian') {
             return `${t.linuxUpdateHint} APT repo update: sudo apt update && sudo apt install --only-upgrade mindwtr. Local file install: sudo apt install ./<downloaded-file>.deb`;
@@ -648,7 +654,7 @@ export function SettingsView() {
             return `${t.linuxUpdateHint} Repo update: sudo dnf upgrade mindwtr. Local file install: sudo dnf install ./<downloaded-file>.rpm`;
         }
         return `${t.linuxUpdateHint} AppImage tip: chmod +x <downloaded-file>.AppImage && ./<downloaded-file>.AppImage`;
-    }, [linuxFlavor, t.downloadAURHint, t.linuxUpdateHint]);
+    }, [installSource, linuxFlavor, t.downloadAURHint, t.linuxUpdateHint]);
 
     const recommendedDownload = useMemo(() => {
         if (!updateInfo) return null;

@@ -399,10 +399,11 @@ fn get_install_source() -> String {
         if command_succeeds("brew", &["list", "--cask", "mindwtr"]) {
             return "homebrew".to_string();
         }
-        if command_succeeds("pacman", &["-Q", "mindwtr-bin"])
-            || command_succeeds("pacman", &["-Q", "mindwtr"])
-        {
-            return "aur".to_string();
+        if command_succeeds("pacman", &["-Q", "mindwtr"]) {
+            return "aur-source".to_string();
+        }
+        if command_succeeds("pacman", &["-Q", "mindwtr-bin"]) {
+            return "aur-bin".to_string();
         }
         if command_succeeds("dpkg-query", &["-W", "mindwtr"]) {
             return "apt".to_string();

@@ -3,6 +3,7 @@
  */
 
 import { reportError } from './report-error';
+import { isTauriRuntime } from './runtime';
 
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/dongdongbh/Mindwtr/releases/latest';
 const GITHUB_RELEASES_URL = 'https://github.com/dongdongbh/Mindwtr/releases/latest';
@@ -12,8 +13,10 @@ const WINGET_MANIFESTS_API = 'https://api.github.com/repos/microsoft/winget-pkgs
 const WINGET_PACKAGE_URL = 'https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/dongdongbh/Mindwtr';
 const HOMEBREW_CASK_API = 'https://formulae.brew.sh/api/cask/mindwtr.json';
 const HOMEBREW_CASK_URL = 'https://formulae.brew.sh/cask/mindwtr';
-const AUR_RPC_API = 'https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=mindwtr-bin';
-const AUR_PACKAGE_URL = 'https://aur.archlinux.org/packages/mindwtr-bin';
+const AUR_SOURCE_RPC_API = 'https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr';
+const AUR_SOURCE_PACKAGE_URL = 'https://aur.archlinux.org/packages/mindwtr';
+const AUR_BIN_RPC_API = 'https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr-bin';
+const AUR_BIN_PACKAGE_URL = 'https://aur.archlinux.org/packages/mindwtr-bin';
 const APP_STORE_BUNDLE_ID = 'tech.dongdongbh.mindwtr';
 const APP_STORE_LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${encodeURIComponent(APP_STORE_BUNDLE_ID)}&country=US`;
 const APP_STORE_LOOKUP_FALLBACK_URL = `https://itunes.apple.com/lookup?bundleId=${encodeURIComponent(APP_STORE_BUNDLE_ID)}`;
@@ -28,6 +31,8 @@ export type InstallSource =
     | 'homebrew'
     | 'mac-app-store'
     | 'aur'
+    | 'aur-bin'
+    | 'aur-source'
     | 'apt'
     | 'rpm'
     | 'flatpak'
@@ -72,6 +77,8 @@ const isManagedInstallSource = (installSource: InstallSource): boolean => {
         installSource === 'mac-app-store'
         || installSource === 'homebrew'
         || installSource === 'winget'
+        || installSource === 'aur-bin'
+        || installSource === 'aur-source'
         || installSource === 'aur'
     );
 };
@@ -125,6 +132,41 @@ interface AppStoreLookupResponse {
         trackViewUrl?: unknown;
     }>;
 }
+
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+let cachedTauriFetch: FetchLike | null | undefined;
+
+const loadTauriFetch = async (): Promise<FetchLike | null> => {
+    if (cachedTauriFetch !== undefined) return cachedTauriFetch;
+    if (!isTauriRuntime()) {
+        cachedTauriFetch = null;
+        return cachedTauriFetch;
+    }
+    try {
+        const mod: any = await import('@tauri-apps/plugin-http');
+        cachedTauriFetch = typeof mod.fetch === 'function'
+            ? (mod.fetch as FetchLike)
+            : null;
+    } catch (error) {
+        // Keep update checks working even if plugin-http is unavailable.
+        reportError('Failed to load native HTTP client for update checks', error, { category: 'network', toast: false });
+        cachedTauriFetch = null;
+    }
+    return cachedTauriFetch;
+};
+
+const fetchForUpdates = async (url: string, init?: RequestInit): Promise<Response> => {
+    const tauriFetch = await loadTauriFetch();
+    if (tauriFetch) {
+        try {
+            return await tauriFetch(url, init);
+        } catch {
+            // Fall back to web fetch if native HTTP fails.
+        }
+    }
+    return fetch(url, init);
+};
 
 /**
  * Detect current platform
@@ -203,7 +245,12 @@ export function normalizeInstallSource(value: string | null | undefined): Instal
         case 'macappstore':
             return 'mac-app-store';
         case 'aur':
-            return 'aur';
+            // Legacy value from older desktop builds; source package is the safer default.
+            return 'aur-source';
+        case 'aur-bin':
+            return 'aur-bin';
+        case 'aur-source':
+            return 'aur-source';
         case 'apt':
             return 'apt';
         case 'rpm':
@@ -222,7 +269,7 @@ export function normalizeInstallSource(value: string | null | undefined): Instal
 }
 
 const fetchGithubLatestRelease = async (): Promise<GitHubRelease> => {
-    const response = await fetch(GITHUB_RELEASES_API, {
+    const response = await fetchForUpdates(GITHUB_RELEASES_API, {
         headers: {
             Accept: 'application/vnd.github.v3+json',
             'User-Agent': 'Mindwtr-App',
@@ -235,7 +282,7 @@ const fetchGithubLatestRelease = async (): Promise<GitHubRelease> => {
 };
 
 const fetchHomebrewLatestVersion = async (): Promise<SourceVersionResult> => {
-    const response = await fetch(HOMEBREW_CASK_API, {
+    const response = await fetchForUpdates(HOMEBREW_CASK_API, {
         headers: {
             Accept: 'application/json',
             'User-Agent': 'Mindwtr-App',
@@ -255,7 +302,7 @@ const fetchHomebrewLatestVersion = async (): Promise<SourceVersionResult> => {
 };
 
 const fetchWingetLatestVersion = async (): Promise<SourceVersionResult> => {
-    const response = await fetch(WINGET_MANIFESTS_API, {
+    const response = await fetchForUpdates(WINGET_MANIFESTS_API, {
         headers: {
             Accept: 'application/vnd.github.v3+json',
             'User-Agent': 'Mindwtr-App',
@@ -280,8 +327,12 @@ const fetchWingetLatestVersion = async (): Promise<SourceVersionResult> => {
     };
 };
 
-const fetchAurLatestVersion = async (): Promise<SourceVersionResult> => {
-    const response = await fetch(AUR_RPC_API, {
+const fetchAurLatestVersion = async (installSource: InstallSource): Promise<SourceVersionResult> => {
+    const target = installSource === 'aur-bin'
+        ? { rpcApi: AUR_BIN_RPC_API, packageUrl: AUR_BIN_PACKAGE_URL }
+        : { rpcApi: AUR_SOURCE_RPC_API, packageUrl: AUR_SOURCE_PACKAGE_URL };
+
+    const response = await fetchForUpdates(target.rpcApi, {
         headers: {
             Accept: 'application/json',
             'User-Agent': 'Mindwtr-App',
@@ -299,7 +350,7 @@ const fetchAurLatestVersion = async (): Promise<SourceVersionResult> => {
     return {
         source: 'aur',
         version: normalized,
-        releaseUrl: AUR_PACKAGE_URL,
+        releaseUrl: target.packageUrl,
     };
 };
 
@@ -307,7 +358,7 @@ const fetchAppStoreLatestVersion = async (): Promise<SourceVersionResult> => {
     const lookupUrls = [APP_STORE_LOOKUP_URL, APP_STORE_LOOKUP_FALLBACK_URL];
     let lastError: Error | null = null;
     for (const url of lookupUrls) {
-        const response = await fetch(url, {
+        const response = await fetchForUpdates(url, {
             headers: {
                 Accept: 'application/json',
                 'User-Agent': 'Mindwtr-App',
@@ -345,7 +396,9 @@ const fetchSourceVersion = async (installSource: InstallSource): Promise<SourceV
         case 'winget':
             return fetchWingetLatestVersion();
         case 'aur':
-            return fetchAurLatestVersion();
+        case 'aur-bin':
+        case 'aur-source':
+            return fetchAurLatestVersion(installSource);
         case 'mac-app-store':
             return fetchAppStoreLatestVersion();
         default:
