@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard } from 'react-native';
+import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Attachment,
@@ -115,6 +115,10 @@ const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
     archived: 'Archived',
 };
 const QUICK_TOKEN_LIMIT = 6;
+const getInitialWindowWidth = (): number => {
+    const width = Dimensions?.get?.('window')?.width;
+    return Number.isFinite(width) && width > 0 ? Math.round(width) : 1;
+};
 
 const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'status',
@@ -1479,7 +1483,7 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
         setEditTab(mode);
     }, []);
 
-    const [containerWidth, setContainerWidth] = useState(0);
+    const [containerWidth, setContainerWidth] = useState(getInitialWindowWidth);
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef<ScrollView | null>(null);
     const [scrollTaskFormToEnd, setScrollTaskFormToEnd] = useState<((targetInput?: number | string) => void) | null>(null);
@@ -1512,10 +1516,16 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
 
     useEffect(() => {
         if (!visible || !containerWidth) return;
-        const targetX = editTab === 'task' ? 0 : containerWidth;
-        scrollX.setValue(targetX);
         scrollToTab(editTab, false);
-    }, [containerWidth, editTab, scrollToTab, task?.id, visible, scrollX]);
+    }, [containerWidth, editTab, scrollToTab, task?.id, visible]);
+
+    useEffect(() => {
+        if (!visible || !containerWidth) return;
+        const alignmentTimer = setTimeout(() => {
+            scrollToTab(editTab, false);
+        }, 90);
+        return () => clearTimeout(alignmentTimer);
+    }, [containerWidth, editTab, scrollToTab, task?.id, visible]);
 
     useEffect(() => {
         if (Platform.OS !== 'android' || !visible) return;
@@ -2603,14 +2613,19 @@ export function TaskEditModal({ visible, task, onClose, onSave, onFocusMode, def
 
                 <View
                     style={styles.tabContent}
-                    onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+                    onLayout={(event) => {
+                        const nextWidth = Math.round(event.nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== containerWidth) {
+                            setContainerWidth(nextWidth);
+                        }
+                    }}
                 >
                     <Animated.ScrollView
                         ref={scrollRef}
                         horizontal
                         pagingEnabled
                         scrollEnabled
-                        snapToInterval={containerWidth || 1}
+                        snapToInterval={containerWidth}
                         snapToAlignment="start"
                         decelerationRate="fast"
                         disableIntervalMomentum
