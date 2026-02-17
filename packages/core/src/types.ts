@@ -258,7 +258,11 @@ export interface AppData {
             port?: number;
             useTls?: boolean;
             username?: string;
-            folder?: string;
+            folder?: string; // Deprecated: kept for migration from MID00001
+            actionFolder?: string;
+            actionPrefix?: string;
+            waitingFolder?: string;
+            waitingPrefix?: string;
             pollIntervalMinutes?: number;
             archiveAction?: 'move' | 'read' | 'delete';
             archiveFolder?: string;

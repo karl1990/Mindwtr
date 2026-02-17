@@ -239,7 +239,10 @@ export function SettingsView() {
         username: emailUsername,
         password: emailPassword,
         passwordLoaded: emailPasswordLoaded,
-        folder: emailFolder,
+        actionFolder: emailActionFolder,
+        actionPrefix: emailActionPrefix,
+        waitingFolder: emailWaitingFolder,
+        waitingPrefix: emailWaitingPrefix,
         pollIntervalMinutes: emailPollInterval,
         archiveAction: emailArchiveAction,
         archiveFolder: emailArchiveFolder,
@@ -1008,7 +1011,10 @@ export function SettingsView() {
                     username={emailUsername}
                     password={emailPassword}
                     passwordLoaded={emailPasswordLoaded}
-                    folder={emailFolder}
+                    actionFolder={emailActionFolder}
+                    actionPrefix={emailActionPrefix}
+                    waitingFolder={emailWaitingFolder}
+                    waitingPrefix={emailWaitingPrefix}
                     pollIntervalMinutes={emailPollInterval}
                     archiveAction={emailArchiveAction}
                     archiveFolder={emailArchiveFolder}

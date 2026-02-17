@@ -385,8 +385,13 @@ impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
 
         let mut emails = Vec::new();
         for msg in messages.iter() {
+            // Skip FETCH responses that have no body (e.g. FLAGS-only
+            // responses some IMAP servers send alongside the actual data).
+            let body_bytes = match msg.body() {
+                Some(b) => b,
+                None => continue,
+            };
             let uid = msg.uid.unwrap_or(0);
-            let body_bytes = msg.body().unwrap_or_default();
             let parsed = mailparse::parse_mail(body_bytes)
                 .map_err(|e| format!("Parse email failed: {e}"))?;
 

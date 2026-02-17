@@ -29,7 +29,11 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
     const port = emailSettings.port ?? 993;
     const useTls = emailSettings.useTls !== false;
     const username = emailSettings.username ?? '';
-    const folder = emailSettings.folder ?? 'INBOX';
+    // Backward-compat: old `folder` field falls back for actionFolder
+    const actionFolder = emailSettings.actionFolder ?? emailSettings.folder ?? '@ACTION';
+    const actionPrefix = emailSettings.actionPrefix ?? 'EMAIL-TODO: ';
+    const waitingFolder = emailSettings.waitingFolder ?? '@WAITINGFOR';
+    const waitingPrefix = emailSettings.waitingPrefix ?? 'EMAIL-AWAIT: ';
     const pollIntervalMinutes = emailSettings.pollIntervalMinutes ?? 5;
     const archiveAction = emailSettings.archiveAction ?? 'read';
     const archiveFolder = emailSettings.archiveFolder ?? 'Archive';
@@ -111,14 +115,28 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
         setFetchStatus('fetching');
         setFetchError(null);
         try {
-            const count = await fetchAndCreateTasks({
+            const shared = {
                 params: getConnectParams(),
-                folder,
                 archiveAction,
                 archiveFolder: archiveAction === 'move' ? archiveFolder : null,
                 tag: tagNewTasks || undefined,
+            };
+
+            const actionCount = await fetchAndCreateTasks({
+                ...shared,
+                folder: actionFolder,
+                titlePrefix: actionPrefix,
+                taskStatus: 'inbox' as const,
             });
 
+            const waitingCount = await fetchAndCreateTasks({
+                ...shared,
+                folder: waitingFolder,
+                titlePrefix: waitingPrefix,
+                taskStatus: 'waiting' as const,
+            });
+
+            const count = actionCount + waitingCount;
             setFetchCount(count);
             updateEmailSettings({
                 lastPollAt: new Date().toISOString(),
@@ -136,7 +154,7 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
             });
             setFetchStatus('error');
         }
-    }, [getConnectParams, folder, tagNewTasks, archiveAction, archiveFolder, updateEmailSettings]);
+    }, [getConnectParams, actionFolder, actionPrefix, waitingFolder, waitingPrefix, tagNewTasks, archiveAction, archiveFolder, updateEmailSettings]);
 
     return {
         enabled,
@@ -146,7 +164,10 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
         username,
         password,
         passwordLoaded,
-        folder,
+        actionFolder,
+        actionPrefix,
+        waitingFolder,
+        waitingPrefix,
         pollIntervalMinutes,
         archiveAction,
         archiveFolder,

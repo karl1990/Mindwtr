@@ -1,4 +1,4 @@
-import { useTaskStore } from '@mindwtr/core';
+import { useTaskStore, type TaskStatus } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
 import { reportError } from './report-error';
 
@@ -22,6 +22,8 @@ interface FetchAndCreateOptions {
         username: string;
     };
     folder: string;
+    titlePrefix: string;
+    taskStatus: TaskStatus;
     archiveAction: string;
     archiveFolder: string | null;
     tag?: string;
@@ -60,8 +62,10 @@ export async function fetchAndCreateTasks(options: FetchAndCreateOptions): Promi
     const uids: number[] = [];
 
     for (const email of emails) {
-        const title = email.subject || '(no subject)';
+        const rawSubject = email.subject || '(no subject)';
+        const title = options.titlePrefix ? `${options.titlePrefix}${rawSubject}` : rawSubject;
         await addTask(title, {
+            status: options.taskStatus,
             description: formatEmailDescription(email),
             tags: options.tag ? [options.tag] : [],
         });
@@ -104,18 +108,39 @@ async function pollOnce(): Promise<void> {
         const ec = settings.emailCapture;
         if (!ec?.enabled || !ec.server || !ec.username) return;
 
-        const count = await fetchAndCreateTasks({
-            params: {
-                server: ec.server,
-                port: ec.port ?? 993,
-                useTls: ec.useTls !== false,
-                username: ec.username,
-            },
-            folder: ec.folder ?? 'INBOX',
-            archiveAction: ec.archiveAction ?? 'read',
-            archiveFolder: ec.archiveAction === 'move' ? (ec.archiveFolder ?? 'Archive') : null,
-            tag: ec.tagNewTasks || undefined,
+        const params = {
+            server: ec.server,
+            port: ec.port ?? 993,
+            useTls: ec.useTls !== false,
+            username: ec.username,
+        };
+        const archiveAction = ec.archiveAction ?? 'read';
+        const archiveFolder = archiveAction === 'move' ? (ec.archiveFolder ?? 'Archive') : null;
+        const tag = ec.tagNewTasks || undefined;
+
+        // Backward-compat: old `folder` field falls back for actionFolder
+        const actionFolder = ec.actionFolder ?? ec.folder ?? '@ACTION';
+        const waitingFolder = ec.waitingFolder ?? '@WAITINGFOR';
+        const actionPrefix = ec.actionPrefix ?? 'EMAIL-TODO: ';
+        const waitingPrefix = ec.waitingPrefix ?? 'EMAIL-AWAIT: ';
+
+        const shared = { params, archiveAction, archiveFolder, tag };
+
+        const actionCount = await fetchAndCreateTasks({
+            ...shared,
+            folder: actionFolder,
+            titlePrefix: actionPrefix,
+            taskStatus: 'inbox',
         });
+
+        const waitingCount = await fetchAndCreateTasks({
+            ...shared,
+            folder: waitingFolder,
+            titlePrefix: waitingPrefix,
+            taskStatus: 'waiting',
+        });
+
+        const count = actionCount + waitingCount;
 
         await updateSettings({
             emailCapture: {

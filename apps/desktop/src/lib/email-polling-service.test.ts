@@ -33,6 +33,8 @@ const defaultOptions = {
         username: 'user@example.com',
     },
     folder: 'INBOX',
+    titlePrefix: '',
+    taskStatus: 'inbox' as const,
     archiveAction: 'read' as const,
     archiveFolder: null,
 };
@@ -296,5 +298,60 @@ describe('fetchAndCreateTasks', () => {
         expect(mockInvoke).toHaveBeenCalledWith('imap_fetch_emails', expect.objectContaining({
             maxCount: 10,
         }));
+    });
+
+    // -- Title prefix --
+
+    it('prepends titlePrefix to email subject when set', async () => {
+        mockInvoke.mockResolvedValueOnce([makeEmail({ subject: 'Project sync' })]);
+        mockInvoke.mockResolvedValueOnce(undefined);
+
+        await fetchAndCreateTasks({ ...defaultOptions, titlePrefix: 'EMAIL-TODO: ' });
+
+        expect(mockAddTask).toHaveBeenCalledWith('EMAIL-TODO: Project sync', expect.any(Object));
+    });
+
+    it('uses raw subject when titlePrefix is empty string', async () => {
+        mockInvoke.mockResolvedValueOnce([makeEmail({ subject: 'Follow up' })]);
+        mockInvoke.mockResolvedValueOnce(undefined);
+
+        await fetchAndCreateTasks({ ...defaultOptions, titlePrefix: '' });
+
+        expect(mockAddTask).toHaveBeenCalledWith('Follow up', expect.any(Object));
+    });
+
+    it('prepends prefix to "(no subject)" when subject is empty', async () => {
+        mockInvoke.mockResolvedValueOnce([makeEmail({ subject: '' })]);
+        mockInvoke.mockResolvedValueOnce(undefined);
+
+        await fetchAndCreateTasks({ ...defaultOptions, titlePrefix: 'EMAIL-TODO: ' });
+
+        expect(mockAddTask).toHaveBeenCalledWith('EMAIL-TODO: (no subject)', expect.any(Object));
+    });
+
+    // -- Task status --
+
+    it('creates inbox tasks by default', async () => {
+        mockInvoke.mockResolvedValueOnce([makeEmail()]);
+        mockInvoke.mockResolvedValueOnce(undefined);
+
+        await fetchAndCreateTasks({ ...defaultOptions, taskStatus: 'inbox' });
+
+        expect(mockAddTask).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ status: 'inbox' }),
+        );
+    });
+
+    it('creates waiting tasks when taskStatus is waiting', async () => {
+        mockInvoke.mockResolvedValueOnce([makeEmail()]);
+        mockInvoke.mockResolvedValueOnce(undefined);
+
+        await fetchAndCreateTasks({ ...defaultOptions, taskStatus: 'waiting' });
+
+        expect(mockAddTask).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ status: 'waiting' }),
+        );
     });
 });

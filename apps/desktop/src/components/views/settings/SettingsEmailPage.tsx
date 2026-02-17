@@ -12,7 +12,11 @@ type Labels = Pick<SettingsLabels,
     emailUsername: string;
     emailPassword: string;
     emailPasswordHint: string;
-    emailFolder: string;
+    emailActionFolder: string;
+    emailActionPrefix: string;
+    emailWaitingFolder: string;
+    emailWaitingPrefix: string;
+    emailPrefixHint: string;
     emailPollInterval: string;
     emailPollIntervalHint: string;
     emailArchiveAction: string;
@@ -42,7 +46,10 @@ type SettingsEmailPageProps = {
     username: string;
     password: string;
     passwordLoaded: boolean;
-    folder: string;
+    actionFolder: string;
+    actionPrefix: string;
+    waitingFolder: string;
+    waitingPrefix: string;
     pollIntervalMinutes: number;
     archiveAction: string;
     archiveFolder: string;
@@ -73,7 +80,10 @@ export function SettingsEmailPage({
     username,
     password,
     passwordLoaded,
-    folder,
+    actionFolder,
+    actionPrefix,
+    waitingFolder,
+    waitingPrefix,
     pollIntervalMinutes,
     archiveAction,
     archiveFolder,
@@ -206,15 +216,16 @@ export function SettingsEmailPage({
                 </div>
             </div>
 
-            {/* Folder and polling settings */}
+            {/* Folder, prefix, and polling settings */}
             <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+                {/* Action folder */}
                 <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1">
-                        <div className="text-sm font-medium">{t.emailFolder}</div>
+                        <div className="text-sm font-medium">{t.emailActionFolder}</div>
                         {availableFolders.length > 0 ? (
                             <select
-                                value={folder}
-                                onChange={(e) => onUpdateEmailSettings({ folder: e.target.value })}
+                                value={actionFolder}
+                                onChange={(e) => onUpdateEmailSettings({ actionFolder: e.target.value })}
                                 className={inputClass}
                             >
                                 {availableFolders.map((f) => (
@@ -223,13 +234,62 @@ export function SettingsEmailPage({
                             </select>
                         ) : (
                             <input
-                                value={folder}
-                                onChange={(e) => onUpdateEmailSettings({ folder: e.target.value })}
-                                placeholder="INBOX"
+                                value={actionFolder}
+                                onChange={(e) => onUpdateEmailSettings({ actionFolder: e.target.value })}
+                                placeholder="@ACTION"
                                 className={inputClass}
                             />
                         )}
                     </div>
+                    <div className="space-y-1">
+                        <div className="text-sm font-medium">{t.emailActionPrefix}</div>
+                        <input
+                            value={actionPrefix}
+                            onChange={(e) => onUpdateEmailSettings({ actionPrefix: e.target.value })}
+                            placeholder="EMAIL-TODO: "
+                            className={inputClass}
+                        />
+                        <div className="text-xs text-muted-foreground">{t.emailPrefixHint}</div>
+                    </div>
+                </div>
+
+                {/* Waiting-for folder */}
+                <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                        <div className="text-sm font-medium">{t.emailWaitingFolder}</div>
+                        {availableFolders.length > 0 ? (
+                            <select
+                                value={waitingFolder}
+                                onChange={(e) => onUpdateEmailSettings({ waitingFolder: e.target.value })}
+                                className={inputClass}
+                            >
+                                {availableFolders.map((f) => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                value={waitingFolder}
+                                onChange={(e) => onUpdateEmailSettings({ waitingFolder: e.target.value })}
+                                placeholder="@WAITINGFOR"
+                                className={inputClass}
+                            />
+                        )}
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-sm font-medium">{t.emailWaitingPrefix}</div>
+                        <input
+                            value={waitingPrefix}
+                            onChange={(e) => onUpdateEmailSettings({ waitingPrefix: e.target.value })}
+                            placeholder="EMAIL-AWAIT: "
+                            className={inputClass}
+                        />
+                        <div className="text-xs text-muted-foreground">{t.emailPrefixHint}</div>
+                    </div>
+                </div>
+
+                {/* Poll interval */}
+                <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                         <div className="text-sm font-medium">{t.emailPollInterval}</div>
                         <input
