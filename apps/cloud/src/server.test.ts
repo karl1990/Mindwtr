@@ -12,6 +12,16 @@ describe('cloud server utils', () => {
         const token = __cloudTestUtils.getToken(req);
         expect(token).toBe('demo-token');
         expect(__cloudTestUtils.tokenToKey(token!)).toHaveLength(64);
+
+        const shortTokenReq = new Request('http://localhost/v1/data', {
+            headers: { Authorization: 'Bearer short' },
+        });
+        expect(__cloudTestUtils.getToken(shortTokenReq)).toBeNull();
+
+        const tokenWithWhitespaceReq = new Request('http://localhost/v1/data', {
+            headers: { Authorization: 'Bearer token with spaces' },
+        });
+        expect(__cloudTestUtils.getToken(tokenWithWhitespaceReq)).toBeNull();
     });
 
     test('parses optional auth token allowlist', () => {

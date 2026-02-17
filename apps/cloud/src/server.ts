@@ -72,6 +72,7 @@ const MAX_ITEMS_PER_COLLECTION = Number.isFinite(maxItemsPerCollectionValue) && 
     : 50_000;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
 const ATTACHMENT_PATH_MAX_DECODE_PASSES = 3;
+const BEARER_TOKEN_PATTERN = /^[\x21-\x7E]{8,512}$/;
 
 function decodeAttachmentPath(rawPath: string): string | null {
     let decoded = rawPath;
@@ -213,7 +214,10 @@ function errorResponse(message: string, status = 400) {
 function getToken(req: Request): string | null {
     const auth = req.headers.get('authorization') || '';
     const match = auth.match(/^Bearer\s+(.+)$/i);
-    return match ? match[1].trim() : null;
+    if (!match) return null;
+    const token = match[1].trim();
+    if (!BEARER_TOKEN_PATTERN.test(token)) return null;
+    return token;
 }
 
 function tokenToKey(token: string): string {
