@@ -74,4 +74,15 @@ describe('TaskItem', () => {
         );
         expect(getByText('Mar 20')).toBeInTheDocument();
     });
+
+    it('applies inset ring style when selected to avoid clipped borders', () => {
+        const { container } = render(
+            <LanguageProvider>
+                <TaskItem task={mockTask} isSelected />
+            </LanguageProvider>
+        );
+        const root = container.querySelector('[data-task-id="1"]');
+        expect(root).toBeTruthy();
+        expect(root?.className).toContain('ring-inset');
+    });
 });
