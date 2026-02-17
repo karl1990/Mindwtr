@@ -125,4 +125,33 @@ describe('SyncService orchestration', () => {
             lastResult: 'success',
         });
     });
+
+    it('serializes re-entrant sync calls triggered by sync status listeners', async () => {
+        let active = 0;
+        let maxActive = 0;
+        const backendSpy = vi.spyOn(SyncService as any, 'getSyncBackend');
+        backendSpy.mockImplementation(async () => {
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            active -= 1;
+            return 'off';
+        });
+
+        let triggered = false;
+        const unsubscribe = SyncService.subscribeSyncStatus((status) => {
+            if (status.inFlight && !triggered) {
+                triggered = true;
+                void SyncService.performSync().catch(() => undefined);
+            }
+        });
+
+        const result = await SyncService.performSync();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        unsubscribe();
+
+        expect(result.success).toBe(true);
+        expect(maxActive).toBe(1);
+        expect(backendSpy).toHaveBeenCalledTimes(2);
+    });
 });
