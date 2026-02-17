@@ -569,6 +569,27 @@ describe('Sync Logic', () => {
             expect(merged.tasks[0].updatedAt).toBe('2023-01-02T00:04:00.000Z');
         });
 
+        it('treats empty updatedAt as older than a valid epoch timestamp', () => {
+            const local = mockAppData([], [
+                {
+                    ...createMockProject('p1', ''),
+                    title: 'Zulu',
+                },
+            ]);
+            const incoming = mockAppData([], [
+                {
+                    ...createMockProject('p1', '1970-01-01T00:00:00.000Z'),
+                    title: 'Alpha',
+                },
+            ]);
+
+            const merged = mergeAppData(local, incoming);
+
+            expect(merged.projects).toHaveLength(1);
+            expect(merged.projects[0].title).toBe('Alpha');
+            expect(merged.projects[0].updatedAt).toBe('1970-01-01T00:00:00.000Z');
+        });
+
         it('normalizes invalid createdAt without rewriting updatedAt', () => {
             const localProject: Project = {
                 ...createMockProject('p1', '2023-01-02T00:01:00.000Z'),
