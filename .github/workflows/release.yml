@@ -751,11 +751,21 @@ jobs:
         shell: bash
         working-directory: aur-mindwtr
         run: |
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
           docker run --rm \
+            -e HOST_UID="$HOST_UID" \
+            -e HOST_GID="$HOST_GID" \
             -v "$PWD:/aur" \
             -w /aur \
             archlinux:latest \
-            bash -lc "pacman -Sy --noconfirm --needed base-devel git && useradd -m builder && chown -R builder:builder /aur && su builder -c 'makepkg --printsrcinfo > .SRCINFO'"
+            bash -lc '
+              set -euo pipefail
+              pacman -Sy --noconfirm --needed base-devel git
+              getent group "$HOST_GID" >/dev/null 2>&1 || groupadd -g "$HOST_GID" builder
+              id -u builder >/dev/null 2>&1 || useradd -m -u "$HOST_UID" -g "$HOST_GID" builder
+              su builder -c "makepkg --printsrcinfo > /aur/.SRCINFO"
+            '
 
       - name: Commit and push changes
         shell: bash
