@@ -355,7 +355,7 @@ where
 /// Trait to abstract over imap::Session<TlsStream> and imap::Session<TcpStream>.
 trait ImapOps {
     fn list_folders(&mut self) -> Result<Vec<String>, String>;
-    fn fetch_unseen(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String>;
+    fn fetch_all(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String>;
     fn archive(&mut self, folder: &str, uids: &[u32], action: &str, archive_folder: Option<&str>) -> Result<u32, String>;
 }
 
@@ -366,10 +366,10 @@ impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
         Ok(mailboxes.iter().map(|m| m.name().to_string()).collect())
     }
 
-    fn fetch_unseen(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String> {
+    fn fetch_all(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String> {
         self.select(folder).map_err(|e| format!("Select folder failed: {e}"))?;
 
-        let uids = self.uid_search("UNSEEN")
+        let uids = self.uid_search("ALL")
             .map_err(|e| format!("Search failed: {e}"))?;
         if uids.is_empty() {
             return Ok(vec![]);
@@ -437,13 +437,9 @@ impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
 
         match action {
             "move" => {
-                let dest = archive_folder.unwrap_or("Archive");
+                let dest = archive_folder.unwrap_or("[Gmail]/All Mail");
                 self.uid_mv(&uid_set, dest)
                     .map_err(|e| format!("Move failed: {e}"))?;
-            }
-            "read" => {
-                self.uid_store(&uid_set, "+FLAGS (\\Seen)")
-                    .map_err(|e| format!("Flag as read failed: {e}"))?;
             }
             "delete" => {
                 self.uid_store(&uid_set, "+FLAGS (\\Deleted)")
@@ -493,7 +489,7 @@ fn imap_fetch_emails(
     let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
         .ok_or_else(|| "IMAP password not configured".to_string())?;
     let limit = max_count.unwrap_or(50) as usize;
-    with_imap_session(&params, &password, 30, |session| session.fetch_unseen(&folder, limit))
+    with_imap_session(&params, &password, 30, |session| session.fetch_all(&folder, limit))
 }
 
 #[tauri::command]

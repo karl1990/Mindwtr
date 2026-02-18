@@ -35,8 +35,8 @@ const defaultOptions = {
     folder: 'INBOX',
     titlePrefix: '',
     taskStatus: 'inbox' as const,
-    archiveAction: 'read' as const,
-    archiveFolder: null,
+    archiveAction: 'move' as const,
+    archiveFolder: '[Gmail]/All Mail',
 };
 
 function makeEmail(overrides: Partial<FetchedEmail> = {}): FetchedEmail {
@@ -200,11 +200,12 @@ describe('fetchAndCreateTasks', () => {
         ]);
         mockInvoke.mockResolvedValueOnce(undefined);
 
-        await fetchAndCreateTasks({ ...defaultOptions, archiveAction: 'read' });
+        await fetchAndCreateTasks(defaultOptions);
 
         expect(mockInvoke).toHaveBeenCalledWith('imap_archive_emails', expect.objectContaining({
             uids: [10, 20],
-            action: 'read',
+            action: 'move',
+            archiveFolder: '[Gmail]/All Mail',
         }));
     });
 

@@ -21,7 +21,6 @@ type Labels = Pick<SettingsLabels,
     emailPollIntervalHint: string;
     emailArchiveAction: string;
     emailArchiveMove: string;
-    emailArchiveRead: string;
     emailArchiveDelete: string;
     emailArchiveFolder: string;
     emailTagNewTasks: string;
@@ -313,7 +312,6 @@ export function SettingsEmailPage({
                             onChange={(e) => onUpdateEmailSettings({ archiveAction: e.target.value })}
                             className={inputClass}
                         >
-                            <option value="read">{t.emailArchiveRead}</option>
                             <option value="move">{t.emailArchiveMove}</option>
                             <option value="delete">{t.emailArchiveDelete}</option>
                         </select>

@@ -35,8 +35,8 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
     const waitingFolder = emailSettings.waitingFolder ?? '@WAITINGFOR';
     const waitingPrefix = emailSettings.waitingPrefix ?? 'EMAIL-AWAIT: ';
     const pollIntervalMinutes = emailSettings.pollIntervalMinutes ?? 5;
-    const archiveAction = emailSettings.archiveAction ?? 'read';
-    const archiveFolder = emailSettings.archiveFolder ?? 'Archive';
+    const archiveAction = emailSettings.archiveAction ?? 'move';
+    const archiveFolder = emailSettings.archiveFolder ?? '[Gmail]/All Mail';
     const tagNewTasks = emailSettings.tagNewTasks ?? 'email';
     const lastPollAt = emailSettings.lastPollAt ?? null;
     const lastPollError = emailSettings.lastPollError ?? null;

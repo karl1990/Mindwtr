@@ -42,7 +42,7 @@ function formatEmailDescription(email: FetchedEmail): string {
 }
 
 /**
- * Core pipeline: fetch unseen emails, create inbox tasks, archive processed.
+ * Core pipeline: fetch all emails from folder, create inbox tasks, archive processed.
  * Returns the number of tasks created. Throws on fetch errors.
  * Archive errors are logged but do not throw (emails would be re-fetched next poll).
  */
@@ -117,8 +117,8 @@ async function pollOnce(): Promise<void> {
             useTls: ec.useTls !== false,
             username: ec.username,
         };
-        const archiveAction = ec.archiveAction ?? 'read';
-        const archiveFolder = archiveAction === 'move' ? (ec.archiveFolder ?? 'Archive') : null;
+        const archiveAction = ec.archiveAction ?? 'move';
+        const archiveFolder = archiveAction === 'move' ? (ec.archiveFolder ?? '[Gmail]/All Mail') : null;
         const tag = ec.tagNewTasks || undefined;
 
         // Backward-compat: old `folder` field falls back for actionFolder
