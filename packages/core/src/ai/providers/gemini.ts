@@ -1,4 +1,4 @@
-import type { AIProvider, AIProviderConfig, BreakdownInput, BreakdownResponse, ClarifyInput, ClarifyResponse, CopilotInput, CopilotResponse, ReviewAnalysisInput, ReviewAnalysisResponse, AIRequestOptions } from '../types';
+import type { AIProvider, AIProviderConfig, BreakdownInput, BreakdownResponse, ClarifyInput, ClarifyResponse, CopilotInput, CopilotResponse, GenerateInboxTaskInput, GenerateInboxTaskResponse, ReviewAnalysisInput, ReviewAnalysisResponse, AIRequestOptions } from '../types';
 import { buildBreakdownPrompt, buildClarifyPrompt, buildCopilotPrompt, buildReviewAnalysisPrompt } from '../prompts';
 import { fetchWithTimeout, normalizeTags, normalizeTimeEstimate, parseJson, rateLimit } from '../utils';
 import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
@@ -257,6 +257,9 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
                     tags,
                 };
             }
+        },
+        generateInboxTask: async (_input: GenerateInboxTaskInput, _options?: AIRequestOptions): Promise<GenerateInboxTaskResponse> => {
+            throw new Error('generateInboxTask not yet implemented');
         },
     };
 }

@@ -1,4 +1,4 @@
-import type { BreakdownResponse, ClarifyResponse, CopilotResponse, ReviewAction, ReviewAnalysisResponse } from './types';
+import type { BreakdownResponse, ClarifyResponse, CopilotResponse, GenerateInboxTaskResponse, ReviewAction, ReviewAnalysisResponse } from './types';
 
 const REVIEW_ACTIONS: ReviewAction[] = ['someday', 'archive', 'breakdown', 'keep'];
 
@@ -40,6 +40,19 @@ export const isReviewAnalysisResponse = (value: unknown): value is ReviewAnalysi
         if (typeof suggestion.reason !== 'string') return false;
         return true;
     });
+};
+
+const INBOX_TYPES = ['inbox', 'waiting'] as const;
+
+export const isGenerateInboxTaskResponse = (value: unknown): value is GenerateInboxTaskResponse => {
+    if (!isRecord(value)) return false;
+    if (value.title !== undefined && typeof value.title !== 'string') return false;
+    if (value.description !== undefined && typeof value.description !== 'string') return false;
+    if (value.inboxType !== undefined) {
+        if (typeof value.inboxType !== 'string') return false;
+        if (!INBOX_TYPES.includes(value.inboxType as typeof INBOX_TYPES[number])) return false;
+    }
+    return true;
 };
 
 export const isCopilotResponse = (value: unknown): value is CopilotResponse => {

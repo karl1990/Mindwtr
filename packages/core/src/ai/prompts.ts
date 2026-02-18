@@ -1,4 +1,4 @@
-import type { BreakdownInput, ClarifyInput } from './types';
+import type { BreakdownInput, ClarifyInput, GenerateInboxTaskInput } from './types';
 
 const SYSTEM_PROMPT = [
     'You are a strict GTD coach.',
@@ -67,6 +67,23 @@ export function buildReviewAnalysisPrompt(items: Array<{ id: string; title: stri
         '{ "suggestions": [{ "id": "task_id", "action": "someday|archive|breakdown|keep", "reason": "..." }] }',
         'Items:',
         JSON.stringify(items),
+    ].join('\n');
+
+    return { system: SYSTEM_PROMPT, user };
+}
+
+export function buildGenerateInboxTaskPrompt(input: GenerateInboxTaskInput): { system: string; user: string } {
+    const user = [
+        'Analyze the following raw content and extract task information.',
+        `Requested fields: ${input.fields.join(', ')}`,
+        'Rules:',
+        '- title: a concise, actionable task title',
+        '- description: a brief summary of the content',
+        '- inboxType: "inbox" for actionable items, "waiting" for items awaiting external input',
+        'Only return the requested fields.',
+        'Output JSON with the requested fields.',
+        'Content:',
+        input.rawContent,
     ].join('\n');
 
     return { system: SYSTEM_PROMPT, user };

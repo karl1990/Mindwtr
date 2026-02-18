@@ -79,6 +79,21 @@ export interface BreakdownInput {
     projectTasks?: string[];
 }
 
+// --- Inbox task generation (used by InboxTaskCreator) ---
+
+export interface GenerateInboxTaskInput {
+    rawContent: string;
+    fields: ('title' | 'description' | 'inboxType')[];
+}
+
+export interface GenerateInboxTaskResponse {
+    title?: string;
+    description?: string;
+    inboxType?: 'inbox' | 'waiting';
+}
+
+// --- Provider config ---
+
 export interface AIProviderConfig {
     provider: AIProviderId;
     apiKey: string;
@@ -98,4 +113,5 @@ export interface AIProvider {
     breakDownTask: (input: BreakdownInput, options?: AIRequestOptions) => Promise<BreakdownResponse>;
     analyzeReview: (input: ReviewAnalysisInput, options?: AIRequestOptions) => Promise<ReviewAnalysisResponse>;
     predictMetadata: (input: CopilotInput, options?: AIRequestOptions) => Promise<CopilotResponse>;
+    generateInboxTask: (input: GenerateInboxTaskInput, options?: AIRequestOptions) => Promise<GenerateInboxTaskResponse>;
 }

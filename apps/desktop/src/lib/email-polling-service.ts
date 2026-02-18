@@ -1,6 +1,7 @@
 import { useTaskStore, type TaskStatus } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
 import { reportError } from './report-error';
+import { createInboxTask } from './inbox-task-creator';
 
 // --- Shared types ---
 
@@ -64,11 +65,13 @@ export async function fetchAndCreateTasks(options: FetchAndCreateOptions): Promi
     for (const email of emails) {
         const rawSubject = email.subject || '(no subject)';
         const title = options.titlePrefix ? `${options.titlePrefix}${rawSubject}` : rawSubject;
-        await addTask(title, {
-            status: options.taskStatus,
+        await createInboxTask({
+            source: `imap-${options.taskStatus === 'waiting' ? 'waiting' : 'action'}`,
+            title,
             description: formatEmailDescription(email),
+            inboxType: options.taskStatus === 'waiting' ? 'waiting' : 'inbox',
             tags: options.tag ? [options.tag] : [],
-        });
+        }, addTask);
         uids.push(email.uid);
     }
 

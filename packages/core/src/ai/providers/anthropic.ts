@@ -7,6 +7,8 @@ import type {
     ClarifyResponse,
     CopilotInput,
     CopilotResponse,
+    GenerateInboxTaskInput,
+    GenerateInboxTaskResponse,
     ReviewAnalysisInput,
     ReviewAnalysisResponse,
     AIRequestOptions,
@@ -183,6 +185,9 @@ export function createAnthropicProvider(config: AIProviderConfig): AIProvider {
                     tags,
                 };
             }
+        },
+        generateInboxTask: async (_input: GenerateInboxTaskInput, _options?: AIRequestOptions): Promise<GenerateInboxTaskResponse> => {
+            throw new Error('generateInboxTask not yet implemented');
         },
     };
 }
