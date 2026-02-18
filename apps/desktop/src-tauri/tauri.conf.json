@@ -37,7 +37,7 @@
       "app"
     ],
     "macOS": {
-      "signingIdentity": "Developer ID Application",
+      "signingIdentity": "-",
       "minimumSystemVersion": "10.15"
     },
     "icon": [

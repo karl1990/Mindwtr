@@ -1,11 +1,33 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { AppData } from '@mindwtr/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AppData, EmailCaptureAccount } from '@mindwtr/core';
 import { isTauriRuntime } from '../../../lib/runtime';
 import { reportError } from '../../../lib/report-error';
-import { fetchAndCreateTasks } from '../../../lib/email-polling-service';
+import { fetchAndCreateTasks, imapPasswordKey } from '../../../lib/email-polling-service';
 
-type EmailCaptureSettings = NonNullable<AppData['settings']['emailCapture']>;
-type EmailSettingsUpdate = Partial<EmailCaptureSettings>;
+/** Per-account transient UI state (not persisted). */
+export interface AccountTransientState {
+    password: string;
+    passwordLoaded: boolean;
+    testStatus: 'idle' | 'testing' | 'success' | 'error';
+    testError: string | null;
+    availableFolders: string[];
+    fetchStatus: 'idle' | 'fetching' | 'success' | 'error';
+    fetchError: string | null;
+    fetchCount: number;
+}
+
+function defaultTransientState(): AccountTransientState {
+    return {
+        password: '',
+        passwordLoaded: false,
+        testStatus: 'idle',
+        testError: null,
+        availableFolders: [],
+        fetchStatus: 'idle',
+        fetchError: null,
+        fetchCount: 0,
+    };
+}
 
 type UseEmailSettingsOptions = {
     settings: AppData['settings'] | undefined;
@@ -14,176 +36,236 @@ type UseEmailSettingsOptions = {
 };
 
 export function useEmailSettings({ settings, updateSettings, showSaved }: UseEmailSettingsOptions) {
-    const [password, setPassword] = useState('');
-    const [passwordLoaded, setPasswordLoaded] = useState(false);
-    const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-    const [testError, setTestError] = useState<string | null>(null);
-    const [availableFolders, setAvailableFolders] = useState<string[]>([]);
-    const [fetchStatus, setFetchStatus] = useState<'idle' | 'fetching' | 'success' | 'error'>('idle');
-    const [fetchError, setFetchError] = useState<string | null>(null);
-    const [fetchCount, setFetchCount] = useState(0);
+    const accounts: EmailCaptureAccount[] = settings?.emailCapture?.accounts ?? [];
 
-    const emailSettings = settings?.emailCapture ?? {};
-    const enabled = emailSettings.enabled === true;
-    const server = emailSettings.server ?? '';
-    const port = emailSettings.port ?? 993;
-    const useTls = emailSettings.useTls !== false;
-    const username = emailSettings.username ?? '';
-    // Backward-compat: old `folder` field falls back for actionFolder
-    const actionFolder = emailSettings.actionFolder ?? emailSettings.folder ?? '@ACTION';
-    const actionPrefix = emailSettings.actionPrefix ?? 'EMAIL-TODO: ';
-    const waitingFolder = emailSettings.waitingFolder ?? '@WAITINGFOR';
-    const waitingPrefix = emailSettings.waitingPrefix ?? 'EMAIL-AWAIT: ';
-    const pollIntervalMinutes = emailSettings.pollIntervalMinutes ?? 5;
-    const archiveAction = emailSettings.archiveAction ?? 'move';
-    const archiveFolder = emailSettings.archiveFolder ?? '[Gmail]/All Mail';
-    const tagNewTasks = emailSettings.tagNewTasks ?? 'email';
-    const lastPollAt = emailSettings.lastPollAt ?? null;
-    const lastPollError = emailSettings.lastPollError ?? null;
-    const lastPollTaskCount = emailSettings.lastPollTaskCount ?? 0;
+    // Per-account transient state, keyed by account ID.
+    const [accountStates, setAccountStates] = useState<Map<string, AccountTransientState>>(new Map());
 
-    // Load password from keyring on mount.
-    useEffect(() => {
-        if (!isTauriRuntime()) {
-            setPasswordLoaded(true);
-            return;
-        }
-        let active = true;
-        (async () => {
-            try {
-                const { invoke } = await import('@tauri-apps/api/core');
-                const value = await invoke<string>('get_imap_password');
-                if (active) setPassword(value || '');
-            } catch (error) {
-                reportError('Failed to load IMAP password', error);
-            } finally {
-                if (active) setPasswordLoaded(true);
-            }
-        })();
-        return () => { active = false; };
+    // Track which account IDs we've already started loading passwords for.
+    const loadedPasswordIds = useRef(new Set<string>());
+
+    // Helper to get or create transient state for an account.
+    const getAccountState = useCallback((accountId: string): AccountTransientState => {
+        return accountStates.get(accountId) ?? defaultTransientState();
+    }, [accountStates]);
+
+    // Helper to update one account's transient state.
+    const updateAccountState = useCallback((accountId: string, partial: Partial<AccountTransientState>) => {
+        setAccountStates((prev) => {
+            const next = new Map(prev);
+            const current = next.get(accountId) ?? defaultTransientState();
+            next.set(accountId, { ...current, ...partial });
+            return next;
+        });
     }, []);
 
-    const updateEmailSettings = useCallback((next: EmailSettingsUpdate) => {
+    // Load passwords from keyring for any account that hasn't been loaded yet.
+    useEffect(() => {
+        if (!isTauriRuntime()) {
+            // In web mode, mark all as loaded immediately.
+            const newLoaded = new Set(loadedPasswordIds.current);
+            let changed = false;
+            for (const account of accounts) {
+                if (!newLoaded.has(account.id)) {
+                    newLoaded.add(account.id);
+                    changed = true;
+                    updateAccountState(account.id, { passwordLoaded: true });
+                }
+            }
+            if (changed) loadedPasswordIds.current = newLoaded;
+            return;
+        }
+
+        for (const account of accounts) {
+            if (loadedPasswordIds.current.has(account.id)) continue;
+            loadedPasswordIds.current.add(account.id);
+
+            const key = account.username && account.server
+                ? imapPasswordKey(account.username, account.server)
+                : undefined;
+
+            if (!key) {
+                updateAccountState(account.id, { passwordLoaded: true });
+                continue;
+            }
+
+            (async () => {
+                try {
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    const value = await invoke<string>('get_imap_password', { key });
+                    updateAccountState(account.id, { password: value || '', passwordLoaded: true });
+                } catch (error) {
+                    reportError('Failed to load IMAP password', error);
+                    updateAccountState(account.id, { passwordLoaded: true });
+                }
+            })();
+        }
+    }, [accounts, updateAccountState]);
+
+    // Persist the accounts array to store.
+    const persistAccounts = useCallback((nextAccounts: EmailCaptureAccount[]) => {
         updateSettings({
-            emailCapture: { ...(settings?.emailCapture ?? {}), ...next },
+            emailCapture: { accounts: nextAccounts },
         })
             .then(showSaved)
             .catch((error) => reportError('Failed to update email settings', error));
-    }, [settings?.emailCapture, showSaved, updateSettings]);
+    }, [showSaved, updateSettings]);
 
-    const handlePasswordChange = useCallback((value: string) => {
-        setPassword(value);
-        if (!isTauriRuntime()) return;
+    const onAddAccount = useCallback(() => {
+        if (accounts.length >= 10) return;
+        const id = crypto.randomUUID();
+        const newAccount: EmailCaptureAccount = {
+            id,
+            enabled: false,
+            server: '',
+            port: 993,
+            useTls: true,
+            username: '',
+            actionFolder: '@ACTION',
+            actionPrefix: 'EMAIL-TODO: ',
+            waitingFolder: '@WAITINGFOR',
+            waitingPrefix: 'EMAIL-AWAIT: ',
+            pollIntervalMinutes: 5,
+            archiveAction: 'move',
+            archiveFolder: '[Gmail]/All Mail',
+            tagNewTasks: 'email',
+        };
+        updateAccountState(id, { ...defaultTransientState(), passwordLoaded: true });
+        persistAccounts([...accounts, newAccount]);
+    }, [accounts, persistAccounts, updateAccountState]);
+
+    const onRemoveAccount = useCallback((accountId: string) => {
+        const account = accounts.find((a) => a.id === accountId);
+        // Delete password from keyring
+        if (account?.username && account?.server && isTauriRuntime()) {
+            const key = imapPasswordKey(account.username, account.server);
+            (async () => {
+                try {
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    await invoke('set_imap_password', { key, value: null });
+                } catch (error) {
+                    reportError('Failed to delete IMAP password', error);
+                }
+            })();
+        }
+        // Clean up transient state
+        setAccountStates((prev) => {
+            const next = new Map(prev);
+            next.delete(accountId);
+            return next;
+        });
+        loadedPasswordIds.current.delete(accountId);
+        persistAccounts(accounts.filter((a) => a.id !== accountId));
+    }, [accounts, persistAccounts]);
+
+    const onUpdateAccount = useCallback((accountId: string, partial: Partial<EmailCaptureAccount>) => {
+        persistAccounts(accounts.map((a) =>
+            a.id === accountId ? { ...a, ...partial } : a
+        ));
+    }, [accounts, persistAccounts]);
+
+    const onPasswordChange = useCallback((accountId: string, value: string) => {
+        updateAccountState(accountId, { password: value });
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account?.username || !account?.server || !isTauriRuntime()) return;
+        const key = imapPasswordKey(account.username, account.server);
         (async () => {
             try {
                 const { invoke } = await import('@tauri-apps/api/core');
-                await invoke('set_imap_password', { value: value || null });
+                await invoke('set_imap_password', { key, value: value || null });
             } catch (error) {
                 reportError('Failed to save IMAP password', error);
             }
         })();
-    }, []);
+    }, [accounts, updateAccountState]);
 
-    const getConnectParams = useCallback(() => ({
-        server,
-        port,
-        useTls,
-        username,
-    }), [server, port, useTls, username]);
-
-    const handleTestConnection = useCallback(async () => {
+    const onTestConnection = useCallback(async (accountId: string) => {
         if (!isTauriRuntime()) return;
-        setTestStatus('testing');
-        setTestError(null);
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account?.server || !account?.username) return;
+
+        updateAccountState(accountId, { testStatus: 'testing', testError: null });
         try {
             const { invoke } = await import('@tauri-apps/api/core');
+            const key = imapPasswordKey(account.username, account.server);
             const folders = await invoke<string[]>('imap_test_connection', {
-                params: getConnectParams(),
+                params: {
+                    server: account.server,
+                    port: account.port ?? 993,
+                    useTls: account.useTls !== false,
+                    username: account.username,
+                },
+                passwordKey: key,
             });
-            setAvailableFolders(folders);
-            setTestStatus('success');
-            setTimeout(() => setTestStatus('idle'), 3000);
+            updateAccountState(accountId, { availableFolders: folders, testStatus: 'success' });
+            setTimeout(() => updateAccountState(accountId, { testStatus: 'idle' }), 3000);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            setTestError(message);
-            setTestStatus('error');
+            updateAccountState(accountId, { testError: message, testStatus: 'error' });
         }
-    }, [getConnectParams]);
+    }, [accounts, updateAccountState]);
 
-    const handleFetchNow = useCallback(async () => {
+    const onFetchNow = useCallback(async (accountId: string) => {
         if (!isTauriRuntime()) return;
-        setFetchStatus('fetching');
-        setFetchError(null);
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account?.server || !account?.username) return;
+
+        updateAccountState(accountId, { fetchStatus: 'fetching', fetchError: null });
         try {
-            const shared = {
-                params: getConnectParams(),
-                archiveAction,
-                archiveFolder: archiveAction === 'move' ? archiveFolder : null,
-                tag: tagNewTasks || undefined,
+            const params = {
+                server: account.server,
+                port: account.port ?? 993,
+                useTls: account.useTls !== false,
+                username: account.username,
             };
+            const passwordKey = imapPasswordKey(account.username, account.server);
+            const archiveAction = account.archiveAction ?? 'move';
+            const archiveFolder = archiveAction === 'move' ? (account.archiveFolder ?? '[Gmail]/All Mail') : null;
+            const tag = account.tagNewTasks || undefined;
+
+            const shared = { params, passwordKey, archiveAction, archiveFolder, tag };
 
             const actionCount = await fetchAndCreateTasks({
                 ...shared,
-                folder: actionFolder,
-                titlePrefix: actionPrefix,
+                folder: account.actionFolder ?? '@ACTION',
+                titlePrefix: account.actionPrefix ?? 'EMAIL-TODO: ',
                 taskStatus: 'inbox' as const,
             });
 
             const waitingCount = await fetchAndCreateTasks({
                 ...shared,
-                folder: waitingFolder,
-                titlePrefix: waitingPrefix,
+                folder: account.waitingFolder ?? '@WAITINGFOR',
+                titlePrefix: account.waitingPrefix ?? 'EMAIL-AWAIT: ',
                 taskStatus: 'waiting' as const,
             });
 
             const count = actionCount + waitingCount;
-            setFetchCount(count);
-            updateEmailSettings({
+            updateAccountState(accountId, { fetchCount: count, fetchStatus: 'success' });
+            onUpdateAccount(accountId, {
                 lastPollAt: new Date().toISOString(),
                 lastPollError: undefined,
                 lastPollTaskCount: count,
             });
-            setFetchStatus('success');
-            setTimeout(() => setFetchStatus('idle'), 3000);
+            setTimeout(() => updateAccountState(accountId, { fetchStatus: 'idle' }), 3000);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            setFetchError(message);
-            updateEmailSettings({
+            updateAccountState(accountId, { fetchError: message, fetchStatus: 'error' });
+            onUpdateAccount(accountId, {
                 lastPollAt: new Date().toISOString(),
                 lastPollError: message,
             });
-            setFetchStatus('error');
         }
-    }, [getConnectParams, actionFolder, actionPrefix, waitingFolder, waitingPrefix, tagNewTasks, archiveAction, archiveFolder, updateEmailSettings]);
+    }, [accounts, updateAccountState, onUpdateAccount]);
 
     return {
-        enabled,
-        server,
-        port,
-        useTls,
-        username,
-        password,
-        passwordLoaded,
-        actionFolder,
-        actionPrefix,
-        waitingFolder,
-        waitingPrefix,
-        pollIntervalMinutes,
-        archiveAction,
-        archiveFolder,
-        tagNewTasks,
-        lastPollAt,
-        lastPollError,
-        lastPollTaskCount,
-        testStatus,
-        testError,
-        availableFolders,
-        fetchStatus,
-        fetchError,
-        fetchCount,
-        onUpdateEmailSettings: updateEmailSettings,
-        onPasswordChange: handlePasswordChange,
-        onTestConnection: handleTestConnection,
-        onFetchNow: handleFetchNow,
+        accounts,
+        accountStates,
+        getAccountState,
+        onAddAccount,
+        onRemoveAccount,
+        onUpdateAccount,
+        onPasswordChange,
+        onTestConnection,
+        onFetchNow,
     };
 }

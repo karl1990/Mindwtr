@@ -178,6 +178,27 @@ export interface SavedSearch {
 
 import type { MergeStats, SyncHistoryEntry } from './sync';
 
+export interface EmailCaptureAccount {
+    id: string;
+    label?: string;
+    enabled?: boolean;
+    server?: string;
+    port?: number;
+    useTls?: boolean;
+    username?: string;
+    actionFolder?: string;
+    actionPrefix?: string;
+    waitingFolder?: string;
+    waitingPrefix?: string;
+    pollIntervalMinutes?: number;
+    archiveAction?: 'move' | 'delete';
+    archiveFolder?: string;
+    lastPollAt?: string;
+    lastPollError?: string;
+    lastPollTaskCount?: number;
+    tagNewTasks?: string;
+}
+
 export interface AppData {
     tasks: Task[];
     projects: Project[];
@@ -253,23 +274,7 @@ export interface AppData {
             };
         };
         emailCapture?: {
-            enabled?: boolean;
-            server?: string;
-            port?: number;
-            useTls?: boolean;
-            username?: string;
-            folder?: string; // Deprecated: kept for migration from MID00001
-            actionFolder?: string;
-            actionPrefix?: string;
-            waitingFolder?: string;
-            waitingPrefix?: string;
-            pollIntervalMinutes?: number;
-            archiveAction?: 'move' | 'read' | 'delete';
-            archiveFolder?: string;
-            lastPollAt?: string;
-            lastPollError?: string;
-            lastPollTaskCount?: number;
-            tagNewTasks?: string;
+            accounts?: EmailCaptureAccount[];
         };
         savedSearches?: SavedSearch[];
         sidebarCollapsed?: boolean;

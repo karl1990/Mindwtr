@@ -231,36 +231,7 @@ export function SettingsView() {
         showSaved,
         enabled: true,
     });
-    const {
-        enabled: emailEnabled,
-        server: emailServer,
-        port: emailPort,
-        useTls: emailUseTls,
-        username: emailUsername,
-        password: emailPassword,
-        passwordLoaded: emailPasswordLoaded,
-        actionFolder: emailActionFolder,
-        actionPrefix: emailActionPrefix,
-        waitingFolder: emailWaitingFolder,
-        waitingPrefix: emailWaitingPrefix,
-        pollIntervalMinutes: emailPollInterval,
-        archiveAction: emailArchiveAction,
-        archiveFolder: emailArchiveFolder,
-        tagNewTasks: emailTagNewTasks,
-        lastPollAt: emailLastPollAt,
-        lastPollError: emailLastPollError,
-        lastPollTaskCount: emailLastPollTaskCount,
-        testStatus: emailTestStatus,
-        testError: emailTestError,
-        availableFolders: emailAvailableFolders,
-        fetchStatus: emailFetchStatus,
-        fetchError: emailFetchError,
-        fetchCount: emailFetchCount,
-        onUpdateEmailSettings,
-        onPasswordChange: onEmailPasswordChange,
-        onTestConnection: onEmailTestConnection,
-        onFetchNow: onEmailFetchNow,
-    } = useEmailSettings({ settings, updateSettings, showSaved });
+    const emailSettings = useEmailSettings({ settings, updateSettings, showSaved });
 
     const selectSyncFolderTitle = useMemo(() => {
         const key = 'settings.selectSyncFolderTitle';
@@ -1004,34 +975,15 @@ export function SettingsView() {
             return (
                 <SettingsEmailPage
                     t={t}
-                    enabled={emailEnabled}
-                    server={emailServer}
-                    port={emailPort}
-                    useTls={emailUseTls}
-                    username={emailUsername}
-                    password={emailPassword}
-                    passwordLoaded={emailPasswordLoaded}
-                    actionFolder={emailActionFolder}
-                    actionPrefix={emailActionPrefix}
-                    waitingFolder={emailWaitingFolder}
-                    waitingPrefix={emailWaitingPrefix}
-                    pollIntervalMinutes={emailPollInterval}
-                    archiveAction={emailArchiveAction}
-                    archiveFolder={emailArchiveFolder}
-                    tagNewTasks={emailTagNewTasks}
-                    lastPollAt={emailLastPollAt}
-                    lastPollError={emailLastPollError}
-                    lastPollTaskCount={emailLastPollTaskCount}
-                    testStatus={emailTestStatus}
-                    testError={emailTestError}
-                    availableFolders={emailAvailableFolders}
-                    fetchStatus={emailFetchStatus}
-                    fetchError={emailFetchError}
-                    fetchCount={emailFetchCount}
-                    onUpdateEmailSettings={onUpdateEmailSettings}
-                    onPasswordChange={onEmailPasswordChange}
-                    onTestConnection={onEmailTestConnection}
-                    onFetchNow={onEmailFetchNow}
+                    accounts={emailSettings.accounts}
+                    accountStates={emailSettings.accountStates}
+                    getAccountState={emailSettings.getAccountState}
+                    onAddAccount={emailSettings.onAddAccount}
+                    onRemoveAccount={emailSettings.onRemoveAccount}
+                    onUpdateAccount={emailSettings.onUpdateAccount}
+                    onPasswordChange={emailSettings.onPasswordChange}
+                    onTestConnection={emailSettings.onTestConnection}
+                    onFetchNow={emailSettings.onFetchNow}
                 />
             );
         }

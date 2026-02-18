@@ -32,6 +32,7 @@ const defaultOptions = {
         useTls: true,
         username: 'user@example.com',
     },
+    passwordKey: 'imap_password_user@example.com_imap.example.com',
     folder: 'INBOX',
     titlePrefix: '',
     taskStatus: 'inbox' as const,
@@ -206,6 +207,7 @@ describe('fetchAndCreateTasks', () => {
             uids: [10, 20],
             action: 'move',
             archiveFolder: '[Gmail]/All Mail',
+            passwordKey: defaultOptions.passwordKey,
         }));
     });
 
@@ -265,7 +267,7 @@ describe('fetchAndCreateTasks', () => {
 
     // -- Invoke arguments --
 
-    it('passes connection params and folder to fetch command', async () => {
+    it('passes connection params, folder, and passwordKey to fetch command', async () => {
         mockInvoke.mockResolvedValueOnce([]);
 
         await fetchAndCreateTasks({
@@ -276,6 +278,7 @@ describe('fetchAndCreateTasks', () => {
                 useTls: false,
                 username: 'karl',
             },
+            passwordKey: 'imap_password_karl_mail.corp.com',
             folder: 'Mindwtr',
         });
 
@@ -288,6 +291,7 @@ describe('fetchAndCreateTasks', () => {
             },
             folder: 'Mindwtr',
             maxCount: 50,
+            passwordKey: 'imap_password_karl_mail.corp.com',
         });
     });
 
@@ -354,5 +358,12 @@ describe('fetchAndCreateTasks', () => {
             expect.any(String),
             expect.objectContaining({ status: 'waiting' }),
         );
+    });
+
+    // -- passwordKey helper --
+
+    it('exports imapPasswordKey utility', async () => {
+        const { imapPasswordKey } = await import('./email-polling-service');
+        expect(imapPasswordKey('user@gmail.com', 'imap.gmail.com')).toBe('imap_password_user@gmail.com_imap.gmail.com');
     });
 });

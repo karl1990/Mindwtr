@@ -473,8 +473,9 @@ fn imap_extract_body_text(parsed: &mailparse::ParsedMail) -> String {
 }
 
 #[tauri::command]
-fn imap_test_connection(app: tauri::AppHandle, params: ImapConnectParams) -> Result<Vec<String>, String> {
-    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+fn imap_test_connection(app: tauri::AppHandle, params: ImapConnectParams, password_key: Option<String>) -> Result<Vec<String>, String> {
+    let key = password_key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    let password = get_keyring_secret(&app, key)?
         .ok_or_else(|| "IMAP password not configured".to_string())?;
     with_imap_session(&params, &password, 15, |session| session.list_folders())
 }
@@ -485,8 +486,10 @@ fn imap_fetch_emails(
     params: ImapConnectParams,
     folder: String,
     max_count: Option<u32>,
+    password_key: Option<String>,
 ) -> Result<Vec<FetchedEmail>, String> {
-    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+    let key = password_key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    let password = get_keyring_secret(&app, key)?
         .ok_or_else(|| "IMAP password not configured".to_string())?;
     let limit = max_count.unwrap_or(50) as usize;
     with_imap_session(&params, &password, 30, |session| session.fetch_all(&folder, limit))
@@ -500,8 +503,10 @@ fn imap_archive_emails(
     uids: Vec<u32>,
     action: String,
     archive_folder: Option<String>,
+    password_key: Option<String>,
 ) -> Result<u32, String> {
-    let password = get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?
+    let key = password_key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    let password = get_keyring_secret(&app, key)?
         .ok_or_else(|| "IMAP password not configured".to_string())?;
     with_imap_session(&params, &password, 30, |session| {
         session.archive(&folder, &uids, &action, archive_folder.as_deref())
@@ -2606,13 +2611,15 @@ fn get_webdav_password(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn get_imap_password(app: tauri::AppHandle) -> Result<String, String> {
-    Ok(get_keyring_secret(&app, KEYRING_IMAP_PASSWORD)?.unwrap_or_default())
+fn get_imap_password(app: tauri::AppHandle, key: Option<String>) -> Result<String, String> {
+    let k = key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    Ok(get_keyring_secret(&app, k)?.unwrap_or_default())
 }
 
 #[tauri::command]
-fn set_imap_password(app: tauri::AppHandle, value: Option<String>) -> Result<(), String> {
-    set_keyring_secret(&app, KEYRING_IMAP_PASSWORD, value)
+fn set_imap_password(app: tauri::AppHandle, value: Option<String>, key: Option<String>) -> Result<(), String> {
+    let k = key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    set_keyring_secret(&app, k, value)
 }
 
 #[tauri::command]
