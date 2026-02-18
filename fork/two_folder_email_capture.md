@@ -3,8 +3,7 @@
 Evolve the IMAP email capture feature from watching a single folder to
 watching two purpose-specific folders — `@ACTION` and `@WAITINGFOR` —
 each producing tasks with a different GTD status and a configurable
-title prefix. This aligns the implementation with the user stories
-defined in `agent/input/userstories.md`.
+title prefix.
 
 ## What changed and why
 
@@ -30,18 +29,18 @@ receives a `titlePrefix` and `taskStatus` parameter. No Rust backend
 changes were needed because the existing IMAP commands already accept
 an arbitrary folder name.
 
-## Files modified (7 files, +214 / -33 lines)
+## Files modified (7 files)
 
 ### `packages/core/src/types.ts`
 
 Added four new optional fields to `emailCapture` in `AppData.settings`:
 
-| Field | Type | Default | Purpose |
-|-------|------|---------|---------|
-| `actionFolder` | `string` | `'@ACTION'` | IMAP folder for action emails |
-| `actionPrefix` | `string` | `'EMAIL-TODO: '` | Title prefix for action tasks |
-| `waitingFolder` | `string` | `'@WAITINGFOR'` | IMAP folder for waiting-for emails |
-| `waitingPrefix` | `string` | `'EMAIL-AWAIT: '` | Title prefix for waiting tasks |
+| Field           | Type     | Default           | Purpose                            |
+| --------------- | -------- | ----------------- | ---------------------------------- |
+| `actionFolder`  | `string` | `'@ACTION'`       | IMAP folder for action emails      |
+| `actionPrefix`  | `string` | `'EMAIL-TODO: '`  | Title prefix for action tasks      |
+| `waitingFolder` | `string` | `'@WAITINGFOR'`   | IMAP folder for waiting-for emails |
+| `waitingPrefix` | `string` | `'EMAIL-AWAIT: '` | Title prefix for waiting tasks     |
 
 The old `folder` field is kept (not removed) for backward compatibility.
 If `actionFolder` is not yet set, the polling service falls back to
@@ -89,13 +88,13 @@ Total test count: 23 (was 18).
 Replaced the single `emailFolder` label with five new labels in both
 English and Chinese:
 
-| Key | EN | ZH |
-|-----|----|----|
-| `emailActionFolder` | Action folder | 动作文件夹 |
-| `emailActionPrefix` | Task title prefix (action) | 任务标题前缀（动作） |
-| `emailWaitingFolder` | Waiting-for folder | 等待文件夹 |
-| `emailWaitingPrefix` | Task title prefix (waiting) | 任务标题前缀（等待） |
-| `emailPrefixHint` | Prepended to the email subject. Leave blank for no prefix. | 添加到邮件主题前。如不需要前缀，请留空。 |
+| Key                  | EN                                                         | ZH                                       |
+| -------------------- | ---------------------------------------------------------- | ---------------------------------------- |
+| `emailActionFolder`  | Action folder                                              | 动作文件夹                               |
+| `emailActionPrefix`  | Task title prefix (action)                                 | 任务标题前缀（动作）                     |
+| `emailWaitingFolder` | Waiting-for folder                                         | 等待文件夹                               |
+| `emailWaitingPrefix` | Task title prefix (waiting)                                | 任务标题前缀（等待）                     |
+| `emailPrefixHint`    | Prepended to the email subject. Leave blank for no prefix. | 添加到邮件主题前。如不需要前缀，请留空。 |
 
 ### `apps/desktop/src/components/views/settings/SettingsEmailPage.tsx`
 
@@ -125,13 +124,13 @@ JSX props to pass the four new fields instead of the old `folder`.
 
 ## Backward compatibility
 
-| Scenario | Behavior |
-|----------|----------|
-| New user (no prior email config) | Sees `@ACTION` / `@WAITINGFOR` defaults |
-| Existing user with `folder: 'INBOX'` | `actionFolder` falls back to `'INBOX'` until they change it |
-| Existing user downgrades | Old `folder` field still present in storage, works as before |
+| Scenario                             | Behavior                                                     |
+| ------------------------------------ | ------------------------------------------------------------ |
+| New user (no prior email config)     | Sees `@ACTION` / `@WAITINGFOR` defaults                      |
+| Existing user with `folder: 'INBOX'` | `actionFolder` falls back to `'INBOX'` until they change it  |
+| Existing user downgrades             | Old `folder` field still present in storage, works as before |
 
-## How to test
+## Testing
 
 1. Configure IMAP connection in Settings → Email Capture
 2. Click "Test Connection" — verify both `@ACTION` and `@WAITINGFOR`

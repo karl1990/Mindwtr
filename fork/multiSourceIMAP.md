@@ -39,6 +39,7 @@ Users who have multiple email accounts (e.g. work Gmail + personal Outlook) prev
 ### i18n labels (`apps/desktop/src/components/views/settings/labels.ts`)
 
 Added 7 new label keys in both EN and ZH:
+
 - `emailAccountLabel` / `emailAccountLabelHint` — friendly name for accounts
 - `emailAddAccount` / `emailRemoveAccount` / `emailRemoveAccountConfirm` — tab management
 - `emailMaxAccounts` — shown when 10-account limit reached
@@ -47,6 +48,7 @@ Added 7 new label keys in both EN and ZH:
 ### Settings hook (`apps/desktop/src/components/views/settings/useEmailSettings.ts`)
 
 Full rewrite to manage an `accounts` array with per-account transient UI state:
+
 - `AccountTransientState` interface holds password, test/fetch status, folders per account
 - Handlers: `onAddAccount`, `onRemoveAccount`, `onUpdateAccount`, `onPasswordChange`, `onTestConnection`, `onFetchNow`
 - Passwords stored in OS keyring keyed by `imap_password_{username}_{server}`
@@ -69,10 +71,3 @@ Full rewrite to manage an `accounts` array with per-account transient UI state:
 - **Removing an account**: Deletes password from keyring, cleans up transient state, resets active tab
 - **Active tab deleted**: Index resets to 0
 - **No accounts**: Shows empty state with prompt to add one
-
-## Testing
-
-- Core tests: 194 passed
-- Desktop tests: 71 passed (24 email polling tests)
-- TypeScript type-check: clean (core + desktop)
-- Production build: successful (.dmg produced)

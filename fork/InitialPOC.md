@@ -1,7 +1,5 @@
 # Initial code to prove the concept of the desktop app as email client polling via IMAP from gmail
 
-```
-
 Implement local IMAP email polling for the desktop app so emails in a
 designated mailbox folder are automatically converted into inbox tasks.
 This is a local-first approach — the desktop app connects directly to
@@ -73,7 +71,6 @@ synced settings.
 - Add `minimumSystemVersion: "10.15"` to tauri.conf.json macOS bundle
   config (required by whisper-rs-sys std::filesystem usage)
 - Add CLAUDE.md, .claude/, agent/ to .gitignore
-```
 
 ---
 
