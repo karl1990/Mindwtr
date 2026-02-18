@@ -4,6 +4,7 @@ import {
     Bell,
     CalendarDays,
     Database,
+    HelpCircle,
     Info,
     ListChecks,
     Mail,
@@ -59,6 +60,7 @@ const SettingsNotificationsPage = lazy(() => import('./settings/SettingsNotifica
 const SettingsCalendarPage = lazy(() => import('./settings/SettingsCalendarPage').then((m) => ({ default: m.SettingsCalendarPage })));
 const SettingsSyncPage = lazy(() => import('./settings/SettingsSyncPage').then((m) => ({ default: m.SettingsSyncPage })));
 const SettingsEmailPage = lazy(() => import('./settings/SettingsEmailPage').then((m) => ({ default: m.SettingsEmailPage })));
+const EmailGuideModal = lazy(() => import('./settings/EmailGuideModal').then((m) => ({ default: m.EmailGuideModal })));
 const SettingsAboutPage = lazy(() => import('./settings/SettingsAboutPage').then((m) => ({ default: m.SettingsAboutPage })));
 
 const UPDATE_BADGE_AVAILABLE_KEY = 'mindwtr-update-available';
@@ -100,6 +102,7 @@ const maskCalendarUrl = (url: string): string => {
 export function SettingsView() {
     const perf = usePerformanceMonitor('SettingsView');
     const [page, setPage] = useState<SettingsPage>('main');
+    const [showEmailGuide, setShowEmailGuide] = useState(false);
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
     const { language, setLanguage, t: translate } = useLanguage();
     const { style: keybindingStyle, setStyle: setKeybindingStyle, openHelp } = useKeybindings();
@@ -1075,8 +1078,17 @@ export function SettingsView() {
                     <main className="min-w-0 flex-1 lg:max-w-[920px]">
                         <div className="space-y-6">
                             <header className="flex items-start justify-between gap-4">
-                                <div>
+                                <div className="flex items-center gap-2">
                                     <h2 className="text-xl font-semibold tracking-tight">{pageTitle}</h2>
+                                    {page === 'email' && (
+                                        <button
+                                            onClick={() => setShowEmailGuide(true)}
+                                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                            title={t.emailGuideTitle}
+                                        >
+                                            <HelpCircle className="h-5 w-5" />
+                                        </button>
+                                    )}
                                 </div>
                             </header>
                             <Suspense
@@ -1087,6 +1099,13 @@ export function SettingsView() {
                                 )}
                             >
                                 {renderPage()}
+                                {showEmailGuide && (
+                                    <EmailGuideModal
+                                        isOpen={showEmailGuide}
+                                        onClose={() => setShowEmailGuide(false)}
+                                        title={t.emailGuideTitle}
+                                    />
+                                )}
                             </Suspense>
                         </div>
                     </main>
