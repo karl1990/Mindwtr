@@ -47,29 +47,48 @@ export function imapPasswordKey(username: string, server: string): string {
     return `imap_password_${username}_${server}`;
 }
 
+/** Result returned by fetchAndCreateTasks. */
+export interface FetchResult {
+    count: number;
+    archiveWarning?: string;
+}
+
+/** Matches the Rust FetchAndArchiveResult struct (serde camelCase). */
+interface RustFetchAndArchiveResult {
+    emails: FetchedEmail[];
+    archiveError: string | null;
+}
+
 /**
- * Core pipeline: fetch all emails from folder, create inbox tasks, archive processed.
- * Returns the number of tasks created. Throws on fetch errors.
- * Archive errors are logged but do not throw (emails would be re-fetched next poll).
+ * Core pipeline: fetch emails and archive them in a single IMAP session,
+ * then create inbox tasks for each email.
+ *
+ * Using a single session avoids UID validity issues where UIDs from one
+ * connection are invalid in a second connection (common on basic IMAP servers).
+ *
+ * Returns the number of tasks created and any archive warning.
+ * Throws on fetch/connection errors. Archive errors are returned as warnings
+ * (emails would be re-fetched next poll).
  */
-export async function fetchAndCreateTasks(options: FetchAndCreateOptions): Promise<number> {
+export async function fetchAndCreateTasks(options: FetchAndCreateOptions): Promise<FetchResult> {
     const { invoke } = await import('@tauri-apps/api/core');
 
-    const emails = await invoke<FetchedEmail[]>('imap_fetch_emails', {
+    const result = await invoke<RustFetchAndArchiveResult>('imap_fetch_and_archive', {
         params: options.params,
         folder: options.folder,
         maxCount: options.maxCount ?? 50,
         passwordKey: options.passwordKey,
+        action: options.archiveAction,
+        archiveFolder: options.archiveAction === 'move' ? options.archiveFolder : null,
     });
 
-    if (emails.length === 0) {
-        return 0;
+    if (result.emails.length === 0) {
+        return { count: 0 };
     }
 
     const { addTask } = useTaskStore.getState();
-    const uids: number[] = [];
 
-    for (const email of emails) {
+    for (const email of result.emails) {
         const rawSubject = email.subject || '(no subject)';
         const title = options.titlePrefix ? `${options.titlePrefix}${rawSubject}` : rawSubject;
         await createInboxTask({
@@ -79,25 +98,14 @@ export async function fetchAndCreateTasks(options: FetchAndCreateOptions): Promi
             inboxType: options.taskStatus === 'waiting' ? 'waiting' : 'inbox',
             tags: options.tag ? [options.tag] : [],
         }, addTask);
-        uids.push(email.uid);
     }
 
-    if (uids.length > 0) {
-        try {
-            await invoke('imap_archive_emails', {
-                params: options.params,
-                folder: options.folder,
-                uids,
-                action: options.archiveAction,
-                archiveFolder: options.archiveAction === 'move' ? options.archiveFolder : null,
-                passwordKey: options.passwordKey,
-            });
-        } catch (archiveError) {
-            reportError('Email archive failed', archiveError);
-        }
+    const archiveWarning = result.archiveError ?? undefined;
+    if (archiveWarning) {
+        reportError('Email archive failed', new Error(archiveWarning));
     }
 
-    return emails.length;
+    return { count: result.emails.length, archiveWarning };
 }
 
 // --- Per-account polling lifecycle ---
@@ -144,21 +152,22 @@ async function pollOnceForAccount(accountId: string): Promise<void> {
 
         const shared = { params, passwordKey, archiveAction, archiveFolder, tag };
 
-        const actionCount = await fetchAndCreateTasks({
+        const actionResult = await fetchAndCreateTasks({
             ...shared,
             folder: actionFolder,
             titlePrefix: actionPrefix,
             taskStatus: 'inbox',
         });
 
-        const waitingCount = await fetchAndCreateTasks({
+        const waitingResult = await fetchAndCreateTasks({
             ...shared,
             folder: waitingFolder,
             titlePrefix: waitingPrefix,
             taskStatus: 'waiting',
         });
 
-        const count = actionCount + waitingCount;
+        const count = actionResult.count + waitingResult.count;
+        const archiveWarning = actionResult.archiveWarning ?? waitingResult.archiveWarning;
 
         // Update just this account's lastPoll fields
         const freshAccounts = useTaskStore.getState().settings.emailCapture?.accounts ?? [];
@@ -166,7 +175,7 @@ async function pollOnceForAccount(accountId: string): Promise<void> {
             emailCapture: {
                 accounts: freshAccounts.map((a) =>
                     a.id === accountId
-                        ? { ...a, lastPollAt: new Date().toISOString(), lastPollError: undefined, lastPollTaskCount: count }
+                        ? { ...a, lastPollAt: new Date().toISOString(), lastPollError: archiveWarning, lastPollTaskCount: count }
                         : a
                 ),
             },

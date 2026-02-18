@@ -38,6 +38,13 @@ type UseEmailSettingsOptions = {
 export function useEmailSettings({ settings, updateSettings, showSaved }: UseEmailSettingsOptions) {
     const accounts: EmailCaptureAccount[] = settings?.emailCapture?.accounts ?? [];
 
+    // Keep a ref to the latest accounts so callbacks always see fresh data.
+    // React's useCallback captures values at render time, but the user can type
+    // faster than React re-renders (e.g. filling username then immediately tabbing
+    // to password). Reading from this ref avoids stale-closure bugs.
+    const accountsRef = useRef(accounts);
+    accountsRef.current = accounts;
+
     // Per-account transient state, keyed by account ID.
     const [accountStates, setAccountStates] = useState<Map<string, AccountTransientState>>(new Map());
 
@@ -112,7 +119,8 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
     }, [showSaved, updateSettings]);
 
     const onAddAccount = useCallback(() => {
-        if (accounts.length >= 10) return;
+        const current = accountsRef.current;
+        if (current.length >= 10) return;
         const id = crypto.randomUUID();
         const newAccount: EmailCaptureAccount = {
             id,
@@ -131,11 +139,12 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
             tagNewTasks: 'email',
         };
         updateAccountState(id, { ...defaultTransientState(), passwordLoaded: true });
-        persistAccounts([...accounts, newAccount]);
-    }, [accounts, persistAccounts, updateAccountState]);
+        persistAccounts([...current, newAccount]);
+    }, [persistAccounts, updateAccountState]);
 
     const onRemoveAccount = useCallback((accountId: string) => {
-        const account = accounts.find((a) => a.id === accountId);
+        const current = accountsRef.current;
+        const account = current.find((a) => a.id === accountId);
         // Delete password from keyring
         if (account?.username && account?.server && isTauriRuntime()) {
             const key = imapPasswordKey(account.username, account.server);
@@ -155,18 +164,21 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
             return next;
         });
         loadedPasswordIds.current.delete(accountId);
-        persistAccounts(accounts.filter((a) => a.id !== accountId));
-    }, [accounts, persistAccounts]);
+        persistAccounts(current.filter((a) => a.id !== accountId));
+    }, [persistAccounts]);
 
     const onUpdateAccount = useCallback((accountId: string, partial: Partial<EmailCaptureAccount>) => {
-        persistAccounts(accounts.map((a) =>
+        const current = accountsRef.current;
+        persistAccounts(current.map((a) =>
             a.id === accountId ? { ...a, ...partial } : a
         ));
-    }, [accounts, persistAccounts]);
+    }, [persistAccounts]);
 
     const onPasswordChange = useCallback((accountId: string, value: string) => {
         updateAccountState(accountId, { password: value });
-        const account = accounts.find((a) => a.id === accountId);
+        // Read from ref to avoid stale-closure: the user may have just typed
+        // username/server and tabbed here before React re-rendered.
+        const account = accountsRef.current.find((a) => a.id === accountId);
         if (!account?.username || !account?.server || !isTauriRuntime()) return;
         const key = imapPasswordKey(account.username, account.server);
         (async () => {
@@ -177,11 +189,11 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
                 reportError('Failed to save IMAP password', error);
             }
         })();
-    }, [accounts, updateAccountState]);
+    }, [updateAccountState]);
 
     const onTestConnection = useCallback(async (accountId: string) => {
         if (!isTauriRuntime()) return;
-        const account = accounts.find((a) => a.id === accountId);
+        const account = accountsRef.current.find((a) => a.id === accountId);
         if (!account?.server || !account?.username) return;
 
         updateAccountState(accountId, { testStatus: 'testing', testError: null });
@@ -203,11 +215,11 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
             const message = error instanceof Error ? error.message : String(error);
             updateAccountState(accountId, { testError: message, testStatus: 'error' });
         }
-    }, [accounts, updateAccountState]);
+    }, [updateAccountState]);
 
     const onFetchNow = useCallback(async (accountId: string) => {
         if (!isTauriRuntime()) return;
-        const account = accounts.find((a) => a.id === accountId);
+        const account = accountsRef.current.find((a) => a.id === accountId);
         if (!account?.server || !account?.username) return;
 
         updateAccountState(accountId, { fetchStatus: 'fetching', fetchError: null });
@@ -225,25 +237,26 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
 
             const shared = { params, passwordKey, archiveAction, archiveFolder, tag };
 
-            const actionCount = await fetchAndCreateTasks({
+            const actionResult = await fetchAndCreateTasks({
                 ...shared,
                 folder: account.actionFolder ?? '@ACTION',
                 titlePrefix: account.actionPrefix ?? 'EMAIL-TODO: ',
                 taskStatus: 'inbox' as const,
             });
 
-            const waitingCount = await fetchAndCreateTasks({
+            const waitingResult = await fetchAndCreateTasks({
                 ...shared,
                 folder: account.waitingFolder ?? '@WAITINGFOR',
                 titlePrefix: account.waitingPrefix ?? 'EMAIL-AWAIT: ',
                 taskStatus: 'waiting' as const,
             });
 
-            const count = actionCount + waitingCount;
-            updateAccountState(accountId, { fetchCount: count, fetchStatus: 'success' });
+            const count = actionResult.count + waitingResult.count;
+            const archiveWarning = actionResult.archiveWarning ?? waitingResult.archiveWarning;
+            updateAccountState(accountId, { fetchCount: count, fetchStatus: 'success', fetchError: archiveWarning ?? null });
             onUpdateAccount(accountId, {
                 lastPollAt: new Date().toISOString(),
-                lastPollError: undefined,
+                lastPollError: archiveWarning,
                 lastPollTaskCount: count,
             });
             setTimeout(() => updateAccountState(accountId, { fetchStatus: 'idle' }), 3000);
@@ -255,7 +268,7 @@ export function useEmailSettings({ settings, updateSettings, showSaved }: UseEma
                 lastPollError: message,
             });
         }
-    }, [accounts, updateAccountState, onUpdateAccount]);
+    }, [updateAccountState, onUpdateAccount]);
 
     return {
         accounts,

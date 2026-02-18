@@ -352,11 +352,21 @@ where
     }
 }
 
+/// Result of a combined fetch-and-archive operation within a single IMAP session.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FetchAndArchiveResult {
+    emails: Vec<FetchedEmail>,
+    archive_error: Option<String>,
+}
+
 /// Trait to abstract over imap::Session<TlsStream> and imap::Session<TcpStream>.
 trait ImapOps {
     fn list_folders(&mut self) -> Result<Vec<String>, String>;
     fn fetch_all(&mut self, folder: &str, limit: usize) -> Result<Vec<FetchedEmail>, String>;
     fn archive(&mut self, folder: &str, uids: &[u32], action: &str, archive_folder: Option<&str>) -> Result<u32, String>;
+    /// Fetch emails and archive them in the same session, avoiding UID validity issues.
+    fn fetch_and_archive(&mut self, folder: &str, limit: usize, action: &str, archive_folder: Option<&str>) -> Result<FetchAndArchiveResult, String>;
 }
 
 impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
@@ -451,6 +461,93 @@ impl<T: std::io::Read + std::io::Write> ImapOps for imap::Session<T> {
         }
         Ok(count)
     }
+
+    fn fetch_and_archive(&mut self, folder: &str, limit: usize, action: &str, archive_folder: Option<&str>) -> Result<FetchAndArchiveResult, String> {
+        // SELECT once — both fetch and archive happen in this same session,
+        // so UIDs are guaranteed valid (same UIDVALIDITY).
+        self.select(folder).map_err(|e| format!("Select folder failed: {e}"))?;
+
+        let uids = self.uid_search("ALL")
+            .map_err(|e| format!("Search failed: {e}"))?;
+        if uids.is_empty() {
+            return Ok(FetchAndArchiveResult { emails: vec![], archive_error: None });
+        }
+
+        let mut uid_list: Vec<u32> = uids.into_iter().collect();
+        uid_list.sort();
+        uid_list.truncate(limit);
+
+        let uid_set = uid_list.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let messages = self.uid_fetch(&uid_set, "(UID RFC822)")
+            .map_err(|e| format!("Fetch failed: {e}"))?;
+
+        let mut emails = Vec::new();
+        let mut fetched_uids = Vec::new();
+        for msg in messages.iter() {
+            let body_bytes = match msg.body() {
+                Some(b) => b,
+                None => continue,
+            };
+            let uid = msg.uid.unwrap_or(0);
+            let parsed = mailparse::parse_mail(body_bytes)
+                .map_err(|e| format!("Parse email failed: {e}"))?;
+
+            let headers = &parsed.headers;
+            let subject = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("subject"))
+                .map(|h| h.get_value())
+                .unwrap_or_default();
+            let from = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("from"))
+                .map(|h| h.get_value())
+                .unwrap_or_default();
+            let date = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("date"))
+                .map(|h| h.get_value());
+            let message_id = headers.iter()
+                .find(|h| h.get_key().eq_ignore_ascii_case("message-id"))
+                .map(|h| h.get_value())
+                .unwrap_or_else(|| format!("uid-{uid}"));
+
+            let body_text = imap_extract_body_text(&parsed);
+
+            emails.push(FetchedEmail {
+                message_id,
+                subject,
+                from,
+                body_text,
+                date,
+                uid,
+            });
+            fetched_uids.push(uid);
+        }
+
+        // Archive in the same session (folder is already SELECTed).
+        let archive_error = if !fetched_uids.is_empty() {
+            let archive_uid_set = fetched_uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+            match action {
+                "move" => {
+                    let dest = archive_folder.unwrap_or("[Gmail]/All Mail");
+                    self.uid_mv(&archive_uid_set, dest)
+                        .err().map(|e| format!("Move failed: {e}"))
+                }
+                "delete" => {
+                    if let Err(e) = self.uid_store(&archive_uid_set, "+FLAGS (\\Deleted)") {
+                        Some(format!("Delete flag failed: {e}"))
+                    } else if let Err(e) = self.expunge() {
+                        Some(format!("Expunge failed: {e}"))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        Ok(FetchAndArchiveResult { emails, archive_error })
+    }
 }
 
 fn imap_extract_body_text(parsed: &mailparse::ParsedMail) -> String {
@@ -510,6 +607,25 @@ fn imap_archive_emails(
         .ok_or_else(|| "IMAP password not configured".to_string())?;
     with_imap_session(&params, &password, 30, |session| {
         session.archive(&folder, &uids, &action, archive_folder.as_deref())
+    })
+}
+
+#[tauri::command]
+fn imap_fetch_and_archive(
+    app: tauri::AppHandle,
+    params: ImapConnectParams,
+    folder: String,
+    max_count: Option<u32>,
+    action: String,
+    archive_folder: Option<String>,
+    password_key: Option<String>,
+) -> Result<FetchAndArchiveResult, String> {
+    let key = password_key.as_deref().unwrap_or(KEYRING_IMAP_PASSWORD);
+    let password = get_keyring_secret(&app, key)?
+        .ok_or_else(|| "IMAP password not configured".to_string())?;
+    let limit = max_count.unwrap_or(50) as usize;
+    with_imap_session(&params, &password, 30, |session| {
+        session.fetch_and_archive(&folder, limit, &action, archive_folder.as_deref())
     })
 }
 
@@ -3084,6 +3200,7 @@ pub fn run() {
             imap_test_connection,
             imap_fetch_emails,
             imap_archive_emails,
+            imap_fetch_and_archive,
             set_webdav_config,
             webdav_get_json,
             webdav_put_json,
