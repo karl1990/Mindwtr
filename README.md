@@ -249,10 +249,8 @@ brew install --cask mindwtr
   <img src="https://img.shields.io/badge/Google_Play-Install-414141?logo=googleplay&logoColor=white" alt="Get it on Google Play">
 </a>
 <a href="https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr">
-  <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroidButtonGreyBorder_nofont.png" alt="Get it on IzzyOnDroid" style="height: 50px" height="50">
+  <img src="https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/tech.dongdongbh.mindwtr&label=IzzyOnDroid" alt="IzzyOnDroid">
 </a>
-
-[![IzzyOnDroid](https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/tech.dongdongbh.mindwtr&label=IzzyOnDroid&style=for-the-badge)](https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr)
 
 Install with IzzyOnDroid:
 1. Install an F-Droid-compatible client (Droid-ify, Neo Store, or F-Droid).
