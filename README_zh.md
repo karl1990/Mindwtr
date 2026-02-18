@@ -40,6 +40,13 @@
          style="height: 50px"
          height="50" />
   </a>
+  <a href="https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr" target="_blank">
+    <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroidButtonGreyBorder_nofont.png"
+         align="center"
+         alt="Get it on IzzyOnDroid"
+         style="height: 50px"
+         height="50" />
+  </a>
   <a href="https://snapcraft.io/mindwtr" target="_blank">
     <img alt="Get it from the Snap Store"
          src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
@@ -241,6 +248,14 @@ brew install --cask mindwtr
 <a href="https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr">
   <img src="https://img.shields.io/badge/Google_Play-Install-414141?logo=googleplay&logoColor=white" alt="Get it on Google Play">
 </a>
+<a href="https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr">
+  <img src="https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/tech.dongdongbh.mindwtr&label=IzzyOnDroid" alt="IzzyOnDroid">
+</a>
+
+通过 IzzyOnDroid 安装：
+1. 安装兼容 F-Droid 的客户端（Droid-ify、Neo Store 或 F-Droid）。
+2. 添加 IzzyOnDroid 仓库：`https://apt.izzysoft.de/fdroid/repo`。
+3. 打开 [Mindwtr（IzzyOnDroid）](https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr) 并安装。
 
 其他方式：从 [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases) 下载 APK。
 
@@ -271,7 +286,7 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
 
 ### :hearts: 贡献与支持
 
-如果你想参与进来，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+如果你想参与进来，请先阅读 [CONTRIBUTING.md](docs/CONTRIBUTING.md)。
 
 你可以通过以下方式帮助项目：
 
@@ -280,9 +295,10 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
 3. **在社交平台分享：** 在 [X](https://twitter.com/intent/tweet?text=I%20like%20Mindwtr%20https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr)、[Reddit](https://www.reddit.com/submit?url=https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr&title=I%20like%20Mindwtr)、[LinkedIn](https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr&title=I%20like%20Mindwtr) 发布使用体验。
 4. **报告问题与提出需求：** 在 [GitHub Issues](https://github.com/dongdongbh/Mindwtr/issues) 提交 Bug 和功能建议。
 5. **加入社区讨论：** 欢迎加入 [Discord](https://discord.gg/ahhFxuDBb4)。
-6. **贡献代码或文档：** 提交 PR，并遵循[贡献指南](docs/CONTRIBUTING.md)和提交规范。
-7. **认领并实现：** 欢迎社区成员从[路线图](#路线图)或任何开放 issue 中认领条目并提交 PR。
-8. **赞助项目：** 可通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持持续开发。
+6. **参与翻译：** 在 [`packages/core/src/i18n/locales/`](packages/core/src/i18n/locales/) 提交语言翻译改进。
+7. **贡献代码或文档：** 提交 PR，并遵循[贡献指南](docs/CONTRIBUTING.md)和提交规范。
+8. **认领并实现：** 欢迎社区成员从[路线图](#路线图)或任何开放 issue 中认领条目并提交 PR。
+9. **赞助项目：** 可通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持持续开发。
 
 ## 路线图
 

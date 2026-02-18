@@ -137,6 +137,62 @@ Only `--write` is supported for write access (no alternate aliases).
 - **`mindwtr.delete_task`**: Soft-delete a task.
 - **`mindwtr.restore_task`**: Restore a soft-deleted task.
 
+## Permission Matrix
+
+Use this matrix when deciding whether to run the server in read-only mode or with `--write`.
+
+| Tool | Data Access | Mutation Type | Read-only Mode | `--write` Mode |
+| --- | --- | --- | --- | --- |
+| `mindwtr.list_tasks` | Task rows (filtered) | None | Allowed | Allowed |
+| `mindwtr.list_projects` | Project rows | None | Allowed | Allowed |
+| `mindwtr.get_task` | Single task by ID | None | Allowed | Allowed |
+| `mindwtr.add_task` | Task table | Insert | Denied | Allowed |
+| `mindwtr.update_task` | Task table | Update | Denied | Allowed |
+| `mindwtr.complete_task` | Task table | Update status | Denied | Allowed |
+| `mindwtr.delete_task` | Task table | Soft-delete | Denied | Allowed |
+| `mindwtr.restore_task` | Task table | Restore soft-delete | Denied | Allowed |
+
+Practical guidance:
+
+- Default to read-only for exploration and reporting.
+- Enable `--write` only in trusted local environments.
+- For agent workflows, prefer explicit confirmation before delete/complete operations.
+
+## Advanced Usage Examples
+
+### 1) Guided Weekly Review
+
+1. `mindwtr.list_tasks` with `status: "waiting"` and `status: "someday"`.
+2. Summarize stalled items by project.
+3. For selected items, call `mindwtr.update_task` to set `reviewAt`.
+
+### 2) Inbox Triage Session
+
+1. `mindwtr.list_tasks` with `status: "inbox"` and `sortBy: "createdAt"`.
+2. For each task, classify with `mindwtr.update_task` (`next`, `waiting`, `reference`, etc.).
+3. Add missing metadata (project, contexts, tags) in a second pass.
+
+### 3) Safe Bulk Close Pattern
+
+For potentially destructive automation:
+
+1. Run read phase: list candidate IDs only.
+2. Present confirmation summary (count + titles).
+3. Execute writes (`complete_task` / `delete_task`) only after explicit user approval.
+4. Keep IDs for rollback via `restore_task`.
+
+### 4) Quick Capture with Natural Language
+
+Use `mindwtr.add_task` + `quickAdd`:
+
+```json
+{
+  "quickAdd": "Follow up with Alex +Hiring @work #ops /due:tomorrow 10am"
+}
+```
+
+Use this for rapid capture flows where parsing commands is more efficient than setting each field manually.
+
 ---
 
 ## Tool Reference

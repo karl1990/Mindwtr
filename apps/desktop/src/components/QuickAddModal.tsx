@@ -7,6 +7,7 @@ import {
     safeFormatDate,
     safeParseDate,
     generateUUID,
+    DEFAULT_PROJECT_COLOR,
     type Attachment,
     type Task,
 } from '@mindwtr/core';
@@ -242,7 +243,7 @@ export function QuickAddModal() {
                 if (match) {
                     updates.projectId = match.id;
                 } else {
-                    const created = await addProjectNow(trimmed, '#94a3b8');
+                    const created = await addProjectNow(trimmed, DEFAULT_PROJECT_COLOR);
                     if (!created) return;
                     updates.projectId = created.id;
                 }
@@ -565,7 +566,7 @@ export function QuickAddModal() {
         }
         let projectId = baseProps.projectId;
         if (!projectId && projectTitle) {
-            const created = await addProject(projectTitle, '#94a3b8');
+            const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
             if (!created) return;
             projectId = created.id;
         }
@@ -660,7 +661,7 @@ export function QuickAddModal() {
                             contexts={PRESET_CONTEXTS}
                             areas={areas}
                             onCreateProject={async (title) => {
-                                const created = await addProject(title, '#94a3b8');
+                                const created = await addProject(title, DEFAULT_PROJECT_COLOR);
                                 return created?.id ?? null;
                             }}
                             onChange={(next) => setValue(next)}

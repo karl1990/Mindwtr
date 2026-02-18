@@ -1,6 +1,6 @@
-import { safeFormatDate, safeParseDate, type Area, type Project } from '@mindwtr/core';
+import { DEFAULT_AREA_COLOR as CORE_DEFAULT_AREA_COLOR, safeFormatDate, safeParseDate, type Area, type Project } from '@mindwtr/core';
 
-export const DEFAULT_AREA_COLOR = '#94a3b8';
+export const DEFAULT_AREA_COLOR = CORE_DEFAULT_AREA_COLOR;
 
 export function toDateTimeLocalValue(dateStr: string | undefined): string {
     if (!dateStr) return '';

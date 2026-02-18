@@ -3,13 +3,13 @@ import { View, Text, TouchableOpacity, Modal, ScrollView, TextInput, Platform, A
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTaskStore, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, safeFormatDate, safeParseDate, resolveTextDirection, type Task, type AIProviderId } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, useTaskStore, PRESET_CONTEXTS, PRESET_TAGS, createAIProvider, safeFormatDate, safeParseDate, resolveTextDirection, type Task, type AIProviderId } from '@mindwtr/core';
 
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { useLanguage } from '../contexts/language-context';
 import { useTheme } from '../contexts/theme-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import { buildAIConfig, loadAIKey } from '../lib/ai-config';
+import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { logWarn } from '../lib/app-log';
 import { styles } from './inbox-processing-modal.styles';
 
@@ -500,7 +500,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
       selectProjectEarly(existing.id);
       return;
     }
-    const created = await addProject(title, '#94a3b8');
+    const created = await addProject(title, DEFAULT_PROJECT_COLOR);
     if (!created) return;
     selectProjectEarly(created.id);
   };
@@ -524,7 +524,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
       return;
     }
     const apiKey = await loadAIKey(aiProvider);
-    if (!apiKey) {
+    if (isAIKeyRequired(settings) && !apiKey) {
       Alert.alert(t('ai.errorTitle'), t('ai.missingKeyBody'));
       return;
     }

@@ -60,4 +60,40 @@ describe('TaskItem', () => {
         fireEvent.click(checkbox);
         expect(onToggleSelect).toHaveBeenCalledTimes(1);
     });
+
+    it('shows due date metadata when compact details are enabled', () => {
+        const taskWithDueDate: Task = {
+            ...mockTask,
+            id: 'task-with-due-date',
+            dueDate: '2026-03-20',
+        };
+        const { getByText } = render(
+            <LanguageProvider>
+                <TaskItem task={taskWithDueDate} compactMetaEnabled />
+            </LanguageProvider>
+        );
+        expect(getByText('Mar 20')).toBeInTheDocument();
+    });
+
+    it('applies inset ring style when selected to avoid clipped borders', () => {
+        const { container } = render(
+            <LanguageProvider>
+                <TaskItem task={mockTask} isSelected />
+            </LanguageProvider>
+        );
+        const root = container.querySelector('[data-task-id="1"]');
+        expect(root).toBeTruthy();
+        expect(root?.className).toContain('ring-inset');
+    });
+
+    it('includes archived in the task status selector', () => {
+        const { getByLabelText } = render(
+            <LanguageProvider>
+                <TaskItem task={mockTask} />
+            </LanguageProvider>
+        );
+        const statusSelect = getByLabelText('task.aria.status') as HTMLSelectElement;
+        const archivedOption = Array.from(statusSelect.options).find((option) => option.value === 'archived');
+        expect(archivedOption).toBeTruthy();
+    });
 });

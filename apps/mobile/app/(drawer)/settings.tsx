@@ -122,6 +122,9 @@ const UPDATE_BADGE_AVAILABLE_KEY = 'mindwtr-update-available';
 const UPDATE_BADGE_LAST_CHECK_KEY = 'mindwtr-update-last-check';
 const UPDATE_BADGE_LATEST_KEY = 'mindwtr-update-latest';
 const UPDATE_BADGE_INTERVAL_MS = 1000 * 60 * 60 * 24;
+const AI_PROVIDER_CONSENT_KEY = 'mindwtr-ai-provider-consent-v1';
+const FOSS_LOCAL_LLM_MODEL_OPTIONS = ['llama3.2', 'qwen2.5', 'mistral', 'phi-4-mini'];
+const FOSS_LOCAL_LLM_COPILOT_OPTIONS = ['llama3.2', 'qwen2.5', 'mistral', 'phi-4-mini'];
 
 const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -205,6 +208,8 @@ export default function SettingsPage() {
     const localize = (enText: string, zhText?: string) =>
         language === 'zh' && zhText ? zhText : translateText(enText, language);
     const { tasks, projects, sections, areas, settings, updateSettings } = useTaskStore();
+    const extraConfig = Constants.expoConfig?.extra as { isFossBuild?: boolean | string } | undefined;
+    const isFossBuild = extraConfig?.isFossBuild === true || extraConfig?.isFossBuild === 'true';
     const [isSyncing, setIsSyncing] = useState(false);
     const currentScreen = useMemo<SettingsScreen>(() => {
         const rawScreen = Array.isArray(settingsScreen) ? settingsScreen[0] : settingsScreen;
@@ -250,8 +255,6 @@ export default function SettingsPage() {
     const tc = useThemeColors();
     const insets = useSafeAreaInsets();
     const isExpoGo = Constants.appOwnership === 'expo';
-    const extraConfig = Constants.expoConfig?.extra as { isFossBuild?: boolean | string } | undefined;
-    const isFossBuild = extraConfig?.isFossBuild === true || extraConfig?.isFossBuild === 'true';
     const [androidInstallerSource, setAndroidInstallerSource] = useState<'play-store' | 'sideload' | 'unknown'>(
         Platform.OS === 'android' ? 'unknown' : 'play-store'
     );
@@ -283,19 +286,19 @@ export default function SettingsPage() {
     const syncHistoryEntries = syncHistory.slice(0, 5);
     const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;
     const cloudUrlError = cloudUrl.trim() ? !isValidHttpUrl(cloudUrl.trim()) : false;
-    const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
+    const aiProvider = (isFossBuild ? 'openai' : (settings.ai?.provider ?? 'openai')) as AIProviderId;
     const aiEnabled = settings.ai?.enabled === true;
-    const aiModel = settings.ai?.model ?? getDefaultAIConfig(aiProvider).model;
+    const aiModelOptions = isFossBuild ? FOSS_LOCAL_LLM_MODEL_OPTIONS : getModelOptions(aiProvider);
+    const aiModel = settings.ai?.model ?? (isFossBuild ? FOSS_LOCAL_LLM_MODEL_OPTIONS[0] : getDefaultAIConfig(aiProvider).model);
     const aiBaseUrl = settings.ai?.baseUrl ?? '';
     const aiReasoningEffort = (settings.ai?.reasoningEffort ?? DEFAULT_REASONING_EFFORT) as AIReasoningEffort;
     const aiThinkingBudget = settings.ai?.thinkingBudget ?? getDefaultAIConfig(aiProvider).thinkingBudget ?? 0;
-    const aiModelOptions = getModelOptions(aiProvider);
-    const aiCopilotModel = settings.ai?.copilotModel ?? getDefaultCopilotModel(aiProvider);
-    const aiCopilotOptions = getCopilotModelOptions(aiProvider);
+    const aiCopilotOptions = isFossBuild ? FOSS_LOCAL_LLM_COPILOT_OPTIONS : getCopilotModelOptions(aiProvider);
+    const aiCopilotModel = settings.ai?.copilotModel ?? (isFossBuild ? FOSS_LOCAL_LLM_COPILOT_OPTIONS[0] : getDefaultCopilotModel(aiProvider));
     const anthropicThinkingEnabled = aiProvider === 'anthropic' && aiThinkingBudget > 0;
     const speechSettings = settings.ai?.speechToText ?? {};
     const speechEnabled = speechSettings.enabled === true;
-    const speechProvider = (speechSettings.provider ?? 'gemini') as 'openai' | 'gemini' | 'whisper';
+    const speechProvider = (isFossBuild ? 'whisper' : (speechSettings.provider ?? 'gemini')) as 'openai' | 'gemini' | 'whisper';
     const speechModel = speechSettings.model ?? (
         speechProvider === 'openai'
             ? 'gpt-4o-transcribe'
@@ -306,7 +309,9 @@ export default function SettingsPage() {
     const speechLanguage = speechSettings.language ?? 'auto';
     const speechMode = speechSettings.mode ?? 'smart_parse';
     const speechFieldStrategy = speechSettings.fieldStrategy ?? 'smart';
-    const speechModelOptions = speechProvider === 'openai'
+    const speechModelOptions = isFossBuild
+        ? WHISPER_MODELS.map((model) => model.id)
+        : speechProvider === 'openai'
         ? ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1']
         : speechProvider === 'gemini'
             ? ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
@@ -554,14 +559,157 @@ export default function SettingsPage() {
     ];
     const currentWeekStartLabel = weekStartOptions.find((opt) => opt.value === weekStart)?.label ?? t('settings.weekStartSunday');
     const openLink = (url: string) => Linking.openURL(url);
-    const updateAISettings = (next: Partial<NonNullable<typeof settings.ai>>) => {
+    const updateAISettings = useCallback((next: Partial<NonNullable<typeof settings.ai>>) => {
         updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(logSettingsError);
+    }, [settings.ai, updateSettings]);
+    const getAIProviderLabel = (provider: AIProviderId): string => (
+        isFossBuild && provider === 'openai'
+            ? localize('Local / Custom (OpenAI-compatible)', '本地 / 自定义（OpenAI 兼容）')
+            : provider === 'openai'
+            ? t('settings.aiProviderOpenAI')
+            : provider === 'gemini'
+                ? t('settings.aiProviderGemini')
+                : t('settings.aiProviderAnthropic')
+    );
+    const getAIProviderPolicyUrl = (provider: AIProviderId): string => (
+        isFossBuild && provider === 'openai'
+            ? ''
+            : provider === 'openai'
+            ? 'https://openai.com/policies/privacy-policy'
+            : provider === 'gemini'
+                ? 'https://policies.google.com/privacy'
+                : 'https://www.anthropic.com/privacy'
+    );
+    const loadAIProviderConsent = async (): Promise<Record<string, boolean>> => {
+        try {
+            const raw = await AsyncStorage.getItem(AI_PROVIDER_CONSENT_KEY);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+            const entries = Object.entries(parsed as Record<string, unknown>)
+                .map(([provider, value]) => [provider, value === true] as const);
+            return Object.fromEntries(entries);
+        } catch (error) {
+            logSettingsWarn('Failed to load AI consent state', error);
+            return {};
+        }
+    };
+    const saveAIProviderConsent = async (provider: AIProviderId): Promise<void> => {
+        try {
+            const consentMap = await loadAIProviderConsent();
+            consentMap[provider] = true;
+            await AsyncStorage.setItem(AI_PROVIDER_CONSENT_KEY, JSON.stringify(consentMap));
+        } catch (error) {
+            logSettingsWarn('Failed to save AI consent state', error);
+        }
+    };
+    const requestAIProviderConsent = async (provider: AIProviderId): Promise<boolean> => {
+        const consentMap = await loadAIProviderConsent();
+        if (consentMap[provider]) return true;
+
+        const providerLabel = getAIProviderLabel(provider);
+        const policyUrl = getAIProviderPolicyUrl(provider);
+        const title = localize('Enable AI features?', '启用 AI 功能？');
+        const message = isFossBuild && provider === 'openai'
+            ? localize(
+                `To use AI assistant, your task text and optional notes will be sent directly to your configured OpenAI-compatible endpoint (for example, a local or self-hosted LLM server) using your API key. Mindwtr does not collect this data. Do you want to continue?`,
+                '要使用 AI 助手，任务文本和可选备注会通过你的 API Key 直接发送到你配置的 OpenAI 兼容端点（例如本地或自托管 LLM 服务）。Mindwtr 不会收集这些数据。是否继续？'
+            )
+            : localize(
+                `To use AI assistant, your task text and optional notes will be sent directly to ${providerLabel} using your API key. Mindwtr does not collect this data. Provider privacy policy: ${policyUrl}. Do you want to continue?`,
+                `要使用 AI 助手，任务文本和可选备注会通过你的 API Key 直接发送到 ${providerLabel}。Mindwtr 不会收集这些数据。服务商隐私政策：${policyUrl}。是否继续？`
+            );
+
+        return await new Promise<boolean>((resolve) => {
+            let settled = false;
+            const finish = (value: boolean) => {
+                if (settled) return;
+                settled = true;
+                resolve(value);
+            };
+            Alert.alert(
+                title,
+                message,
+                [
+                    {
+                        text: localize('Cancel', '取消'),
+                        style: 'cancel',
+                        onPress: () => finish(false),
+                    },
+                    {
+                        text: localize('Agree', '同意'),
+                        onPress: () => {
+                            void saveAIProviderConsent(provider);
+                            finish(true);
+                        },
+                    },
+                ],
+                { cancelable: true, onDismiss: () => finish(false) }
+            );
+        });
+    };
+    const applyAIProviderDefaults = useCallback((provider: AIProviderId) => {
+        const defaults = getDefaultAIConfig(provider);
+        updateAISettings({
+            provider,
+            model: isFossBuild && provider === 'openai' ? FOSS_LOCAL_LLM_MODEL_OPTIONS[0] : defaults.model,
+            copilotModel: isFossBuild && provider === 'openai' ? FOSS_LOCAL_LLM_COPILOT_OPTIONS[0] : getDefaultCopilotModel(provider),
+            reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+            thinkingBudget: defaults.thinkingBudget
+                ?? (provider === 'gemini'
+                    ? DEFAULT_GEMINI_THINKING_BUDGET
+                    : provider === 'anthropic'
+                        ? DEFAULT_ANTHROPIC_THINKING_BUDGET
+                        : 0),
+        });
+    }, [isFossBuild, updateAISettings]);
+    useEffect(() => {
+        if (!isFossBuild) return;
+        const configuredProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
+        if (configuredProvider !== 'openai') {
+            applyAIProviderDefaults('openai');
+        }
+    }, [applyAIProviderDefaults, isFossBuild, settings.ai?.provider]);
+    const handleAIProviderChange = (provider: AIProviderId) => {
+        if (provider === aiProvider) return;
+        void (async () => {
+            if (aiEnabled) {
+                const consented = await requestAIProviderConsent(provider);
+                if (!consented) return;
+            }
+            applyAIProviderDefaults(provider);
+        })();
+    };
+    const handleAIEnabledToggle = (value: boolean) => {
+        if (!value) {
+            updateAISettings({ enabled: false });
+            return;
+        }
+        void (async () => {
+            const consented = await requestAIProviderConsent(aiProvider);
+            if (!consented) return;
+            updateAISettings({ enabled: true });
+        })();
     };
     const updateSpeechSettings = (
         next: Partial<NonNullable<NonNullable<typeof settings.ai>['speechToText']>>
     ) => {
         updateAISettings({ speechToText: { ...(settings.ai?.speechToText ?? {}), ...next } });
     };
+
+    useEffect(() => {
+        if (!isFossBuild) return;
+        const configuredProvider = settings.ai?.speechToText?.provider ?? 'whisper';
+        const configuredModel = settings.ai?.speechToText?.model;
+        const modelIsValidWhisper = typeof configuredModel === 'string'
+            && WHISPER_MODELS.some((entry) => entry.id === configuredModel);
+        if (configuredProvider !== 'whisper' || !modelIsValidWhisper) {
+            updateSpeechSettings({
+                provider: 'whisper',
+                model: modelIsValidWhisper ? configuredModel : DEFAULT_WHISPER_MODEL,
+            });
+        }
+    }, [isFossBuild, settings.ai?.speechToText?.model, settings.ai?.speechToText?.provider, updateSpeechSettings]);
 
     const getWhisperDirectories = () => {
         const candidates: Directory[] = [];
@@ -986,8 +1134,7 @@ export default function SettingsPage() {
 
     const fetchLatestComparableVersion = useCallback(async (): Promise<{ version: string; source: 'play-store' | 'app-store' | 'github-release' }> => {
         if (isFossBuild) {
-            const githubVersion = await fetchLatestGithubVersion();
-            return { version: githubVersion, source: 'github-release' };
+            throw new Error('Update checks are disabled in FOSS build');
         }
         if (Platform.OS === 'ios') {
             const appStoreInfo = await fetchLatestAppStoreInfo();
@@ -1012,6 +1159,15 @@ export default function SettingsPage() {
     }, [androidInstallerSource, fetchLatestAppStoreInfo, fetchLatestGithubVersion, fetchLatestPlayStoreVersion, isFossBuild]);
 
     useEffect(() => {
+        if (isFossBuild) {
+            setHasUpdateBadge(false);
+            AsyncStorage.multiRemove([
+                UPDATE_BADGE_AVAILABLE_KEY,
+                UPDATE_BADGE_LATEST_KEY,
+                UPDATE_BADGE_LAST_CHECK_KEY,
+            ]).catch((error) => logSettingsWarn('Failed to clear update badge state for FOSS build', error));
+            return;
+        }
         let cancelled = false;
         AsyncStorage.multiGet([UPDATE_BADGE_AVAILABLE_KEY, UPDATE_BADGE_LATEST_KEY])
             .then((entries) => {
@@ -1030,10 +1186,10 @@ export default function SettingsPage() {
         return () => {
             cancelled = true;
         };
-    }, [currentVersion]);
+    }, [currentVersion, isFossBuild]);
 
     useEffect(() => {
-        if (isExpoGo) return;
+        if (isExpoGo || isFossBuild) return;
         let cancelled = false;
         const checkUpdates = async () => {
             try {
@@ -1053,9 +1209,19 @@ export default function SettingsPage() {
         return () => {
             cancelled = true;
         };
-    }, [currentVersion, fetchLatestComparableVersion, isExpoGo, persistUpdateBadge]);
+    }, [currentVersion, fetchLatestComparableVersion, isExpoGo, isFossBuild, persistUpdateBadge]);
 
     const handleCheckUpdates = async () => {
+        if (isFossBuild) {
+            Alert.alert(
+                localize('Updates are managed by your distribution source', '更新由发行渠道管理'),
+                localize(
+                    'In-app update checks are disabled in this FOSS build. Please update from your repository or package source.',
+                    '此 FOSS 版本已禁用应用内更新检查。请通过你的软件源或包管理渠道更新。'
+                )
+            );
+            return;
+        }
         setIsCheckingUpdate(true);
         try {
             await AsyncStorage.setItem(UPDATE_BADGE_LAST_CHECK_KEY, String(Date.now()));
@@ -2016,10 +2182,16 @@ export default function SettingsPage() {
                             <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
                                 <View style={styles.settingInfo}>
                                     <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiEnable')}</Text>
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {localize(
+                                            `When enabled, task text is sent directly to ${getAIProviderLabel(aiProvider)} using your API key.`,
+                                            `启用后，任务文本将通过你的 API Key 直接发送到 ${getAIProviderLabel(aiProvider)}。`
+                                        )}
+                                    </Text>
                                 </View>
                                 <Switch
                                     value={aiEnabled}
-                                    onValueChange={(value) => updateAISettings({ enabled: value })}
+                                    onValueChange={handleAIEnabledToggle}
                                     trackColor={{ false: '#767577', true: '#3B82F6' }}
                                 />
                             </View>
@@ -2028,11 +2200,7 @@ export default function SettingsPage() {
                                 <View style={styles.settingInfo}>
                                     <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiProvider')}</Text>
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                        {aiProvider === 'openai'
-                                            ? t('settings.aiProviderOpenAI')
-                                            : aiProvider === 'gemini'
-                                                ? t('settings.aiProviderGemini')
-                                                : t('settings.aiProviderAnthropic')}
+                                        {getAIProviderLabel(aiProvider)}
                                     </Text>
                                 </View>
                             </View>
@@ -2043,61 +2211,38 @@ export default function SettingsPage() {
                                             styles.backendOption,
                                             { borderColor: tc.border, backgroundColor: aiProvider === 'openai' ? tc.filterBg : 'transparent' },
                                         ]}
-                                        onPress={() => {
-                                            const defaults = getDefaultAIConfig('openai');
-                                            updateAISettings({
-                                                provider: 'openai',
-                                                model: defaults.model,
-                                                copilotModel: getDefaultCopilotModel('openai'),
-                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
-                                                thinkingBudget: defaults.thinkingBudget ?? 0,
-                                            });
-                                        }}
+                                        onPress={() => handleAIProviderChange('openai')}
                                     >
                                         <Text style={[styles.backendOptionText, { color: aiProvider === 'openai' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.aiProviderOpenAI')}
+                                            {getAIProviderLabel('openai')}
                                         </Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.backendOption,
-                                            { borderColor: tc.border, backgroundColor: aiProvider === 'gemini' ? tc.filterBg : 'transparent' },
-                                        ]}
-                                        onPress={() => {
-                                            const defaults = getDefaultAIConfig('gemini');
-                                            updateAISettings({
-                                                provider: 'gemini',
-                                                model: defaults.model,
-                                                copilotModel: getDefaultCopilotModel('gemini'),
-                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
-                                                thinkingBudget: defaults.thinkingBudget ?? DEFAULT_GEMINI_THINKING_BUDGET,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={[styles.backendOptionText, { color: aiProvider === 'gemini' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.aiProviderGemini')}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.backendOption,
-                                            { borderColor: tc.border, backgroundColor: aiProvider === 'anthropic' ? tc.filterBg : 'transparent' },
-                                        ]}
-                                        onPress={() => {
-                                            const defaults = getDefaultAIConfig('anthropic');
-                                            updateAISettings({
-                                                provider: 'anthropic',
-                                                model: defaults.model,
-                                                copilotModel: getDefaultCopilotModel('anthropic'),
-                                                reasoningEffort: defaults.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
-                                                thinkingBudget: defaults.thinkingBudget ?? DEFAULT_ANTHROPIC_THINKING_BUDGET,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={[styles.backendOptionText, { color: aiProvider === 'anthropic' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.aiProviderAnthropic')}
-                                        </Text>
-                                    </TouchableOpacity>
+                                    {!isFossBuild && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: aiProvider === 'gemini' ? tc.filterBg : 'transparent' },
+                                            ]}
+                                            onPress={() => handleAIProviderChange('gemini')}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: aiProvider === 'gemini' ? tc.tint : tc.secondaryText }]}>
+                                                {t('settings.aiProviderGemini')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {!isFossBuild && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: aiProvider === 'anthropic' ? tc.filterBg : 'transparent' },
+                                            ]}
+                                            onPress={() => handleAIProviderChange('anthropic')}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: aiProvider === 'anthropic' ? tc.tint : tc.secondaryText }]}>
+                                                {t('settings.aiProviderAnthropic')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             </View>
 
@@ -2164,7 +2309,7 @@ export default function SettingsPage() {
                                     <View style={styles.settingInfo}>
                                         <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.aiReasoning')}</Text>
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                            {t('settings.aiReasoningHint')}
+                                            {t(isFossBuild ? 'settings.aiReasoningHintFoss' : 'settings.aiReasoningHint')}
                                         </Text>
                                     </View>
                                 </View>
@@ -2373,40 +2518,44 @@ export default function SettingsPage() {
                             </View>
                             <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
                                 <View style={styles.backendToggle}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.backendOption,
-                                            { borderColor: tc.border, backgroundColor: speechProvider === 'openai' ? tc.filterBg : 'transparent' },
-                                        ]}
-                                        onPress={() => {
-                                            updateSpeechSettings({
-                                                provider: 'openai',
-                                                model: 'gpt-4o-transcribe',
-                                                offlineModelPath: undefined,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={[styles.backendOptionText, { color: speechProvider === 'openai' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.aiProviderOpenAI')}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.backendOption,
-                                            { borderColor: tc.border, backgroundColor: speechProvider === 'gemini' ? tc.filterBg : 'transparent' },
-                                        ]}
-                                        onPress={() => {
-                                            updateSpeechSettings({
-                                                provider: 'gemini',
-                                                model: 'gemini-2.5-flash',
-                                                offlineModelPath: undefined,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={[styles.backendOptionText, { color: speechProvider === 'gemini' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.aiProviderGemini')}
-                                        </Text>
-                                    </TouchableOpacity>
+                                    {!isFossBuild && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: speechProvider === 'openai' ? tc.filterBg : 'transparent' },
+                                            ]}
+                                            onPress={() => {
+                                                updateSpeechSettings({
+                                                    provider: 'openai',
+                                                    model: 'gpt-4o-transcribe',
+                                                    offlineModelPath: undefined,
+                                                });
+                                            }}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: speechProvider === 'openai' ? tc.tint : tc.secondaryText }]}>
+                                                {t('settings.aiProviderOpenAI')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {!isFossBuild && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: speechProvider === 'gemini' ? tc.filterBg : 'transparent' },
+                                            ]}
+                                            onPress={() => {
+                                                updateSpeechSettings({
+                                                    provider: 'gemini',
+                                                    model: 'gemini-2.5-flash',
+                                                    offlineModelPath: undefined,
+                                                });
+                                            }}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: speechProvider === 'gemini' ? tc.tint : tc.secondaryText }]}>
+                                                {t('settings.aiProviderGemini')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                     <TouchableOpacity
                                         style={[
                                             styles.backendOption,
@@ -2421,7 +2570,9 @@ export default function SettingsPage() {
                                         }}
                                     >
                                         <Text style={[styles.backendOptionText, { color: speechProvider === 'whisper' ? tc.tint : tc.secondaryText }]}>
-                                            {t('settings.speechProviderOffline')}
+                                            {isFossBuild
+                                                ? localize('Local Whisper', '本地 Whisper')
+                                                : t('settings.speechProviderOffline')}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -4098,22 +4249,24 @@ export default function SettingsPage() {
                             <Text style={[styles.settingLabel, { color: tc.text }]}>{localize('License', '许可证')}</Text>
                             <Text style={[styles.settingValue, { color: tc.secondaryText }]}>AGPL-3.0</Text>
                         </View>
-                        <TouchableOpacity
-                            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
-                            onPress={handleCheckUpdates}
-                            disabled={isCheckingUpdate}
-                        >
-                            <Text style={[styles.settingLabel, { color: tc.text }]}>
-                                {localize('Check for Updates', '检查更新')}
-                            </Text>
-                            {isCheckingUpdate ? (
-                                <ActivityIndicator size="small" color="#3B82F6" />
-                            ) : (
-                                <Text style={styles.linkText}>
-                                    {localize('Tap to check', '点击检查')}
+                        {!isFossBuild && (
+                            <TouchableOpacity
+                                style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                onPress={handleCheckUpdates}
+                                disabled={isCheckingUpdate}
+                            >
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                    {localize('Check for Updates', '检查更新')}
                                 </Text>
-                            )}
-                        </TouchableOpacity>
+                                {isCheckingUpdate ? (
+                                    <ActivityIndicator size="small" color="#3B82F6" />
+                                ) : (
+                                    <Text style={styles.linkText}>
+                                        {localize('Tap to check', '点击检查')}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </ScrollView>
             </SafeAreaView>
@@ -4131,7 +4284,7 @@ export default function SettingsPage() {
                     <MenuItem title={t('settings.notifications')} onPress={() => pushSettingsScreen('notifications')} />
                     <MenuItem title={t('settings.dataSync')} onPress={() => pushSettingsScreen('sync')} />
                     <MenuItem title={t('settings.advanced')} onPress={() => pushSettingsScreen('advanced')} />
-                    <MenuItem title={t('settings.about')} onPress={() => pushSettingsScreen('about')} showIndicator={hasUpdateBadge} />
+                    <MenuItem title={t('settings.about')} onPress={() => pushSettingsScreen('about')} showIndicator={!isFossBuild && hasUpdateBadge} />
                 </View>
             </ScrollView>
         </SafeAreaView>

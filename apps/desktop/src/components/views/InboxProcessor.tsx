@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Play } from 'lucide-react';
-import { safeParseDate, safeFormatDate, hasTimeComponent, type AppData, type Area, type Project, type Task } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, safeParseDate, safeFormatDate, hasTimeComponent, type AppData, type Area, type Project, type Task } from '@mindwtr/core';
 
 import { InboxProcessingWizard, type ProcessingStep } from '../InboxProcessingWizard';
 import { resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
@@ -428,7 +428,7 @@ export function InboxProcessor({
             return;
         }
         const existing = projects.find((project) => project.title.toLowerCase() === projectTitle.toLowerCase());
-        const project = existing ?? await addProject(projectTitle, '#94a3b8');
+        const project = existing ?? await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
         if (!project) return;
         applyProcessingEdits({
             title: nextAction,

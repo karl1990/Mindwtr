@@ -504,7 +504,7 @@ function createEmptyEntityStats(localTotal: number, incomingTotal: number): Enti
     };
 }
 
-const CONTENT_DIFF_IGNORED_KEYS = new Set(['rev', 'revBy', 'updatedAt', 'createdAt', 'localStatus']);
+const CONTENT_DIFF_IGNORED_KEYS = new Set(['rev', 'revBy', 'updatedAt', 'createdAt', 'localStatus', 'purgedAt']);
 
 const toComparableValue = (value: unknown): unknown => {
     if (Array.isArray(value)) {
@@ -534,6 +534,12 @@ const chooseDeterministicWinner = <T>(localItem: T, incomingItem: T): T => {
     const incomingSignature = toComparableSignature(incomingItem);
     if (localSignature === incomingSignature) return incomingItem;
     return incomingSignature > localSignature ? incomingItem : localItem;
+};
+
+const parseMergeTimestamp = (value: unknown): number => {
+    if (typeof value !== 'string') return -1;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : -1;
 };
 
 function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; deletedAt?: string }>(
@@ -587,10 +593,8 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
         if (!localItem || !incomingItem) continue;
 
-        const localTime = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-        const incomingTime = incomingItem.updatedAt ? new Date(incomingItem.updatedAt).getTime() : 0;
-        const safeLocalTime = isNaN(localTime) ? 0 : localTime;
-        const safeIncomingTime = isNaN(incomingTime) ? 0 : incomingTime;
+        const safeLocalTime = parseMergeTimestamp(localItem.updatedAt);
+        const safeIncomingTime = parseMergeTimestamp(incomingItem.updatedAt);
         const localRev = typeof (localItem as any).rev === 'number' && Number.isFinite((localItem as any).rev)
             ? (localItem as any).rev as number
             : 0;
@@ -623,8 +627,7 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
         }
         const withinSkew = Math.abs(timeDiff) <= CLOCK_SKEW_THRESHOLD_MS;
         const resolveOperationTime = (item: T): number => {
-            const updatedTimeRaw = item.updatedAt ? new Date(item.updatedAt).getTime() : NaN;
-            const updatedTime = Number.isFinite(updatedTimeRaw) ? updatedTimeRaw : 0;
+            const updatedTime = parseMergeTimestamp(item.updatedAt);
             if (!item.deletedAt) return updatedTime;
 
             const deletedTimeRaw = new Date(item.deletedAt).getTime();

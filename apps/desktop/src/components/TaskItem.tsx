@@ -1,5 +1,6 @@
 import { useState, memo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import {
+    DEFAULT_PROJECT_COLOR,
     Task,
     TaskEditorFieldId,
     type Recurrence,
@@ -325,7 +326,6 @@ export const TaskItem = memo(function TaskItem({
         setEditingTaskId(task.id);
     }, [effectiveReadOnly, isEditing, resetEditState, setEditingTaskId, task.id]);
 
-    const DEFAULT_PROJECT_COLOR = '#94a3b8';
     const handleCreateProject = useCallback(async (title: string) => {
         const trimmed = title.trim();
         if (!trimmed) return null;
@@ -515,8 +515,24 @@ export const TaskItem = memo(function TaskItem({
             try {
                 const created = await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
                 resolvedProjectId = created?.id;
+                if (!resolvedProjectId) {
+                    const projectCreateFailed = t('projects.createFailed');
+                    showToast(
+                        projectCreateFailed === 'projects.createFailed'
+                            ? 'Failed to create project from quick add.'
+                            : projectCreateFailed,
+                        'error'
+                    );
+                }
             } catch (error) {
                 reportError('Failed to create project from quick add', error);
+                const projectCreateFailed = t('projects.createFailed');
+                showToast(
+                    projectCreateFailed === 'projects.createFailed'
+                        ? 'Failed to create project from quick add.'
+                        : projectCreateFailed,
+                    'error'
+                );
             }
         }
         if (!resolvedProjectId) {
@@ -735,8 +751,8 @@ export const TaskItem = memo(function TaskItem({
                 className={cn(
                     "group rounded-lg hover:bg-muted/50 dark:hover:bg-muted/20 transition-colors animate-in fade-in slide-in-from-bottom-2",
                     isCompact ? "p-2.5" : "px-3 py-3",
-                    isSelected && "ring-2 ring-primary/40 bg-primary/5",
-                    isHighlighted && "ring-2 ring-primary/70 bg-primary/5"
+                    isSelected && "ring-2 ring-inset ring-primary/40 bg-primary/5",
+                    isHighlighted && "ring-2 ring-inset ring-primary/70 bg-primary/5"
                 )}
             >
                 <div className={cn("flex items-start", isCompact ? "gap-2" : "gap-3")}>

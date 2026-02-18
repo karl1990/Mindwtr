@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Linux Build + Snap + AUR
     timeout-minutes: 90
 
@@ -74,6 +74,68 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Repair AppImage metadata
+        run: |
+          set -euo pipefail
+
+          mapfile -t APPIMAGES < <(find apps/desktop/src-tauri/target/release/bundle/appimage -maxdepth 1 -type f -name '*.AppImage' | sort)
+          if [ "${#APPIMAGES[@]}" -eq 0 ]; then
+            echo "No AppImage found, skipping repair."
+            exit 0
+          fi
+
+          RUNNER_ARCH="$(uname -m)"
+          case "$RUNNER_ARCH" in
+            amd64) RUNNER_ARCH="x86_64" ;;
+            arm64) RUNNER_ARCH="aarch64" ;;
+          esac
+
+          TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          TOOL_WORKDIR="$(mktemp -d)"
+          METAINFO_SOURCE="$GITHUB_WORKSPACE/apps/desktop/src-tauri/linux/Mindwtr.metainfo.xml"
+          curl -fsSL "$TOOL_URL" -o "$TOOL_WORKDIR/appimagetool.AppImage"
+          chmod +x "$TOOL_WORKDIR/appimagetool.AppImage"
+          (
+            cd "$TOOL_WORKDIR"
+            ./appimagetool.AppImage --appimage-extract >/dev/null
+          )
+          APPIMAGETOOL="$TOOL_WORKDIR/squashfs-root/AppRun"
+
+          for APPIMAGE_PATH in "${APPIMAGES[@]}"; do
+            echo "Checking AppImage: $APPIMAGE_PATH"
+            APP_WORKDIR="$(mktemp -d)"
+            cp "$APPIMAGE_PATH" "$APP_WORKDIR/original.AppImage"
+            chmod +x "$APP_WORKDIR/original.AppImage"
+
+            (
+              cd "$APP_WORKDIR"
+              ./original.AppImage --appimage-extract >/dev/null
+              mv squashfs-root appdir
+
+              if [ ! -e appdir/.DirIcon ]; then
+                cp "$GITHUB_WORKSPACE/apps/desktop/src-tauri/icons/128x128.png" appdir/.DirIcon
+                echo "Injected missing .DirIcon"
+              else
+                echo ".DirIcon already present"
+              fi
+
+              if [ -f "$METAINFO_SOURCE" ]; then
+                mkdir -p appdir/usr/share/metainfo
+                cp "$METAINFO_SOURCE" appdir/usr/share/metainfo/Mindwtr.metainfo.xml
+                echo "Injected AppStream metainfo"
+              fi
+
+              ARCH="$RUNNER_ARCH" "$APPIMAGETOOL" appdir fixed.AppImage
+            )
+
+            cp "$APP_WORKDIR/fixed.AppImage" "$APPIMAGE_PATH"
+            chmod +x "$APPIMAGE_PATH"
+            rm -rf "$APP_WORKDIR"
+          done
+
+          rm -rf "$TOOL_WORKDIR"
+        shell: bash
 
       - name: Normalize deb filename for packaging
         run: |

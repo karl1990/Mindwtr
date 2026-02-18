@@ -1,5 +1,5 @@
 import { ArrowRight, BookOpen, CheckCircle, ChevronLeft, Clock, Trash2, User, X } from 'lucide-react';
-import type { Area, Project, Task } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, type Area, type Project, type Task } from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 import { ProjectSelector } from './ui/ProjectSelector';
@@ -246,7 +246,7 @@ export function InboxProcessingWizard({
                                         }
                                     }}
                                     onCreateProject={async (title) => {
-                                        const created = await addProject(title, '#94a3b8');
+                                        const created = await addProject(title, DEFAULT_PROJECT_COLOR);
                                         return created?.id ?? null;
                                     }}
                                     placeholder={t('process.project')}
@@ -635,7 +635,7 @@ export function InboxProcessingWizard({
                                             handleSetProject(existing.id);
                                             return;
                                         }
-                                        const created = await addProject(title, '#94a3b8');
+                                        const created = await addProject(title, DEFAULT_PROJECT_COLOR);
                                         if (!created) return;
                                         handleSetProject(created.id);
                                         setProjectSearch('');
@@ -649,7 +649,7 @@ export function InboxProcessingWizard({
                                         onClick={async () => {
                                             const title = projectSearch.trim();
                                             if (!title) return;
-                                            const created = await addProject(title, '#94a3b8');
+                                            const created = await addProject(title, DEFAULT_PROJECT_COLOR);
                                             if (!created) return;
                                             handleSetProject(created.id);
                                             setProjectSearch('');

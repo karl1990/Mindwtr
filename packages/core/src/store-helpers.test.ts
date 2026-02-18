@@ -15,21 +15,21 @@ const createTask = (id: string, projectId: string, orderNum: number): Task => ({
 });
 
 describe('getNextProjectOrder', () => {
-    it('increments cached project order values across repeated calls', () => {
+    it('returns deterministic next project order without mutating shared cache', () => {
         const tasks = [
             createTask('t1', 'project-1', 0),
             createTask('t2', 'project-1', 1),
         ];
 
         expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
-        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(3);
-        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(4);
+        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
+        expect(getNextProjectOrder('project-1', tasks, 101)).toBe(2);
     });
 
-    it('starts from zero for unseen projects and increments subsequent calls', () => {
+    it('starts from zero for unseen projects on repeated calls', () => {
         const tasks = [createTask('t1', 'project-1', 0)];
 
         expect(getNextProjectOrder('project-2', tasks, 202)).toBe(0);
-        expect(getNextProjectOrder('project-2', tasks, 202)).toBe(1);
+        expect(getNextProjectOrder('project-2', tasks, 202)).toBe(0);
     });
 });

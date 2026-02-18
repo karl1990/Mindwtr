@@ -1,4 +1,4 @@
-import type { Area, Project, Task } from '@mindwtr/core';
+import { DEFAULT_AREA_COLOR, type Area, type Project, type Task } from '@mindwtr/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2 } from 'lucide-react';
@@ -39,7 +39,7 @@ export function SortableAreaRow({
             </button>
             <input
                 type="color"
-                value={area.color || '#94a3b8'}
+                value={area.color || DEFAULT_AREA_COLOR}
                 onChange={(e) => onUpdateColor(area.id, e.target.value)}
                 className="w-8 h-8 rounded cursor-pointer border-0 p-0"
                 title={t('projects.color')}

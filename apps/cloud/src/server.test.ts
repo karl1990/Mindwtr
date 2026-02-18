@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { __cloudTestUtils, startCloudServer } from './server';
@@ -12,6 +12,16 @@ describe('cloud server utils', () => {
         const token = __cloudTestUtils.getToken(req);
         expect(token).toBe('demo-token');
         expect(__cloudTestUtils.tokenToKey(token!)).toHaveLength(64);
+
+        const shortTokenReq = new Request('http://localhost/v1/data', {
+            headers: { Authorization: 'Bearer short' },
+        });
+        expect(__cloudTestUtils.getToken(shortTokenReq)).toBeNull();
+
+        const tokenWithWhitespaceReq = new Request('http://localhost/v1/data', {
+            headers: { Authorization: 'Bearer token with spaces' },
+        });
+        expect(__cloudTestUtils.getToken(tokenWithWhitespaceReq)).toBeNull();
     });
 
     test('parses optional auth token allowlist', () => {
@@ -141,7 +151,9 @@ describe('cloud server utils', () => {
     test('normalizes attachment paths with allowlist and segment checks', () => {
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('folder/file.txt')).toBe('folder/file.txt');
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('/folder/file.txt/')).toBe('folder/file.txt');
+        expect(__cloudTestUtils.normalizeAttachmentRelativePath('%2e%2e/secret')).toBeNull();
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('%252e%252e/secret')).toBeNull();
+        expect(__cloudTestUtils.normalizeAttachmentRelativePath('%25252e%25252e/secret')).toBeNull();
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('../secret')).toBeNull();
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('folder\\\\file.txt')).toBeNull();
         expect(__cloudTestUtils.normalizeAttachmentRelativePath('folder/file?.txt')).toBeNull();
@@ -265,6 +277,29 @@ describe('cloud server api', () => {
         expect(missingResponse.status).toBe(404);
     });
 
+    test('rejects attachment uploads when target path is a symlink', async () => {
+        const token = 'integration-token';
+        const key = __cloudTestUtils.tokenToKey(token);
+        const attachmentDir = join(dataDir, key, 'attachments', 'folder');
+        mkdirSync(attachmentDir, { recursive: true });
+
+        const outsideDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-outside-'));
+        const outsideFile = join(outsideDir, 'outside.bin');
+        writeFileSync(outsideFile, 'original');
+        const symlinkPath = join(attachmentDir, 'link.bin');
+        symlinkSync(outsideFile, symlinkPath);
+
+        const putResponse = await fetch(`${baseUrl}/v1/attachments/folder/link.bin`, {
+            method: 'PUT',
+            headers: authHeaders,
+            body: new TextEncoder().encode('attacker-data'),
+        });
+        expect(putResponse.status).toBe(400);
+        expect(readFileSync(outsideFile, 'utf8')).toBe('original');
+
+        rmSync(outsideDir, { recursive: true, force: true });
+    });
+
     test('applies attachment endpoint rate limits', async () => {
         stopServer?.();
         const server = await startCloudServer({
@@ -292,6 +327,41 @@ describe('cloud server api', () => {
             body: new TextEncoder().encode('b'),
         });
         expect(second.status).toBe(429);
+    });
+
+    test('rate limits /v1/data by method and route', async () => {
+        stopServer?.();
+        const server = await startCloudServer({
+            host: '127.0.0.1',
+            port: 0,
+            dataDir,
+            windowMs: 60_000,
+            maxPerWindow: 1,
+            allowedAuthTokens: new Set(['integration-token']),
+        });
+        baseUrl = `http://127.0.0.1:${server.port}`;
+        stopServer = server.stop;
+
+        const getResponse = await fetch(`${baseUrl}/v1/data`, {
+            headers: authHeaders,
+        });
+        expect(getResponse.status).toBe(200);
+
+        const putResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                tasks: [],
+                projects: [],
+                sections: [],
+                areas: [],
+                settings: {},
+            }),
+        });
+        expect(putResponse.status).toBe(200);
     });
 
     test('serializes concurrent task writes without dropping records', async () => {

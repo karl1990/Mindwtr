@@ -404,117 +404,119 @@ export function BoardView() {
 
     return (
         <ErrorBoundary>
-            <div className="h-full overflow-x-auto overflow-y-hidden">
-                <div className="px-4 pb-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold tracking-tight">{t('board.title')}</h2>
-                        <span className="text-xs text-muted-foreground">
-                            {filteredTasks.length} {t('common.tasks')}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {hasProjectFilters && (
+            <div className="flex h-full min-h-0 flex-col">
+                <div className="shrink-0 px-4 pb-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-bold tracking-tight">{t('board.title')}</h2>
+                            <span className="text-xs text-muted-foreground">
+                                {filteredTasks.length} {t('common.tasks')}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {hasProjectFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearProjectFilters}
+                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    {t('filters.clear')}
+                                </button>
+                            )}
                             <button
                                 type="button"
-                                onClick={clearProjectFilters}
+                                onClick={() => setBoardFilters({ open: !boardFilters.open })}
                                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                             >
-                                {t('filters.clear')}
+                                {showFiltersPanel ? t('filters.hide') : t('filters.show')}
                             </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setBoardFilters({ open: !boardFilters.open })}
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            {showFiltersPanel ? t('filters.hide') : t('filters.show')}
-                        </button>
+                        </div>
                     </div>
+
+                    {showFiltersPanel && (
+                        <div className="mt-3 bg-card border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                <Filter className="w-4 h-4" />
+                                {t('filters.projects')}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleProjectFilter(NO_PROJECT_FILTER)}
+                                    aria-pressed={selectedProjectIds.includes(NO_PROJECT_FILTER)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                        selectedProjectIds.includes(NO_PROJECT_FILTER)
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                                    }`}
+                                >
+                                    {t('taskEdit.noProjectOption')}
+                                </button>
+                                {sortedProjects.map((project) => {
+                                    const isActive = selectedProjectIds.includes(project.id);
+                                    const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
+                                    return (
+                                        <button
+                                            key={project.id}
+                                            type="button"
+                                            onClick={() => toggleProjectFilter(project.id)}
+                                            aria-pressed={isActive}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-2 ${
+                                                isActive
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                                            }`}
+                                        >
+                                            <span
+                                                className="w-2 h-2 rounded-full"
+                                                style={{ backgroundColor: projectColor || "#6B7280" }}
+                                            />
+                                            <span className="truncate max-w-[140px]">{project.title}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {showFiltersPanel && (
-                    <div className="mt-3 bg-card border border-border rounded-lg p-3 space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                            <Filter className="w-4 h-4" />
-                            {t('filters.projects')}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                onClick={() => toggleProjectFilter(NO_PROJECT_FILTER)}
-                                aria-pressed={selectedProjectIds.includes(NO_PROJECT_FILTER)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                    selectedProjectIds.includes(NO_PROJECT_FILTER)
-                                        ? "bg-primary text-primary-foreground"
-                                        : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                                }`}
-                            >
-                                {t('taskEdit.noProjectOption')}
-                            </button>
-                            {sortedProjects.map((project) => {
-                                const isActive = selectedProjectIds.includes(project.id);
-                                const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
-                                return (
-                                    <button
-                                        key={project.id}
-                                        type="button"
-                                        onClick={() => toggleProjectFilter(project.id)}
-                                        aria-pressed={isActive}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-2 ${
-                                            isActive
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                                        }`}
-                                    >
-                                        <span
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: projectColor || "#6B7280" }}
-                                        />
-                                        <span className="truncate max-w-[140px]">{project.title}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="flex gap-4 h-full min-w-full pb-4 px-4">
-                <DndContext
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    collisionDetection={closestCorners}
-                    sensors={sensors}
-                >
-                    {COLUMNS.map((col) => (
-                        <DroppableColumn
-                            key={col.id}
-                            id={col.id}
-                            label={col.label}
-                            tasks={getColumnTasks(col.id)}
-                            emptyState={getEmptyState(col.id)}
-                            onQuickAdd={openQuickAdd}
-                            dragLabel={t('board.dragTask') || 'Drag task'}
-                            compact={isCompact}
-                        />
-                    ))}
-
-                    <DragOverlay>
-                        {activeTask ? (
-                            <div className="w-80 rotate-3 cursor-grabbing">
-                                <TaskItem
-                                    task={activeTask}
-                                    showStatusSelect={false}
-                                    showProjectBadgeInActions={false}
-                                    actionsOverlay
-                                    showHoverHint={false}
+                <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+                    <div className="flex gap-4 h-full min-w-full pb-4 px-4">
+                        <DndContext
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                            collisionDetection={closestCorners}
+                            sensors={sensors}
+                        >
+                            {COLUMNS.map((col) => (
+                                <DroppableColumn
+                                    key={col.id}
+                                    id={col.id}
+                                    label={col.label}
+                                    tasks={getColumnTasks(col.id)}
+                                    emptyState={getEmptyState(col.id)}
+                                    onQuickAdd={openQuickAdd}
+                                    dragLabel={t('board.dragTask') || 'Drag task'}
+                                    compact={isCompact}
                                 />
-                            </div>
-                        ) : null}
-                    </DragOverlay>
-                </DndContext>
-            </div>
+                            ))}
+
+                            <DragOverlay>
+                                {activeTask ? (
+                                    <div className="w-80 rotate-3 cursor-grabbing">
+                                        <TaskItem
+                                            task={activeTask}
+                                            showStatusSelect={false}
+                                            showProjectBadgeInActions={false}
+                                            actionsOverlay
+                                            showHoverHint={false}
+                                        />
+                                    </div>
+                                ) : null}
+                            </DragOverlay>
+                        </DndContext>
+                    </div>
+                </div>
             </div>
         </ErrorBoundary>
     );

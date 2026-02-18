@@ -40,6 +40,13 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
          style="height: 50px"
          height="50" />
   </a>
+  <a href="https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr" target="_blank">
+    <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroidButtonGreyBorder_nofont.png"
+         align="center"
+         alt="Get it on IzzyOnDroid"
+         style="height: 50px"
+         height="50" />
+  </a>
   <a href="https://snapcraft.io/mindwtr" target="_blank">
     <img alt="Get it from the Snap Store"
          src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"
@@ -241,6 +248,14 @@ brew install --cask mindwtr
 <a href="https://play.google.com/store/apps/details?id=tech.dongdongbh.mindwtr">
   <img src="https://img.shields.io/badge/Google_Play-Install-414141?logo=googleplay&logoColor=white" alt="Get it on Google Play">
 </a>
+<a href="https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr">
+  <img src="https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/tech.dongdongbh.mindwtr&label=IzzyOnDroid" alt="IzzyOnDroid">
+</a>
+
+Install with IzzyOnDroid:
+1. Install an F-Droid-compatible client (Droid-ify, Neo Store, or F-Droid).
+2. Add the IzzyOnDroid repository: `https://apt.izzysoft.de/fdroid/repo`.
+3. Open [Mindwtr on IzzyOnDroid](https://apt.izzysoft.de/fdroid/index/apk/tech.dongdongbh.mindwtr) and install.
 
 Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/releases).
 
@@ -271,7 +286,7 @@ Mindwtr is shaped by its users and contributors. Thank you for helping improve i
 
 ### :hearts: Contributing & Support
 
-If you want to get involved, start with [CONTRIBUTING.md](CONTRIBUTING.md).
+If you want to get involved, start with [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 You can help in several ways:
 
@@ -280,9 +295,10 @@ You can help in several ways:
 3. **Share on social platforms:** Post about Mindwtr on [X](https://twitter.com/intent/tweet?text=I%20like%20Mindwtr%20https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr), [Reddit](https://www.reddit.com/submit?url=https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr&title=I%20like%20Mindwtr), or [LinkedIn](https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fgithub.com%2Fdongdongbh%2FMindwtr&title=I%20like%20Mindwtr).
 4. **Report bugs and request features:** Open issues on [GitHub Issues](https://github.com/dongdongbh/Mindwtr/issues).
 5. **Join the community chat:** Come to [Discord](https://discord.gg/ahhFxuDBb4).
-6. **Contribute code/docs:** Open a pull request and follow the [contribution guide](docs/CONTRIBUTING.md) and commit conventions.
-7. **Pick and build:** Community members are welcome to pick any item in the [Roadmap](#roadmap) or any open issue and submit a PR.
-8. **Sponsor the project:** Support ongoing development via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
+6. **Help with translations:** Contribute locale updates in [`packages/core/src/i18n/locales/`](packages/core/src/i18n/locales/).
+7. **Contribute code/docs:** Open a pull request and follow the [contribution guide](docs/CONTRIBUTING.md) and commit conventions.
+8. **Pick and build:** Community members are welcome to pick any item in the [Roadmap](#roadmap) or any open issue and submit a PR.
+9. **Sponsor the project:** Support ongoing development via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
 
 ## Roadmap
 
@@ -300,3 +316,4 @@ You can help in several ways:
 - 🚀 [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
 - ❓ [FAQ](https://github.com/dongdongbh/Mindwtr/wiki/FAQ)
 - 🔄 [Data & Sync](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
+- 📝 [Release Notes Index](docs/release-notes/README.md)

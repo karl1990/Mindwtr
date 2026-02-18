@@ -32,6 +32,7 @@
 * [[Data and Sync]]
 * [[Sync Algorithm]]
 * [[Cloud Sync]]
+* [[Cloud Deployment]]
 * [[Local API]]
 * [[MCP Server]]
 * [[Web App PWA]]

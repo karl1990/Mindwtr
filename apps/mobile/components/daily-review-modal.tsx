@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
     useTaskStore,
@@ -42,6 +42,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     const { isDark } = useTheme();
     const { t } = useLanguage();
     const tc = useThemeColors();
+    const insets = useSafeAreaInsets();
 
     const [currentStep, setCurrentStep] = useState<DailyReviewStep>('intro');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -423,7 +424,16 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
                 <View style={styles.content}>{renderStep()}</View>
 
                 {currentStep !== 'intro' && currentStep !== 'complete' && (
-                    <View style={[styles.footer, { borderTopColor: tc.border, backgroundColor: tc.cardBg }]}>
+                    <View
+                        style={[
+                            styles.footer,
+                            {
+                                borderTopColor: tc.border,
+                                backgroundColor: tc.cardBg,
+                                paddingBottom: 14 + Math.max(insets.bottom, 8),
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             onPress={back}
                             disabled={currentIndex === 0}

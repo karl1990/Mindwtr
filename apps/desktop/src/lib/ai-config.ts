@@ -1,4 +1,4 @@
-import type { AIProviderId } from '@mindwtr/core';
+import type { AIProviderId, AppData } from '@mindwtr/core';
 import { buildAIConfig, buildCopilotConfig, getAIKeyStorageKey } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
 import { logError } from './app-log';
@@ -127,6 +127,11 @@ export async function saveAIKey(provider: AIProviderId, value: string): Promise<
         }
     }
     await saveLocalKey(provider, value);
+}
+
+export function isAIKeyRequired(settings: AppData['settings'] | undefined): boolean {
+    const config = buildAIConfig(settings ?? {}, '');
+    return !(config.provider === 'openai' && Boolean(config.endpoint));
 }
 
 export { buildAIConfig, buildCopilotConfig };

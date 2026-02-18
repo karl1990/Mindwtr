@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppData } from '@mindwtr/core';
 import { createAIProvider, type AIProviderId } from '@mindwtr/core';
-import { buildCopilotConfig, loadAIKey } from '../../../lib/ai-config';
+import { buildCopilotConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
 
 type CopilotSuggestion = { context?: string; tags?: string[] };
 
@@ -15,6 +15,7 @@ type UseListCopilotArgs = {
 export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }: UseListCopilotArgs) {
     const aiEnabled = settings?.ai?.enabled === true;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
+    const keyRequired = isAIKeyRequired(settings);
     const [aiKey, setAiKey] = useState('');
     const [copilotSuggestion, setCopilotSuggestion] = useState<CopilotSuggestion | null>(null);
     const [copilotApplied, setCopilotApplied] = useState(false);
@@ -37,7 +38,7 @@ export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }:
     }, [aiProvider]);
 
     useEffect(() => {
-        if (!aiEnabled || !aiKey) {
+        if (!aiEnabled || (keyRequired && !aiKey)) {
             setCopilotSuggestion(null);
             return;
         }
@@ -75,7 +76,7 @@ export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }:
                 copilotAbortRef.current = null;
             }
         };
-    }, [aiEnabled, aiKey, newTaskTitle, allContexts, allTags, settings]);
+    }, [aiEnabled, aiKey, allContexts, allTags, keyRequired, newTaskTitle, settings]);
 
     const applyCopilotSuggestion = useCallback((suggestion: CopilotSuggestion | null) => {
         if (!suggestion) return;

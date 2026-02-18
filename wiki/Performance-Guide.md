@@ -18,6 +18,24 @@ This page documents practical performance patterns for Mindwtr (desktop, mobile,
 4. Use virtualization for large lists and avoid dynamic height recalculation in hot paths.
 5. Avoid creating new inline callbacks/objects in large mapped lists.
 
+### Rendering Optimization Playbook
+
+When a screen feels slow, use this order:
+
+1. Verify list item render count first (React DevTools profiler).
+2. Hoist static constants/styles out of render functions.
+3. Memoize heavy child components (`React.memo`) with explicit prop equality where needed.
+4. Split large components by concern (header/form/list/modals) so state updates stay localized.
+5. Replace broad dependency arrays with smaller memoized selectors/helpers.
+
+### FlatList / Virtualization Tuning (Mobile)
+
+- Set `initialNumToRender`, `maxToRenderPerBatch`, `windowSize` intentionally by screen.
+- Provide `getItemLayout` where practical (fixed or measured fallback).
+- Enable `removeClippedSubviews` for larger lists.
+- Keep `keyExtractor` stable and avoid index keys.
+- Avoid inline anonymous renderers in deeply nested item trees.
+
 ## Sync Performance Guidance
 
 1. Validate payload shape before merge to fail fast.
@@ -25,6 +43,24 @@ This page documents practical performance patterns for Mindwtr (desktop, mobile,
 3. Reconcile attachment metadata first; defer file IO/network to separate sync phase.
 4. Bound retries with backoff and classify retryable vs terminal errors.
 5. Cache backend config reads during a sync cycle to reduce repeated storage access.
+
+### Sync Tuning Tips
+
+1. Keep attachment upload/download concurrency conservative on mobile networks.
+2. Tune timeout and retry windows separately for metadata vs attachments.
+3. Abort quickly on offline transitions; avoid long retry chains after connectivity loss.
+4. Use progress instrumentation for long-running attachment phases.
+5. Track conflict count, max clock skew, and timestamp adjustments per sync run.
+
+### Sync Debug Checklist
+
+If sync latency regresses:
+
+1. Compare local read, merge, remote write, and attachment phases separately.
+2. Verify rate-limit responses (`429`) are not causing cascaded retries.
+3. Check attachment hash validation/retries for repeated failures.
+4. Confirm remote payload size and collection counts are within configured limits.
+5. Capture log samples with timestamps and request IDs around slow windows.
 
 ## Database Guidance
 
@@ -46,6 +82,13 @@ This page documents practical performance patterns for Mindwtr (desktop, mobile,
 - Search requests should be sub-100ms on typical local datasets.
 - Sync merge should scale linearly with entity count.
 - Avoid blocking UI threads with file/network operations.
+
+## Continuous Performance Hygiene
+
+1. Add targeted tests when fixing regressions (render churn, merge complexity, retry behavior).
+2. Keep budget checks in CI for critical views and sync paths.
+3. Prefer small measurable improvements over broad speculative refactors.
+4. Re-profile after each optimization to verify real impact.
 
 ## Related docs
 

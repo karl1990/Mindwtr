@@ -1402,7 +1402,17 @@ export class SyncService {
             SyncService.updateSyncStatus({ queued: true });
             return SyncService.syncInFlight;
         }
-
+        let inFlightSettled = false;
+        let resolveInFlight: ((value: { success: boolean; stats?: MergeStats; error?: string }) => void) | null = null;
+        const inFlightPromise = new Promise<{ success: boolean; stats?: MergeStats; error?: string }>((resolve) => {
+            resolveInFlight = resolve;
+        });
+        const settleInFlight = (value: { success: boolean; stats?: MergeStats; error?: string }) => {
+            if (inFlightSettled) return;
+            inFlightSettled = true;
+            resolveInFlight?.(value);
+        };
+        SyncService.syncInFlight = inFlightPromise;
         let step = 'init';
         let backend: SyncBackend = 'off';
         let syncUrl: string | undefined;
@@ -1714,7 +1724,6 @@ export class SyncService {
             return { success: false, error: `${safeMessage}${logHint}` };
         });
 
-        SyncService.syncInFlight = resultPromise;
         const result = await resultPromise;
         SyncService.syncInFlight = null;
         SyncService.updateSyncStatus({
@@ -1738,6 +1747,7 @@ export class SyncService {
                 });
         }
 
+        settleInFlight(result);
         return result;
     }
 }

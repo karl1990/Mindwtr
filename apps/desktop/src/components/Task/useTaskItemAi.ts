@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     type AppData,
     type AIProviderId,
@@ -8,7 +8,7 @@ import {
     createAIProvider,
 } from '@mindwtr/core';
 import { isTauriRuntime } from '../../lib/runtime';
-import { buildAIConfig, buildCopilotConfig, loadAIKey } from '../../lib/ai-config';
+import { buildAIConfig, buildCopilotConfig, isAIKeyRequired, loadAIKey } from '../../lib/ai-config';
 import { logWarn } from '../../lib/app-log';
 
 type TaskItemAiContext = {
@@ -52,9 +52,7 @@ export function useTaskItemAi({
     const aiEnabled = settings?.ai?.enabled === true;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
     const copilotModel = settings?.ai?.copilotModel;
-    const copilotSettings = useMemo(() => ({
-        ai: { provider: aiProvider, copilotModel },
-    }), [aiProvider, copilotModel]);
+    const keyRequired = isAIKeyRequired(settings);
 
     const [aiKey, setAiKey] = useState('');
     const [aiClarifyResponse, setAiClarifyResponse] = useState<ClarifyResponse | null>(null);
@@ -84,7 +82,7 @@ export function useTaskItemAi({
     }, [aiProvider]);
 
     useEffect(() => {
-        if (!aiEnabled || !aiKey) {
+        if (!aiEnabled || (keyRequired && !aiKey)) {
             setCopilotSuggestion(null);
             return;
         }
@@ -112,7 +110,7 @@ export function useTaskItemAi({
         const handle = setTimeout(async () => {
             try {
                 const currentContexts = editContexts.split(',').map((c) => c.trim()).filter(Boolean);
-                const provider = createAIProvider(buildCopilotConfig(copilotSettings as AppData['settings'], aiKey));
+                const provider = createAIProvider(buildCopilotConfig(settings ?? {}, aiKey));
                 const abortController = typeof AbortController === 'function' ? new AbortController() : null;
                 localAbort = abortController;
                 const previousController = copilotAbortRef.current;
@@ -150,7 +148,7 @@ export function useTaskItemAi({
                 copilotAbortRef.current = null;
             }
         };
-    }, [aiEnabled, aiKey, editTitle, editDescription, editContexts, aiProvider, copilotModel, copilotSettings, timeEstimatesEnabled, tagOptions]);
+    }, [aiEnabled, aiKey, aiProvider, copilotModel, editContexts, editDescription, editTitle, keyRequired, settings, tagOptions, timeEstimatesEnabled]);
 
     useEffect(() => {
         copilotMountedRef.current = true;
@@ -187,12 +185,12 @@ export function useTaskItemAi({
             setAiError(t('ai.disabledBody'));
             return null;
         }
-        if (!aiKey) {
+        if (keyRequired && !aiKey) {
             setAiError(t('ai.missingKeyBody'));
             return null;
         }
         return createAIProvider(buildAIConfig(settings, aiKey));
-    }, [aiEnabled, aiKey, settings, t]);
+    }, [aiEnabled, aiKey, keyRequired, settings, t]);
 
     const resetCopilotDraft = useCallback(() => {
         setCopilotApplied(false);

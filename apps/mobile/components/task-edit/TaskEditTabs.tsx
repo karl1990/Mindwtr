@@ -14,11 +14,12 @@ type TaskEditTabsProps = {
 export function TaskEditTabs({ editTab, onTabPress, scrollX, containerWidth }: TaskEditTabsProps) {
   const { t } = useLanguage();
   const tc = useThemeColors();
+  const canAnimateIndicator = containerWidth > 0 && typeof (scrollX as { interpolate?: unknown })?.interpolate === 'function';
 
   return (
     <View style={[styles.modeTabs, { borderBottomColor: tc.border, backgroundColor: tc.cardBg }]}>
       <View style={[styles.modeTabsTrack, { backgroundColor: tc.filterBg, borderColor: tc.border }]}>
-        {containerWidth > 0 && (
+        {canAnimateIndicator && (
           <Animated.View
             pointerEvents="none"
             style={[
