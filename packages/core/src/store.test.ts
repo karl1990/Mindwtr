@@ -4,16 +4,15 @@ import { safeParseDate } from './date';
 import { useTaskStore, flushPendingSave, setStorageAdapter } from './store';
 import type { StorageAdapter } from './storage';
 
-const waitForExpectation = async (assertion: () => void, timeoutMs = 1000, intervalMs = 10): Promise<void> => {
-    const startedAt = Date.now();
+const waitForExpectation = async (assertion: () => void, maxAttempts = 200): Promise<void> => {
     let lastError: unknown = null;
-    while (Date.now() - startedAt < timeoutMs) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         try {
             assertion();
             return;
         } catch (error) {
             lastError = error;
-            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+            await Promise.resolve();
         }
     }
     throw lastError ?? new Error('Timed out waiting for expectation');
