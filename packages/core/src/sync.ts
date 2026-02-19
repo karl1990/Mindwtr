@@ -632,16 +632,15 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
             const deletedTimeRaw = new Date(item.deletedAt).getTime();
             if (!Number.isFinite(deletedTimeRaw)) {
-                const fallbackDeletedTime = updatedTime;
                 invalidDeletedAtWarnings += 1;
                 if (invalidDeletedAtWarnings <= 5) {
                     logWarn('Invalid deletedAt timestamp during merge; using updatedAt fallback', {
                         scope: 'sync',
                         category: 'sync',
-                        context: { id: item.id, deletedAt: item.deletedAt, updatedAt: item.updatedAt, fallbackDeletedTime },
+                        context: { id: item.id, deletedAt: item.deletedAt, updatedAt: item.updatedAt, fallbackDeletedTime: updatedTime },
                     });
                 }
-                return Math.max(updatedTime, fallbackDeletedTime);
+                return updatedTime;
             }
 
             return Math.max(updatedTime, deletedTimeRaw);
