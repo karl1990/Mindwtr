@@ -1,0 +1,119 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { HEARTBEAT_LAST_SENT_DAY_KEY, sendDailyHeartbeat } from './analytics-heartbeat';
+
+type MemoryStore = {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+    dump: () => Record<string, string>;
+};
+
+const createMemoryStore = (initial: Record<string, string> = {}): MemoryStore => {
+    const map = new Map<string, string>(Object.entries(initial));
+    return {
+        getItem: (key: string) => map.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+            map.set(key, value);
+        },
+        dump: () => Object.fromEntries(map.entries()),
+    };
+};
+
+const fixedDate = new Date('2026-02-19T12:00:00.000Z');
+
+describe('sendDailyHeartbeat', () => {
+    it('sends heartbeat and stores last-sent day', async () => {
+        const store = createMemoryStore();
+        const fetcher = vi.fn().mockResolvedValue({ ok: true });
+
+        const sent = await sendDailyHeartbeat({
+            enabled: true,
+            endpointUrl: 'https://analytics.example.com/heartbeat',
+            distinctId: 'device-123',
+            platform: 'ios',
+            channel: 'app-store',
+            appVersion: '0.6.17',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+
+        expect(sent).toBe(true);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(store.dump()[HEARTBEAT_LAST_SENT_DAY_KEY]).toBe('2026-02-19');
+    });
+
+    it('skips when heartbeat was already sent today', async () => {
+        const store = createMemoryStore({
+            [HEARTBEAT_LAST_SENT_DAY_KEY]: '2026-02-19',
+        });
+        const fetcher = vi.fn().mockResolvedValue({ ok: true });
+
+        const sent = await sendDailyHeartbeat({
+            enabled: true,
+            endpointUrl: 'https://analytics.example.com/heartbeat',
+            distinctId: 'device-123',
+            platform: 'android',
+            channel: 'play-store',
+            appVersion: '0.6.17',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+
+        expect(sent).toBe(false);
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it('does not store sent day when server responds non-2xx', async () => {
+        const store = createMemoryStore();
+        const fetcher = vi.fn().mockResolvedValue({ ok: false });
+
+        const sent = await sendDailyHeartbeat({
+            enabled: true,
+            endpointUrl: 'https://analytics.example.com/heartbeat',
+            distinctId: 'device-123',
+            platform: 'macos',
+            channel: 'homebrew',
+            appVersion: '0.6.17',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+
+        expect(sent).toBe(false);
+        expect(store.dump()[HEARTBEAT_LAST_SENT_DAY_KEY]).toBeUndefined();
+    });
+
+    it('skips when disabled or endpoint is invalid', async () => {
+        const store = createMemoryStore();
+        const fetcher = vi.fn().mockResolvedValue({ ok: true });
+
+        const disabled = await sendDailyHeartbeat({
+            enabled: false,
+            endpointUrl: 'https://analytics.example.com/heartbeat',
+            distinctId: 'device-123',
+            platform: 'linux',
+            channel: 'aur-bin',
+            appVersion: '0.6.17',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+        const invalidUrl = await sendDailyHeartbeat({
+            enabled: true,
+            endpointUrl: 'not-a-url',
+            distinctId: 'device-123',
+            platform: 'linux',
+            channel: 'aur-bin',
+            appVersion: '0.6.17',
+            storage: store,
+            now: () => fixedDate,
+            fetcher,
+        });
+
+        expect(disabled).toBe(false);
+        expect(invalidUrl).toBe(false);
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+});
