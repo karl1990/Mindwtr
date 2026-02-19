@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
 
 // Minimal globals for Expo modules in node test env.
-// @ts-ignore
+// @ts-expect-error test-only global
 globalThis.__DEV__ = false;
-// @ts-ignore
+// @ts-expect-error test-only global
 globalThis.expo = globalThis.expo ?? {
   EventEmitter: class {
     addListener() {
