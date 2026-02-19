@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView, SectionList, Dimensions, Platform, Keyboard, ActionSheetIOS } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, Alert, Pressable, ScrollView, SectionList, Dimensions, Platform, Keyboard, ActionSheetIOS, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Area, Attachment, DEFAULT_PROJECT_COLOR, generateUUID, getAttachmentDisplayTitle, normalizeLinkAttachmentInput, Project, PRESET_TAGS, Task, TaskStatus, useTaskStore, validateAttachmentForUpload } from '@mindwtr/core';
@@ -45,6 +45,7 @@ export default function ProjectsScreen() {
   const [showReviewPicker, setShowReviewPicker] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [linkModalVisible, setLinkModalVisible] = useState(false);
+  const [imagePreviewAttachment, setImagePreviewAttachment] = useState<Attachment | null>(null);
   const [linkInput, setLinkInput] = useState('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
@@ -734,6 +735,12 @@ export default function ProjectsScreen() {
       item.id === id ? { ...item, localStatus: status } : item
     );
 
+  const isImageAttachment = useCallback((attachment: Attachment) => {
+    const mime = attachment.mimeType?.toLowerCase();
+    if (mime?.startsWith('image/')) return true;
+    return /\.(png|jpg|jpeg|gif|webp|heic|heif)$/i.test(attachment.uri);
+  }, []);
+
   const openAttachment = async (attachment: Attachment) => {
     const shouldDownload = attachment.kind === 'file'
       && attachment.cloudKey
@@ -777,6 +784,10 @@ export default function ProjectsScreen() {
       Linking.openURL(resolved.uri).catch((error) => logProjectError('Failed to open attachment URL', error));
       return;
     }
+    if (isImageAttachment(resolved)) {
+      setImagePreviewAttachment(resolved);
+      return;
+    }
 
     const available = await Sharing.isAvailableAsync().catch((error) => {
       void logWarn('[Sharing] availability check failed', {
@@ -791,6 +802,12 @@ export default function ProjectsScreen() {
       Linking.openURL(resolved.uri).catch((error) => logProjectError('Failed to open attachment URL', error));
     }
   };
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setImagePreviewAttachment(null);
+    }
+  }, [selectedProject]);
 
   const downloadAttachment = async (attachment: Attachment) => {
     if (!selectedProject) return;
@@ -1503,6 +1520,34 @@ export default function ProjectsScreen() {
         </View>
       </Modal>
       <Modal
+        visible={Boolean(imagePreviewAttachment)}
+        transparent
+        animationType="fade"
+        presentationStyle={overlayModalPresentation}
+        onRequestClose={() => setImagePreviewAttachment(null)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setImagePreviewAttachment(null)}>
+          <Pressable
+            style={[styles.previewCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={styles.previewHeader}>
+              <Text style={[styles.previewTitle, { color: tc.text }]} numberOfLines={1}>
+                {imagePreviewAttachment?.title || t('attachments.title')}
+              </Text>
+              <TouchableOpacity onPress={() => setImagePreviewAttachment(null)} style={styles.smallButton}>
+                <Text style={[styles.smallButtonText, { color: tc.secondaryText }]}>{t('common.close')}</Text>
+              </TouchableOpacity>
+            </View>
+            {imagePreviewAttachment?.uri ? (
+              <Image source={{ uri: imagePreviewAttachment.uri }} style={styles.previewImage} resizeMode="contain" />
+            ) : (
+              <Text style={[styles.helperText, { color: tc.secondaryText }]}>{t('attachments.missing')}</Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
         visible={showAreaPicker}
         transparent
         animationType="fade"
@@ -2177,6 +2222,32 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 12,
     marginTop: 14,
+  },
+  previewCard: {
+    width: '100%',
+    maxWidth: 520,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  previewTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  previewImage: {
+    width: '100%',
+    height: 360,
+    backgroundColor: '#000',
   },
   areaManagerList: {
     paddingBottom: 8,
