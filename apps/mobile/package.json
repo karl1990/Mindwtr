@@ -2,7 +2,7 @@
   "name": "mobile",
   "license": "AGPL-3.0-only",
   "main": "index.js",
-  "version": "0.6.16",
+  "version": "0.6.18",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -79,7 +79,7 @@
     "@types/react": "~19.1.0",
     "@types/react-test-renderer": "^19.1.0",
     "babel-preset-expo": "~54.0.10",
-    "eslint": "^9.25.0",
+    "eslint": "^9.39.1",
     "eslint-config-expo": "~10.0.0",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2",

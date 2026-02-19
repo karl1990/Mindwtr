@@ -176,6 +176,13 @@ export interface SavedSearch {
     groupBy?: string;
 }
 
+export interface PendingRemoteAttachmentDelete {
+    cloudKey: string;
+    title?: string;
+    attempts?: number;
+    lastErrorAt?: string;
+}
+
 import type { MergeStats, SyncHistoryEntry } from './sync';
 
 export interface AppData {
@@ -202,6 +209,7 @@ export interface AppData {
         };
         attachments?: {
             lastCleanupAt?: string;
+            pendingRemoteDeletes?: PendingRemoteAttachmentDelete[];
         };
         features?: {
             priorities?: boolean;

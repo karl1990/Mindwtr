@@ -35,12 +35,18 @@ import {
     DEFAULT_REASONING_EFFORT,
     DEFAULT_ANTHROPIC_THINKING_BUDGET,
     DEFAULT_GEMINI_THINKING_BUDGET,
+    cloudGetJson,
     generateUUID,
     getDefaultAIConfig,
+    normalizeDateFormatSetting,
+    normalizeCloudUrl,
+    normalizeWebdavUrl,
     getDefaultCopilotModel,
     getCopilotModelOptions,
     getModelOptions,
+    resolveDateLocaleTag,
     translateText,
+    webdavGetJson,
     type AIProviderId,
     type AIReasoningEffort,
     type AppData,
@@ -225,6 +231,7 @@ export default function SettingsPage() {
     }, [router]);
     const [syncPath, setSyncPath] = useState<string | null>(null);
     const [syncBackend, setSyncBackend] = useState<'file' | 'webdav' | 'cloud' | 'off'>('off');
+    const [isTestingConnection, setIsTestingConnection] = useState(false);
     const [webdavUrl, setWebdavUrl] = useState('');
     const [webdavUsername, setWebdavUsername] = useState('');
     const [webdavPassword, setWebdavPassword] = useState('');
@@ -240,6 +247,7 @@ export default function SettingsPage() {
     const [modelPicker, setModelPicker] = useState<null | 'model' | 'copilot' | 'speech'>(null);
     const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
     const [weekStartPickerOpen, setWeekStartPickerOpen] = useState(false);
+    const [dateFormatPickerOpen, setDateFormatPickerOpen] = useState(false);
     const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [syncHistoryExpanded, setSyncHistoryExpanded] = useState(false);
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
@@ -268,6 +276,7 @@ export default function SettingsPage() {
     const weeklyReviewTime = settings.weeklyReviewTime || '18:00';
     const weeklyReviewDay = Number.isFinite(settings.weeklyReviewDay) ? settings.weeklyReviewDay as number : 0;
     const weekStart = settings.weekStart === 'monday' ? 'monday' : 'sunday';
+    const dateFormat = normalizeDateFormatSetting(settings.dateFormat);
     const loggingEnabled = settings.diagnostics?.loggingEnabled === true;
     const lastSyncStats = settings.lastSyncStats ?? null;
     const syncConflictCount = (lastSyncStats?.tasks.conflicts || 0) + (lastSyncStats?.projects.conflicts || 0);
@@ -372,22 +381,10 @@ export default function SettingsPage() {
             },
         }).catch(logSettingsError);
     };
-    const localeMap: Record<Language, string> = {
-        en: 'en-US',
-        zh: 'zh-CN',
-        es: 'es-ES',
-        hi: 'hi-IN',
-        ar: 'ar',
-        de: 'de-DE',
-        ru: 'ru-RU',
-        ja: 'ja-JP',
-        fr: 'fr-FR',
-        pt: 'pt-PT',
-        ko: 'ko-KR',
-        it: 'it-IT',
-        tr: 'tr-TR',
-    };
-    const locale = localeMap[language] ?? 'en-US';
+    const systemLocale = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
+        ? Intl.DateTimeFormat().resolvedOptions().locale
+        : '';
+    const locale = resolveDateLocaleTag({ language, dateFormat, systemLocale });
     const toTimePickerDate = (time: string) => {
         const [hours, minutes] = time.split(':').map((v) => parseInt(v, 10));
         const date = new Date();
@@ -558,6 +555,12 @@ export default function SettingsPage() {
         { value: 'monday', label: t('settings.weekStartMonday') },
     ];
     const currentWeekStartLabel = weekStartOptions.find((opt) => opt.value === weekStart)?.label ?? t('settings.weekStartSunday');
+    const dateFormatOptions: { value: 'system' | 'dmy' | 'mdy'; label: string }[] = [
+        { value: 'system', label: t('settings.dateFormatSystem') },
+        { value: 'dmy', label: t('settings.dateFormatDmy') },
+        { value: 'mdy', label: t('settings.dateFormatMdy') },
+    ];
+    const currentDateFormatLabel = dateFormatOptions.find((opt) => opt.value === dateFormat)?.label ?? t('settings.dateFormatSystem');
     const openLink = (url: string) => Linking.openURL(url);
     const updateAISettings = useCallback((next: Partial<NonNullable<typeof settings.ai>>) => {
         updateSettings({ ai: { ...(settings.ai ?? {}), ...next } }).catch(logSettingsError);
@@ -1346,6 +1349,13 @@ export default function SettingsPage() {
         }
     };
 
+    const resetSyncStatusForBackendSwitch = useCallback(() => {
+        updateSettings({
+            lastSyncStatus: 'idle',
+            lastSyncError: undefined,
+        }).catch(logSettingsError);
+    }, [updateSettings]);
+
     // Set sync folder (Android) or sync file (iOS)
     const handleSetSyncPath = async () => {
         try {
@@ -1358,6 +1368,7 @@ export default function SettingsPage() {
                     setSyncPath(fileUri);
                     await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file');
                     setSyncBackend('file');
+                    resetSyncStatusForBackendSwitch();
                     Alert.alert(
                         localize('Success', '成功'),
                         localize('Sync folder set successfully', '同步文件夹已设置')
@@ -1440,6 +1451,7 @@ export default function SettingsPage() {
                 await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file');
             }
 
+            resetSyncStatusForBackendSwitch();
             const result = await performMobileSync(syncBackend === 'file' ? syncPath || undefined : undefined);
             if (result.success) {
                 const conflictCount = (result.stats?.tasks.conflicts || 0) + (result.stats?.projects.conflicts || 0);
@@ -1468,6 +1480,55 @@ export default function SettingsPage() {
             Alert.alert(localize('Error', '错误'), localize('Sync failed', '同步失败'));
         } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleTestConnection = async (backend: 'webdav' | 'cloud') => {
+        setIsTestingConnection(true);
+        try {
+            if (backend === 'webdav') {
+                if (!webdavUrl.trim() || webdavUrlError) {
+                    Alert.alert(
+                        localize('Invalid URL', '地址无效'),
+                        localize('Please enter a valid WebDAV URL (http/https).', '请输入有效的 WebDAV 地址（http/https）。')
+                    );
+                    return;
+                }
+                await webdavGetJson<unknown>(normalizeWebdavUrl(webdavUrl.trim()), {
+                    username: webdavUsername.trim(),
+                    password: webdavPassword,
+                    timeoutMs: 10_000,
+                });
+                Alert.alert(
+                    localize('Connection OK', '连接成功'),
+                    localize('WebDAV endpoint is reachable.', 'WebDAV 端点可访问。')
+                );
+                return;
+            }
+
+            if (!cloudUrl.trim() || cloudUrlError) {
+                Alert.alert(
+                    localize('Invalid URL', '地址无效'),
+                    localize('Please enter a valid self-hosted URL (http/https).', '请输入有效的自托管地址（http/https）。')
+                );
+                return;
+            }
+            await cloudGetJson<unknown>(normalizeCloudUrl(cloudUrl.trim()), {
+                token: cloudToken,
+                timeoutMs: 10_000,
+            });
+            Alert.alert(
+                localize('Connection OK', '连接成功'),
+                localize('Self-hosted endpoint is reachable.', '自托管端点可访问。')
+            );
+        } catch (error) {
+            logSettingsWarn('Sync connection test failed', error);
+            Alert.alert(
+                localize('Connection failed', '连接失败'),
+                formatError(error)
+            );
+        } finally {
+            setIsTestingConnection(false);
         }
     };
 
@@ -2127,6 +2188,56 @@ export default function SettingsPage() {
                                                 onPress={() => {
                                                     updateSettings({ weekStart: option.value }).catch(logSettingsError);
                                                     setWeekStartPickerOpen(false);
+                                                }}
+                                            >
+                                                <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
+                                                    {option.label}
+                                                </Text>
+                                                {selected && <Text style={{ color: tc.tint, fontSize: 18 }}>✓</Text>}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        </Pressable>
+                    </Modal>
+
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 12 }]}>
+                        <TouchableOpacity style={styles.settingRow} onPress={() => setDateFormatPickerOpen(true)}>
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.dateFormat')}</Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {currentDateFormatLabel}
+                                </Text>
+                            </View>
+                            <Text style={{ color: tc.secondaryText, fontSize: 18 }}>▾</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Modal
+                        transparent
+                        visible={dateFormatPickerOpen}
+                        animationType="fade"
+                        onRequestClose={() => setDateFormatPickerOpen(false)}
+                    >
+                        <Pressable style={styles.pickerOverlay} onPress={() => setDateFormatPickerOpen(false)}>
+                            <View
+                                style={[styles.pickerCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                                onStartShouldSetResponder={() => true}
+                            >
+                                <Text style={[styles.pickerTitle, { color: tc.text }]}>{t('settings.dateFormat')}</Text>
+                                <ScrollView style={styles.pickerList} contentContainerStyle={styles.pickerListContent}>
+                                    {dateFormatOptions.map((option) => {
+                                        const selected = dateFormat === option.value;
+                                        return (
+                                            <TouchableOpacity
+                                                key={option.value}
+                                                style={[
+                                                    styles.pickerOption,
+                                                    { borderColor: tc.border, backgroundColor: selected ? tc.filterBg : 'transparent' },
+                                                ]}
+                                                onPress={() => {
+                                                    updateSettings({ dateFormat: option.value }).catch(logSettingsError);
+                                                    setDateFormatPickerOpen(false);
                                                 }}
                                             >
                                                 <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
@@ -3185,7 +3296,6 @@ export default function SettingsPage() {
             'priority',
             'contexts',
             'description',
-            'textDirection',
             'tags',
             'timeEstimate',
             'recurrence',
@@ -3201,7 +3311,6 @@ export default function SettingsPage() {
             'project',
             'area',
             'description',
-            'textDirection',
             'checklist',
             'contexts',
             'dueDate',
@@ -3248,8 +3357,6 @@ export default function SettingsPage() {
                     return t('attachments.title');
                 case 'checklist':
                     return t('taskEdit.checklist');
-                case 'textDirection':
-                    return t('taskEdit.textDirectionLabel');
                 default:
                     return fieldId;
             }
@@ -3302,7 +3409,7 @@ export default function SettingsPage() {
             { id: 'basic', title: t('taskEdit.basic') || 'Basic', fields: ['status', 'project', 'area', 'dueDate'] },
             { id: 'scheduling', title: t('taskEdit.scheduling'), fields: ['startTime', 'recurrence', 'reviewAt'] },
             { id: 'organization', title: t('taskEdit.organization'), fields: ['contexts', 'tags', 'priority', 'timeEstimate'] },
-            { id: 'details', title: t('taskEdit.details'), fields: ['description', 'textDirection', 'attachments', 'checklist'] },
+            { id: 'details', title: t('taskEdit.details'), fields: ['description', 'attachments', 'checklist'] },
         ];
 
         function TaskEditorRow({
@@ -3623,6 +3730,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off').catch(logSettingsError);
                                         setSyncBackend('off');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'off' ? tc.tint : tc.secondaryText }]}>
@@ -3637,6 +3745,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file').catch(logSettingsError);
                                         setSyncBackend('file');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'file' ? tc.tint : tc.secondaryText }]}>
@@ -3650,6 +3759,7 @@ export default function SettingsPage() {
                                     ]}
                                     onPress={() => {
                                         setSyncBackend('webdav');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'webdav' ? tc.tint : tc.secondaryText }]}>
@@ -3664,6 +3774,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(logSettingsError);
                                         setSyncBackend('cloud');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'cloud' ? tc.tint : tc.secondaryText }]}>
@@ -3858,6 +3969,7 @@ export default function SettingsPage() {
                                             [WEBDAV_USERNAME_KEY, webdavUsername.trim()],
                                             [WEBDAV_PASSWORD_KEY, webdavPassword],
                                         ]).then(() => {
+                                            resetSyncStatusForBackendSwitch();
                                             Alert.alert(localize('Success', '成功'), t('settings.webdavSave'));
                                         }).catch(logSettingsError);
                                     }}
@@ -3887,6 +3999,24 @@ export default function SettingsPage() {
                                         </Text>
                                     </View>
                                     {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={() => handleTestConnection('webdav')}
+                                    disabled={isSyncing || isTestingConnection || !webdavUrl.trim() || webdavUrlError}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={localize('Test WebDAV connection', '测试 WebDAV 连接')}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: webdavUrl.trim() && !webdavUrlError ? tc.tint : tc.secondaryText }]}>
+                                            {localize('Test connection', '测试连接')}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {localize('Verify URL and credentials without syncing data', '仅验证地址和凭据，不执行数据同步')}
+                                        </Text>
+                                    </View>
+                                    {isTestingConnection && <ActivityIndicator size="small" color={tc.tint} />}
                                 </TouchableOpacity>
 
                                 <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -3992,6 +4122,7 @@ export default function SettingsPage() {
                                             [CLOUD_URL_KEY, cloudUrl.trim()],
                                             [CLOUD_TOKEN_KEY, cloudToken],
                                         ]).then(() => {
+                                            resetSyncStatusForBackendSwitch();
                                             Alert.alert(localize('Success', '成功'), t('settings.cloudSave'));
                                         }).catch(logSettingsError);
                                     }}
@@ -4021,6 +4152,24 @@ export default function SettingsPage() {
                                         </Text>
                                     </View>
                                     {isSyncing && <ActivityIndicator size="small" color={tc.tint} />}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+                                    onPress={() => handleTestConnection('cloud')}
+                                    disabled={isSyncing || isTestingConnection || !cloudUrl.trim() || cloudUrlError}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={localize('Test self-hosted connection', '测试自托管连接')}
+                                >
+                                    <View style={styles.settingInfo}>
+                                        <Text style={[styles.settingLabel, { color: cloudUrl.trim() && !cloudUrlError ? tc.tint : tc.secondaryText }]}>
+                                            {localize('Test connection', '测试连接')}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {localize('Verify URL and token without syncing data', '仅验证地址和令牌，不执行数据同步')}
+                                        </Text>
+                                    </View>
+                                    {isTestingConnection && <ActivityIndicator size="small" color={tc.tint} />}
                                 </TouchableOpacity>
 
                                 <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}>

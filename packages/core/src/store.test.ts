@@ -4,6 +4,20 @@ import { safeParseDate } from './date';
 import { useTaskStore, flushPendingSave, setStorageAdapter } from './store';
 import type { StorageAdapter } from './storage';
 
+const waitForExpectation = async (assertion: () => void, maxAttempts = 200): Promise<void> => {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+            await Promise.resolve();
+        }
+    }
+    throw lastError ?? new Error('Timed out waiting for expectation');
+};
+
 describe('TaskStore', () => {
     let mockStorage: StorageAdapter;
 
@@ -255,6 +269,19 @@ describe('TaskStore', () => {
         expect(archived?.title).toBe('Lifecycle Task Updated');
     });
 
+    it('restores deleted tasks without forcing status changes', async () => {
+        const { addTask, deleteTask, restoreTask } = useTaskStore.getState();
+        addTask('Keep Archived', { status: 'archived' });
+        const taskId = useTaskStore.getState()._allTasks[0].id;
+
+        await deleteTask(taskId);
+        await restoreTask(taskId);
+
+        const restored = useTaskStore.getState()._allTasks.find((task) => task.id === taskId);
+        expect(restored?.deletedAt).toBeUndefined();
+        expect(restored?.status).toBe('archived');
+    });
+
     it('should coalesce saves and allow immediate flush', async () => {
         const { addTask } = useTaskStore.getState();
 
@@ -315,6 +342,39 @@ describe('TaskStore', () => {
 
         const saveCalls = (mockStorage.saveData as unknown as { mock: { calls: any[][] } }).mock.calls;
         expect(saveCalls.length).toBeGreaterThanOrEqual(2);
+        const lastSaved = saveCalls[saveCalls.length - 1]?.[0];
+        expect(lastSaved.tasks).toHaveLength(1);
+        expect(lastSaved.tasks[0].title).toBe('Alpha Updated');
+    });
+
+    it('keeps flushing newer queued saves after a failed in-flight write', async () => {
+        let rejectFirstSave: ((reason?: unknown) => void) | null = null;
+        let callCount = 0;
+        mockStorage.saveData = vi.fn().mockImplementation(() => {
+            callCount += 1;
+            if (callCount === 1) {
+                return new Promise<void>((_, reject) => {
+                    rejectFirstSave = reject;
+                });
+            }
+            return Promise.resolve();
+        });
+        setStorageAdapter(mockStorage);
+
+        const { addTask, updateTask } = useTaskStore.getState();
+        addTask('Alpha');
+        await Promise.resolve();
+
+        const taskId = useTaskStore.getState().tasks[0].id;
+        updateTask(taskId, { title: 'Alpha Updated' });
+        expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
+
+        rejectFirstSave?.(new Error('disk full'));
+        await waitForExpectation(() => {
+            expect(mockStorage.saveData).toHaveBeenCalledTimes(2);
+        });
+
+        const saveCalls = (mockStorage.saveData as unknown as { mock: { calls: any[][] } }).mock.calls;
         const lastSaved = saveCalls[saveCalls.length - 1]?.[0];
         expect(lastSaved.tasks).toHaveLength(1);
         expect(lastSaved.tasks[0].title).toBe('Alpha Updated');

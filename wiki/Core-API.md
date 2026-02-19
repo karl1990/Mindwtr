@@ -352,4 +352,4 @@ translations.zh['nav.inbox'];  // '收集箱'
 
 - [[Architecture]]
 - [[Developer Guide]]
-- [[Contributing]]
+- [Contributing (Repository Guide)](https://github.com/dongdongbh/Mindwtr/blob/main/docs/CONTRIBUTING.md)

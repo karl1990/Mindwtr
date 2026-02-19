@@ -346,18 +346,12 @@ jobs:
             - Architecture: x64
               InstallerUrl: ${INSTALLER_URL}
               InstallerSha256: ${SHA_EXE}
-              Dependencies:
-                PackageDependencies:
-                  - PackageIdentifier: Microsoft.EdgeWebView2Runtime
           ManifestType: installer
           ManifestVersion: 1.10.0
           EOF
 
           INSTALLER_MANIFEST="$MANIFEST_DIR/dongdongbh.Mindwtr.installer.yaml"
-          if ! grep -q "PackageIdentifier: Microsoft.EdgeWebView2Runtime" "$INSTALLER_MANIFEST"; then
-            echo "::error::Missing Microsoft.EdgeWebView2Runtime dependency in Winget installer manifest."
-            exit 1
-          fi
+          test -s "$INSTALLER_MANIFEST"
 
           cat <<EOF | sed 's/^          //' > "$MANIFEST_DIR/dongdongbh.Mindwtr.locale.en-US.yaml"
           # yaml-language-server: \$schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
@@ -546,6 +540,10 @@ jobs:
           if [ "$STATUS" -ne 0 ]; then
             if echo "$OUTPUT" | grep -Eiq "already (at version|up[ -]?to[ -]?date)|no changes"; then
               echo "Official cask is already at version $VERSION; skipping."
+              exit 0
+            fi
+            if echo "$OUTPUT" | grep -Eiq "BrewTestBot|autobump|no_autobump"; then
+              echo "Official cask is BrewTestBot-managed; skipping manual bump."
               exit 0
             fi
             exit "$STATUS"

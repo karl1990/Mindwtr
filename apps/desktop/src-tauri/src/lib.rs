@@ -2607,6 +2607,24 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> 
     }
 }
 
+#[tauri::command]
+fn set_macos_activation_policy(app: tauri::AppHandle, accessory: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if accessory {
+            tauri::ActivationPolicy::Accessory
+        } else {
+            tauri::ActivationPolicy::Regular
+        };
+        app.set_activation_policy(policy).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (&app, accessory);
+    }
+    Ok(())
+}
+
 fn sanitize_json_text(raw: &str) -> String {
     // Strip BOM and trailing NULs (can occur with partial writes / filesystem quirks).
     let mut text = raw.trim_start_matches('\u{FEFF}').trim_end().to_string();
@@ -2856,6 +2874,7 @@ pub fn run() {
             read_sync_file,
             write_sync_file,
             set_tray_visible,
+            set_macos_activation_policy,
             get_linux_distro,
             start_audio_recording,
             stop_audio_recording,

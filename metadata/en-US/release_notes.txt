@@ -1,3 +1,4 @@
-- Stabilized iOS task editing and navigation behavior across keyboard/safe-area heavy screens.
-- Improved cross-device sync safety with stronger cloud attachment validation and race-condition fixes.
-- Added additional consent/privacy safeguards when enabling AI features.
+- Fixed stale mobile sync banner (“Conflicts resolved”) showing unexpectedly.
+- Improved App Store upload reliability when no editable App Store version exists.
+- Standardized official-build heartbeat endpoint wiring across release pipelines.
+- Kept heartbeat behavior fully silent for users on mobile.

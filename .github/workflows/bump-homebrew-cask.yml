@@ -94,5 +94,9 @@ jobs:
               echo "Official cask is already at version $VERSION; skipping."
               exit 0
             fi
+            if echo "$OUTPUT" | grep -Eiq "BrewTestBot|autobump|no_autobump"; then
+              echo "Official cask is BrewTestBot-managed; skipping manual bump."
+              exit 0
+            fi
             exit "$STATUS"
           fi

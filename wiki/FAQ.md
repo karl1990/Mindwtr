@@ -360,7 +360,7 @@ Note: This deletes local data.
 - Help with translations
 - Spread the word!
 
-See [[Contributing]].
+See the [Contributing guide](https://github.com/dongdongbh/Mindwtr/blob/main/docs/CONTRIBUTING.md).
 
 ---
 
@@ -369,4 +369,4 @@ See [[Contributing]].
 - [[Getting Started]]
 - [[GTD Overview]]
 - [[Data and Sync]]
-- [[Contributing]]
+- [Contributing (Repository Guide)](https://github.com/dongdongbh/Mindwtr/blob/main/docs/CONTRIBUTING.md)

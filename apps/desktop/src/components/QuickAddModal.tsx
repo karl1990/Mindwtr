@@ -401,7 +401,7 @@ export function QuickAddModal() {
             }
 
             const nowIso = now.toISOString();
-            const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+            const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'Pp')}`;
             const speech = settings.ai?.speechToText;
             const provider = speech?.provider ?? 'gemini';
             const model = speech?.model ?? (
@@ -578,7 +578,7 @@ export function QuickAddModal() {
     };
 
     const scheduledLabel = initialProps?.startTime
-        ? safeFormatDate(initialProps.startTime, "MMM d, HH:mm")
+        ? safeFormatDate(initialProps.startTime, 'Pp')
         : null;
 
     if (!isOpen) return null;

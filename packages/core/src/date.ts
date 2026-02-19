@@ -1,4 +1,124 @@
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO, setDefaultOptions, type Locale } from 'date-fns';
+import { ar, de, enGB, enUS, es, fr, hi, it, ja, ko, ptBR, ru, tr, zhCN } from 'date-fns/locale';
+import type { Language } from './i18n/i18n-types';
+
+export type DateFormatSetting = 'system' | 'dmy' | 'mdy' | 'ymd';
+
+const DEFAULT_LOCALE = enUS;
+const DMY_EN_REGIONS = new Set(['GB', 'IE', 'AU', 'NZ', 'ZA']);
+const DATE_LOCALE_BY_LANGUAGE: Record<Language, Locale> = {
+    en: enUS,
+    zh: zhCN,
+    es,
+    hi,
+    ar,
+    de,
+    ru,
+    ja,
+    fr,
+    pt: ptBR,
+    ko,
+    it,
+    tr,
+};
+const LOCALE_TAG_BY_LANGUAGE: Record<Language, string> = {
+    en: 'en-US',
+    zh: 'zh-CN',
+    es: 'es-ES',
+    hi: 'hi-IN',
+    ar: 'ar',
+    de: 'de-DE',
+    ru: 'ru-RU',
+    ja: 'ja-JP',
+    fr: 'fr-FR',
+    pt: 'pt-PT',
+    ko: 'ko-KR',
+    it: 'it-IT',
+    tr: 'tr-TR',
+};
+
+let activeLocale: Locale = DEFAULT_LOCALE;
+let activeDateFormatSetting: DateFormatSetting = 'system';
+
+const normalizeLocaleTag = (value?: string | null): string => String(value || '').trim().replace(/_/g, '-');
+
+const normalizeLanguage = (language?: string | null): Language => {
+    const primary = normalizeLocaleTag(language).toLowerCase().split('-')[0];
+    if (primary in DATE_LOCALE_BY_LANGUAGE) {
+        return primary as Language;
+    }
+    return 'en';
+};
+
+const resolveLocaleFromSystem = (systemLocale?: string | null, fallback: Language = 'en'): Locale => {
+    const tag = normalizeLocaleTag(systemLocale);
+    const primary = tag.toLowerCase().split('-')[0];
+    const region = tag.split('-')[1]?.toUpperCase();
+    if (primary === 'en') {
+        return region && DMY_EN_REGIONS.has(region) ? enGB : enUS;
+    }
+    if (primary in DATE_LOCALE_BY_LANGUAGE) {
+        return DATE_LOCALE_BY_LANGUAGE[primary as Language];
+    }
+    return DATE_LOCALE_BY_LANGUAGE[fallback] ?? DEFAULT_LOCALE;
+};
+
+const normalizeLocalizedFormatTokens = (formatStr: string): string => {
+    if (activeDateFormatSetting !== 'ymd') return formatStr;
+    if (!/[Pp]/.test(formatStr)) return formatStr;
+    return formatStr.replace(/P{1,4}/g, 'yyyy-MM-dd').replace(/p{1,4}/g, 'HH:mm');
+};
+
+export function normalizeDateFormatSetting(value?: string | null): DateFormatSetting {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'dmy') return 'dmy';
+    if (normalized === 'mdy') return 'mdy';
+    if (normalized === 'ymd' || normalized === 'yyyy-mm-dd' || normalized === 'iso') return 'ymd';
+    return 'system';
+}
+
+export function resolveDateLocaleTag(params: {
+    language?: string | null;
+    dateFormat?: string | null;
+    systemLocale?: string | null;
+}): string {
+    const dateFormat = normalizeDateFormatSetting(params.dateFormat);
+    const language = normalizeLanguage(params.language);
+    const systemLocale = normalizeLocaleTag(params.systemLocale);
+    if (dateFormat === 'mdy') return 'en-US';
+    if (dateFormat === 'dmy') {
+        return language === 'en' ? 'en-GB' : LOCALE_TAG_BY_LANGUAGE[language];
+    }
+    if (dateFormat === 'ymd') {
+        if (systemLocale) return systemLocale;
+        return LOCALE_TAG_BY_LANGUAGE[language] ?? 'en-US';
+    }
+    if (systemLocale) return systemLocale;
+    return LOCALE_TAG_BY_LANGUAGE[language] ?? 'en-US';
+}
+
+export function configureDateFormatting(params: {
+    language?: string | null;
+    dateFormat?: string | null;
+    systemLocale?: string | null;
+} = {}): void {
+    const language = normalizeLanguage(params.language);
+    const dateFormat = normalizeDateFormatSetting(params.dateFormat);
+    const systemLocale = normalizeLocaleTag(params.systemLocale);
+    activeDateFormatSetting = dateFormat;
+
+    if (dateFormat === 'mdy') {
+        activeLocale = enUS;
+    } else if (dateFormat === 'dmy') {
+        activeLocale = language === 'en' ? enGB : DATE_LOCALE_BY_LANGUAGE[language];
+    } else if (dateFormat === 'ymd') {
+        activeLocale = resolveLocaleFromSystem(systemLocale, language);
+    } else {
+        activeLocale = resolveLocaleFromSystem(systemLocale, language);
+    }
+
+    setDefaultOptions({ locale: activeLocale });
+}
 
 /**
  * Safely formats a date string, handling undefined, null, or invalid dates.
@@ -18,7 +138,8 @@ export function safeFormatDate(
     try {
         const date = typeof dateStr === 'string' ? safeParseDate(dateStr) : dateStr;
         if (!date || !isValid(date)) return fallback;
-        return format(date, formatStr);
+        const normalizedFormat = normalizeLocalizedFormatTokens(formatStr);
+        return format(date, normalizedFormat, { locale: activeLocale });
     } catch {
         return fallback;
     }

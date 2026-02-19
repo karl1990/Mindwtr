@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Dimensions, Image } from 'react-native';
+import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Attachment,
@@ -25,7 +25,7 @@ import {
     safeFormatDate,
     safeParseDate,
     safeParseDueDate,
-    resolveTextDirection,
+    resolveAutoTextDirection,
     getAttachmentDisplayTitle,
     normalizeLinkAttachmentInput,
     validateAttachmentForUpload,
@@ -43,7 +43,6 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { MarkdownText } from './markdown-text';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { ensureAttachmentAvailable, persistAttachmentLocally } from '../lib/attachment-sync';
-import { logError, logWarn } from '../lib/app-log';
 import { AIResponseModal, type AIResponseAction } from './ai-response-modal';
 import { styles } from './task-edit/task-edit-modal.styles';
 import { TaskEditViewTab } from './task-edit/TaskEditViewTab';
@@ -67,6 +66,18 @@ import {
 } from './task-edit/recurrence-utils';
 import { useTaskEditCopilot } from './task-edit/use-task-edit-copilot';
 import {
+    DEFAULT_CONTEXT_SUGGESTIONS,
+    DEFAULT_TASK_EDITOR_ORDER,
+    DEFAULT_TASK_EDITOR_VISIBLE,
+    getInitialWindowWidth,
+    isReleasedAudioPlayerError,
+    isValidLinkUri,
+    logTaskError,
+    logTaskWarn,
+    QUICK_TOKEN_LIMIT,
+    STATUS_OPTIONS,
+} from './task-edit/task-edit-modal.utils';
+import {
     applyMarkdownChecklistToTask,
     getActiveTokenQuery,
     parseTokenList,
@@ -82,87 +93,6 @@ interface TaskEditModalProps {
     onFocusMode?: (taskId: string) => void;
     defaultTab?: 'task' | 'view';
 }
-
-const STATUS_OPTIONS: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done'];
-const formatError = (error: unknown) => (error instanceof Error ? error.message : String(error));
-const buildTaskExtra = (message?: string, error?: unknown): Record<string, string> | undefined => {
-    const extra: Record<string, string> = {};
-    if (message) extra.message = message;
-    if (error) extra.error = formatError(error);
-    return Object.keys(extra).length ? extra : undefined;
-};
-const logTaskWarn = (message: string, error?: unknown) => {
-    void logWarn(message, { scope: 'task', extra: buildTaskExtra(undefined, error) });
-};
-const logTaskError = (message: string, error?: unknown) => {
-    const err = error instanceof Error ? error : new Error(message);
-    void logError(err, { scope: 'task', extra: buildTaskExtra(message, error) });
-};
-const isReleasedAudioPlayerError = (error: unknown): boolean => {
-    const message = formatError(error).toLowerCase();
-    return (
-        message.includes('already released')
-        || message.includes('cannot use shared object')
-        || message.includes('cannot be cast to type expo.modules.audio.audioplayer')
-    );
-};
-const isValidLinkUri = (value: string): boolean => {
-    try {
-        const parsed = new URL(value);
-        return parsed.protocol.length > 0;
-    } catch {
-        return false;
-    }
-};
-const STATUS_LABEL_FALLBACKS: Record<TaskStatus, string> = {
-    inbox: 'Inbox',
-    next: 'Next',
-    waiting: 'Waiting',
-    someday: 'Someday',
-    reference: 'Reference',
-    done: 'Done',
-    archived: 'Archived',
-};
-const QUICK_TOKEN_LIMIT = 6;
-const DEFAULT_CONTEXT_SUGGESTIONS = ['@home', '@work', '@errands', '@computer', '@phone'];
-const getInitialWindowWidth = (): number => {
-    const width = Dimensions?.get?.('window')?.width;
-    return Number.isFinite(width) && width > 0 ? Math.round(width) : 1;
-};
-
-const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
-    'status',
-    'project',
-    'section',
-    'area',
-    'priority',
-    'contexts',
-    'description',
-    'textDirection',
-    'tags',
-    'timeEstimate',
-    'recurrence',
-    'startTime',
-    'dueDate',
-    'reviewAt',
-    'attachments',
-    'checklist',
-];
-const DEFAULT_TASK_EDITOR_VISIBLE: TaskEditorFieldId[] = [
-    'status',
-    'project',
-    'section',
-    'area',
-    'description',
-    'textDirection',
-    'checklist',
-    'contexts',
-    'dueDate',
-    'priority',
-    'timeEstimate',
-];
-
-
 
 type TaskEditTab = 'task' | 'view';
 
@@ -180,7 +110,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         addArea,
         deleteTask,
     } = useTaskStore();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const tc = useThemeColors();
     const prioritiesEnabled = settings.features?.priorities === true;
     const timeEstimatesEnabled = settings.features?.timeEstimates === true;
@@ -1265,10 +1195,6 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                 return Boolean(contextInputDraft.trim());
             case 'description':
                 return Boolean(descriptionDraft.trim());
-            case 'textDirection': {
-                const direction = editedTask.textDirection ?? task?.textDirection;
-                return direction !== undefined && direction !== 'auto';
-            }
             case 'tags':
                 return Boolean(tagInputDraft.trim());
             case 'timeEstimate':
@@ -1302,7 +1228,6 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         editedTask.sectionId,
         editedTask.startTime,
         editedTask.status,
-        editedTask.textDirection,
         editedTask.timeEstimate,
         prioritiesEnabled,
         tagInputDraft,
@@ -1316,7 +1241,6 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         task?.sectionId,
         task?.startTime,
         task?.status,
-        task?.textDirection,
         task?.timeEstimate,
         timeEstimatesEnabled,
         visibleAttachments.length,
@@ -1345,7 +1269,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         [filterVisibleFields, orderFields]
     );
     const detailsFields = useMemo(
-        () => filterVisibleFields(orderFields(['description', 'textDirection', 'checklist', 'attachments'])),
+        () => filterVisibleFields(orderFields(['description', 'checklist', 'attachments'])),
         [filterVisibleFields, orderFields]
     );
 
@@ -1771,9 +1695,8 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     };
 
     const inputStyle = { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text };
-    const textDirectionValue = (editedTask.textDirection ?? 'auto') as Task['textDirection'] | 'auto';
     const combinedText = `${titleDraft ?? ''}\n${descriptionDraft ?? ''}`.trim();
-    const resolvedDirection = resolveTextDirection(combinedText, textDirectionValue);
+    const resolvedDirection = resolveAutoTextDirection(combinedText, language);
     const textDirectionStyle = {
         writingDirection: resolvedDirection,
         textAlign: resolvedDirection === 'rtl' ? 'right' : 'left',
@@ -1789,7 +1712,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     const getStatusLabel = (status: TaskStatus) => {
         const key = `status.${status}` as const;
         const translated = t(key);
-        return translated === key ? STATUS_LABEL_FALLBACKS[status] : translated;
+        return translated === key ? status : translated;
     };
     const getQuickTokenChipStyle = (active: boolean) => ([
         styles.quickTokenChip,
@@ -2367,35 +2290,6 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                             )}
                         </View>
                         {renderInlineIOSDatePicker(['review'])}
-                    </View>
-                );
-            case 'textDirection':
-                return (
-                    <View style={styles.formGroup}>
-                        <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.textDirectionLabel')}</Text>
-                        <View style={styles.statusContainer}>
-                            {([
-                                { value: 'auto', label: t('taskEdit.textDirection.auto') },
-                                { value: 'ltr', label: t('taskEdit.textDirection.ltr') },
-                                { value: 'rtl', label: t('taskEdit.textDirection.rtl') },
-                            ] as const).map((option) => {
-                                const isActive = (editedTask.textDirection ?? 'auto') === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.value}
-                                        style={getStatusChipStyle(isActive)}
-                                        onPress={() => {
-                                            setEditedTask((prev) => ({
-                                                ...prev,
-                                                textDirection: option.value,
-                                            }));
-                                        }}
-                                    >
-                                        <Text style={getStatusTextStyle(isActive)}>{option.label}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
                     </View>
                 );
             case 'description':
@@ -3022,6 +2916,58 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     );
 }
 
+type TaskEditModalErrorBoundaryProps = {
+    visible: boolean;
+    resetKey: string;
+    onClose: () => void;
+    children: React.ReactNode;
+};
+
+type TaskEditModalErrorBoundaryState = {
+    hasError: boolean;
+};
+
+class TaskEditModalErrorBoundary extends React.Component<TaskEditModalErrorBoundaryProps, TaskEditModalErrorBoundaryState> {
+    state: TaskEditModalErrorBoundaryState = { hasError: false };
+
+    static getDerivedStateFromError(): TaskEditModalErrorBoundaryState {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error: unknown) {
+        logTaskError('Task edit modal render failed', error);
+    }
+
+    componentDidUpdate(prevProps: TaskEditModalErrorBoundaryProps) {
+        if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+            this.setState({ hasError: false });
+        }
+    }
+
+    render() {
+        if (!this.state.hasError) return this.props.children;
+
+        return (
+            <Modal
+                visible={this.props.visible}
+                transparent
+                animationType="fade"
+                onRequestClose={this.props.onClose}
+            >
+                <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 16 }}>
+                    <View style={[styles.modalCard, { backgroundColor: '#111827', borderColor: '#334155' }]}>
+                        <Text style={[styles.modalTitle, { color: '#F8FAFC' }]}>Something went wrong</Text>
+                        <Text style={{ color: '#CBD5E1', marginBottom: 14 }}>The editor encountered an error and was safely closed.</Text>
+                        <TouchableOpacity style={styles.modalButton} onPress={this.props.onClose}>
+                            <Text style={[styles.modalButtonText, { color: '#93C5FD' }]}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </Modal>
+        );
+    }
+}
+
 const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModalProps): boolean => (
     prev.visible === next.visible
     && prev.task === next.task
@@ -3031,5 +2977,18 @@ const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModa
     && prev.defaultTab === next.defaultTab
 );
 
-export const TaskEditModal = React.memo(TaskEditModalInner, areTaskEditModalPropsEqual);
+const TaskEditModalWithBoundary = (props: TaskEditModalProps) => {
+    const resetKey = `${props.visible ? 'open' : 'closed'}:${props.task?.id ?? 'new'}`;
+    return (
+        <TaskEditModalErrorBoundary
+            visible={props.visible}
+            resetKey={resetKey}
+            onClose={props.onClose}
+        >
+            <TaskEditModalInner {...props} />
+        </TaskEditModalErrorBoundary>
+    );
+};
+
+export const TaskEditModal = React.memo(TaskEditModalWithBoundary, areTaskEditModalPropsEqual);
 TaskEditModal.displayName = 'TaskEditModal';

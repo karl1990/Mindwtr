@@ -4,8 +4,6 @@ import {
     Attachment,
     useTaskStore,
     MergeStats,
-    computeSha256Hex,
-    globalProgressTracker,
     findDeletedAttachmentsForFileCleanup,
     findOrphanedAttachments,
     removeOrphanedAttachmentsFromData,
@@ -48,6 +46,15 @@ import { reportError } from './report-error';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { ExternalCalendarService } from './external-calendar-service';
 import { webStorage } from './storage-adapter-web';
+import {
+    collectAttachmentsById,
+    getBaseSyncUrl,
+    getCloudBaseUrl,
+    normalizePendingRemoteDeletes,
+    reportProgress,
+    syncBasicRemoteAttachments,
+    validateAttachmentHash,
+} from './sync-attachments';
 import {
     ATTACHMENTS_DIR_NAME,
     buildCloudKey,
@@ -207,49 +214,9 @@ const cleanupAttachmentTempFiles = async (): Promise<void> => {
     }
 };
 
-const validateAttachmentHash = async (attachment: Attachment, bytes: Uint8Array): Promise<void> => {
-    const expected = attachment.fileHash;
-    if (!expected || expected.length !== 64) return;
-    const computed = await computeSha256Hex(bytes);
-    if (!computed) return;
-    if (computed.toLowerCase() !== expected.toLowerCase()) {
-        throw new Error('Integrity validation failed');
-    }
-};
-
-const reportProgress = (
-    attachmentId: string,
-    operation: 'upload' | 'download',
-    loaded: number,
-    total: number,
-    status: 'active' | 'completed' | 'failed',
-    error?: string,
-) => {
-    const percentage = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-    globalProgressTracker.updateProgress(attachmentId, {
-        operation,
-        bytesTransferred: loaded,
-        totalBytes: total,
-        percentage,
-        status,
-        error,
-    });
-};
-
-const collectAttachmentsById = (appData: AppData): Map<string, Attachment> => {
-    const attachmentsById = new Map<string, Attachment>();
-    for (const task of appData.tasks) {
-        for (const attachment of task.attachments || []) {
-            attachmentsById.set(attachment.id, attachment);
-        }
-    }
-    for (const project of appData.projects) {
-        for (const attachment of project.attachments || []) {
-            attachmentsById.set(attachment.id, attachment);
-        }
-    }
-    return attachmentsById;
-};
+type PendingRemoteAttachmentDeleteEntry = NonNullable<
+    NonNullable<AppData['settings']['attachments']>['pendingRemoteDeletes']
+>[number];
 
 const deleteAttachmentFile = async (attachment: Attachment): Promise<void> => {
     if (!attachment.uri) return;
@@ -273,12 +240,28 @@ const deleteAttachmentFile = async (attachment: Attachment): Promise<void> => {
 const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend): Promise<AppData> => {
     const orphaned = findOrphanedAttachments(appData);
     const deletedAttachments = findDeletedAttachmentsForFileCleanup(appData);
+    const previousPendingRemoteDeletes = normalizePendingRemoteDeletes(appData.settings.attachments?.pendingRemoteDeletes);
+    const previousPendingByCloudKey = new Map(previousPendingRemoteDeletes.map((item) => [item.cloudKey, item]));
     const cleanupTargets = new Map<string, Attachment>();
     for (const attachment of orphaned) cleanupTargets.set(attachment.id, attachment);
     for (const attachment of deletedAttachments) cleanupTargets.set(attachment.id, attachment);
+    const remoteCleanupTargets = new Map<string, { cloudKey: string; title: string }>();
+    for (const attachment of cleanupTargets.values()) {
+        if (!attachment.cloudKey) continue;
+        remoteCleanupTargets.set(attachment.cloudKey, {
+            cloudKey: attachment.cloudKey,
+            title: attachment.title || attachment.cloudKey,
+        });
+    }
+    for (const pending of previousPendingRemoteDeletes) {
+        remoteCleanupTargets.set(pending.cloudKey, {
+            cloudKey: pending.cloudKey,
+            title: pending.title || pending.cloudKey,
+        });
+    }
     const lastCleanupAt = new Date().toISOString();
 
-    if (cleanupTargets.size === 0) {
+    if (cleanupTargets.size === 0 && remoteCleanupTargets.size === 0) {
         await cleanupAttachmentTempFiles();
         return {
             ...appData,
@@ -287,6 +270,7 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
                 attachments: {
                     ...appData.settings.attachments,
                     lastCleanupAt,
+                    pendingRemoteDeletes: undefined,
                 },
             },
         };
@@ -308,39 +292,63 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
 
     const fetcher = await getTauriFetch();
     const webdavPassword = webdavConfig ? await resolveWebdavPassword(webdavConfig) : '';
+    const nextPendingRemoteDeletes = new Map<string, PendingRemoteAttachmentDeleteEntry>();
 
     for (const attachment of cleanupTargets.values()) {
         await deleteAttachmentFile(attachment);
-        if (attachment.cloudKey) {
-            try {
-                if (backend === 'webdav' && webdavConfig?.url) {
-                    const baseUrl = getBaseSyncUrl(webdavConfig.url);
-                    await webdavDeleteFile(`${baseUrl}/${attachment.cloudKey}`, {
-                        username: webdavConfig.username,
-                        password: webdavPassword,
-                        fetcher,
-                    });
-                } else if (backend === 'cloud' && cloudConfig?.url) {
-                    const baseUrl = getCloudBaseUrl(cloudConfig.url);
-                    await cloudDeleteFile(`${baseUrl}/${attachment.cloudKey}`, {
-                        token: cloudConfig.token,
-                        fetcher,
-                    });
-                } else if (backend === 'file' && fileBaseDir) {
-                    const { remove } = await import('@tauri-apps/plugin-fs');
-                    const { join } = await import('@tauri-apps/api/path');
-                    const targetPath = await join(fileBaseDir, attachment.cloudKey);
-                    await remove(targetPath);
-                }
-            } catch (error) {
-                logSyncWarning(`Failed to delete remote attachment ${attachment.title}`, error);
+    }
+
+    const canAttemptRemoteDelete = (
+        (backend === 'webdav' && !!webdavConfig?.url)
+        || (backend === 'cloud' && !!cloudConfig?.url)
+        || (backend === 'file' && !!fileBaseDir)
+    );
+    for (const target of remoteCleanupTargets.values()) {
+        const existing = previousPendingByCloudKey.get(target.cloudKey);
+        if (!canAttemptRemoteDelete) {
+            nextPendingRemoteDeletes.set(target.cloudKey, {
+                cloudKey: target.cloudKey,
+                title: target.title,
+                attempts: existing?.attempts ?? 0,
+                lastErrorAt: existing?.lastErrorAt,
+            });
+            continue;
+        }
+        try {
+            if (backend === 'webdav' && webdavConfig?.url) {
+                const baseUrl = getBaseSyncUrl(webdavConfig.url);
+                await webdavDeleteFile(`${baseUrl}/${target.cloudKey}`, {
+                    username: webdavConfig.username,
+                    password: webdavPassword,
+                    fetcher,
+                });
+            } else if (backend === 'cloud' && cloudConfig?.url) {
+                const baseUrl = getCloudBaseUrl(cloudConfig.url);
+                await cloudDeleteFile(`${baseUrl}/${target.cloudKey}`, {
+                    token: cloudConfig.token,
+                    fetcher,
+                });
+            } else if (backend === 'file' && fileBaseDir) {
+                const { remove } = await import('@tauri-apps/plugin-fs');
+                const { join } = await import('@tauri-apps/api/path');
+                const targetPath = await join(fileBaseDir, target.cloudKey);
+                await remove(targetPath);
             }
+        } catch (error) {
+            logSyncWarning(`Failed to delete remote attachment ${target.title}`, error);
+            nextPendingRemoteDeletes.set(target.cloudKey, {
+                cloudKey: target.cloudKey,
+                title: target.title,
+                attempts: (existing?.attempts ?? 0) + 1,
+                lastErrorAt: lastCleanupAt,
+            });
         }
     }
 
     await cleanupAttachmentTempFiles();
 
     const cleaned = orphaned.length > 0 ? removeOrphanedAttachmentsFromData(appData) : appData;
+    const pendingRemoteDeletes = Array.from(nextPendingRemoteDeletes.values());
     return {
         ...cleaned,
         settings: {
@@ -348,26 +356,10 @@ const cleanupOrphanedAttachments = async (appData: AppData, backend: SyncBackend
             attachments: {
                 ...cleaned.settings.attachments,
                 lastCleanupAt,
+                pendingRemoteDeletes: pendingRemoteDeletes.length > 0 ? pendingRemoteDeletes : undefined,
             },
         },
     };
-};
-
-const getBaseSyncUrl = (fullUrl: string): string => {
-    const trimmed = fullUrl.replace(/\/+$/, '');
-    if (trimmed.toLowerCase().endsWith('.json')) {
-        const lastSlash = trimmed.lastIndexOf('/');
-        return lastSlash >= 0 ? trimmed.slice(0, lastSlash) : trimmed;
-    }
-    return trimmed;
-};
-
-const getCloudBaseUrl = (fullUrl: string): string => {
-    const trimmed = fullUrl.replace(/\/+$/, '');
-    if (trimmed.toLowerCase().endsWith('/data')) {
-        return trimmed.slice(0, -'/data'.length);
-    }
-    return trimmed;
 };
 
 async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -712,58 +704,6 @@ async function syncAttachments(
         appData.settings = workingData.settings;
     }
     logSyncInfo('WebDAV attachment sync done', { mutated: didMutate ? 'true' : 'false' });
-    return didMutate;
-}
-
-type BasicRemoteAttachmentSyncOptions = {
-    attachmentsById: Map<string, Attachment>;
-    localFileExists: (path: string) => Promise<boolean>;
-    onUpload: (attachment: Attachment, localPath: string) => Promise<boolean>;
-    onUploadError: (attachment: Attachment, error: unknown) => void;
-    onDownload: (attachment: Attachment) => Promise<boolean>;
-    onDownloadError: (attachment: Attachment, error: unknown) => void;
-};
-
-async function syncBasicRemoteAttachments(options: BasicRemoteAttachmentSyncOptions): Promise<boolean> {
-    let didMutate = false;
-
-    for (const attachment of options.attachmentsById.values()) {
-        if (attachment.kind !== 'file') continue;
-        if (attachment.deletedAt) continue;
-
-        const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
-        const isHttp = /^https?:\/\//i.test(rawUri);
-        const localPath = isHttp ? '' : rawUri;
-        const hasLocalPath = Boolean(localPath);
-        const existsLocally = hasLocalPath ? await options.localFileExists(localPath) : false;
-
-        const nextStatus: Attachment['localStatus'] = existsLocally ? 'available' : 'missing';
-        if (attachment.localStatus !== nextStatus) {
-            attachment.localStatus = nextStatus;
-            didMutate = true;
-        }
-
-        if (!attachment.cloudKey && existsLocally) {
-            try {
-                if (await options.onUpload(attachment, localPath)) {
-                    didMutate = true;
-                }
-            } catch (error) {
-                options.onUploadError(attachment, error);
-            }
-        }
-
-        if (attachment.cloudKey && !existsLocally) {
-            try {
-                if (await options.onDownload(attachment)) {
-                    didMutate = true;
-                }
-            } catch (error) {
-                options.onDownloadError(attachment, error);
-            }
-        }
-    }
-
     return didMutate;
 }
 

@@ -1,37 +1,105 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createRequire } from 'node:module';
 
 import { SqliteAdapter, type SqliteClient } from './sqlite-adapter';
 import type { AppData } from './types';
 
-type Database = import('bun:sqlite').Database;
+const require = createRequire(import.meta.url);
+type BunStatement = {
+    run: (params?: unknown[] | unknown) => unknown;
+    all: (params?: unknown[] | unknown) => unknown[];
+    get: (params?: unknown[] | unknown) => unknown;
+};
 
-const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
-const describeBun = isBun ? describe : describe.skip;
+type NodeStatement = {
+    run: (...params: unknown[]) => unknown;
+    all: (...params: unknown[]) => unknown[];
+    get: (...params: unknown[]) => unknown;
+};
+
+type Database = {
+    exec: (sql: string) => void;
+    close: () => void;
+    query?: (sql: string) => BunStatement;
+    prepare?: (sql: string) => NodeStatement;
+};
+
+type DatabaseCtor = new (filename: string) => Database;
+
+const getStatement = (db: Database, sql: string): BunStatement | NodeStatement => {
+    if (typeof db.prepare === 'function') return db.prepare(sql);
+    if (typeof db.query === 'function') return db.query(sql);
+    throw new Error('Unsupported sqlite runtime: missing prepare/query');
+};
+
+const runSql = (db: Database, sql: string, params: unknown[] = []) => {
+    const statement = getStatement(db, sql);
+    if ('prepare' in db && typeof db.prepare === 'function') {
+        (statement as NodeStatement).run(...params);
+        return;
+    }
+    (statement as BunStatement).run(params);
+};
+
+const allSql = <T = Record<string, unknown>>(db: Database, sql: string, params: unknown[] = []): T[] => {
+    const statement = getStatement(db, sql);
+    if ('prepare' in db && typeof db.prepare === 'function') {
+        return (statement as NodeStatement).all(...params) as T[];
+    }
+    return (statement as BunStatement).all(params) as T[];
+};
+
+const getSql = <T = Record<string, unknown>>(db: Database, sql: string, params: unknown[] = []): T | undefined => {
+    const statement = getStatement(db, sql);
+    if ('prepare' in db && typeof db.prepare === 'function') {
+        return (statement as NodeStatement).get(...params) as T | undefined;
+    }
+    return (statement as BunStatement).get(params) as T | undefined;
+};
+
+const loadDatabaseCtor = (): DatabaseCtor | null => {
+    const bunGlobal = globalThis as typeof globalThis & { Bun?: unknown };
+    if (typeof bunGlobal.Bun !== 'undefined') {
+        try {
+            const mod = require('bun:sqlite') as { Database: DatabaseCtor };
+            return mod.Database;
+        } catch {
+            return null;
+        }
+    }
+    try {
+        const mod = require('node:sqlite') as { DatabaseSync: DatabaseCtor };
+        return mod.DatabaseSync;
+    } catch {
+        return null;
+    }
+};
+
+const RuntimeDatabase = loadDatabaseCtor();
+const describeSqlite = RuntimeDatabase ? describe : describe.skip;
 
 const createClient = (db: Database): SqliteClient => ({
     run: async (sql: string, params: unknown[] = []) => {
-        db.query(sql).run(params);
+        runSql(db, sql, params);
     },
     all: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
-        db.query(sql).all(params) as T[],
+        allSql<T>(db, sql, params),
     get: async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
-        db.query(sql).get(params) as T | undefined,
+        getSql<T>(db, sql, params),
     exec: async (sql: string) => {
         db.exec(sql);
     },
 });
 
-describeBun('SqliteAdapter', () => {
+describeSqlite('SqliteAdapter', () => {
     let db: Database;
     let adapter: SqliteAdapter;
-    let DatabaseCtor: typeof Database | null = null;
 
-    beforeEach(async () => {
-        if (!DatabaseCtor) {
-            const mod = await import('bun:sqlite');
-            DatabaseCtor = mod.Database;
+    beforeEach(() => {
+        if (!RuntimeDatabase) {
+            throw new Error('No compatible sqlite runtime available for tests');
         }
-        db = new DatabaseCtor(':memory:');
+        db = new RuntimeDatabase(':memory:');
         adapter = new SqliteAdapter(createClient(db));
     });
 
@@ -158,7 +226,7 @@ describeBun('SqliteAdapter', () => {
         expect(area.revBy).toBe('device-desktop');
     });
 
-    it('drops attachments with empty URIs when loading tasks', async () => {
+    it('preserves attachments with empty URIs when loading tasks', async () => {
         const now = new Date().toISOString();
         const data: AppData = {
             tasks: [
@@ -192,7 +260,9 @@ describeBun('SqliteAdapter', () => {
         const loaded = await adapter.getData();
 
         expect(loaded.tasks).toHaveLength(1);
-        expect(loaded.tasks[0].attachments).toBeUndefined();
+        expect(loaded.tasks[0].attachments).toHaveLength(1);
+        expect(loaded.tasks[0].attachments?.[0]?.id).toBe('att-empty');
+        expect(loaded.tasks[0].attachments?.[0]?.uri).toBe('   ');
     });
 
     it('adds missing task columns on older schemas', async () => {
@@ -216,7 +286,7 @@ describeBun('SqliteAdapter', () => {
 
         await adapter.ensureSchema();
 
-        const columns = db.query('PRAGMA table_info(tasks)').all() as { name: string }[];
+        const columns = allSql<{ name: string }>(db, 'PRAGMA table_info(tasks)');
         const names = columns.map((col) => col.name);
         expect(names).toContain('orderNum');
         expect(names).toContain('areaId');
@@ -225,17 +295,17 @@ describeBun('SqliteAdapter', () => {
         expect(names).toContain('rev');
         expect(names).toContain('revBy');
 
-        const projectColumns = db.query('PRAGMA table_info(projects)').all() as { name: string }[];
+        const projectColumns = allSql<{ name: string }>(db, 'PRAGMA table_info(projects)');
         const projectColumnNames = projectColumns.map((col) => col.name);
         expect(projectColumnNames).toContain('rev');
         expect(projectColumnNames).toContain('revBy');
 
-        const sectionColumns = db.query('PRAGMA table_info(sections)').all() as { name: string }[];
+        const sectionColumns = allSql<{ name: string }>(db, 'PRAGMA table_info(sections)');
         const sectionColumnNames = sectionColumns.map((col) => col.name);
         expect(sectionColumnNames).toContain('rev');
         expect(sectionColumnNames).toContain('revBy');
 
-        const areaColumns = db.query('PRAGMA table_info(areas)').all() as { name: string }[];
+        const areaColumns = allSql<{ name: string }>(db, 'PRAGMA table_info(areas)');
         const areaColumnNames = areaColumns.map((col) => col.name);
         expect(areaColumnNames).toContain('rev');
         expect(areaColumnNames).toContain('revBy');
@@ -245,10 +315,10 @@ describeBun('SqliteAdapter', () => {
         await adapter.ensureSchema();
 
         expect(() =>
-            db.query(`
+            runSql(db, `
                 INSERT INTO tasks (id, title, status, createdAt, updatedAt)
                 VALUES ('bad-status', 'Bad status', 'active', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
-            `).run()
+            `)
         ).toThrow(/invalid_task_status/i);
     });
 
@@ -256,17 +326,17 @@ describeBun('SqliteAdapter', () => {
         await adapter.ensureSchema();
 
         expect(() =>
-            db.query(`
+            runSql(db, `
                 INSERT INTO tasks (id, title, status, tags, createdAt, updatedAt)
                 VALUES ('bad-json', 'Bad json', 'next', '{invalid', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
-            `).run()
+            `)
         ).toThrow(/invalid_tasks_tags_json/i);
     });
 
     it('creates composite indexes used by sync queries', async () => {
         await adapter.ensureSchema();
 
-        const indexes = db.query(`PRAGMA index_list(tasks)`).all() as Array<{ name: string }>;
+        const indexes = allSql<{ name: string }>(db, 'PRAGMA index_list(tasks)');
         const names = new Set(indexes.map((index) => index.name));
 
         expect(names.has('idx_tasks_project_status_updatedAt')).toBe(true);
