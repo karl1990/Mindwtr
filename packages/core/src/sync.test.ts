@@ -255,6 +255,21 @@ describe('Sync Logic', () => {
             expect(attachment?.localStatus).toBe('available');
         });
 
+        it('preserves explicit empty attachment arrays', () => {
+            const localTask: Task = {
+                ...createMockTask('1', '2023-01-02'),
+                attachments: [],
+            };
+            const incomingTask: Task = {
+                ...createMockTask('1', '2023-01-03'),
+                attachments: [],
+            };
+
+            const merged = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+            expect(Array.isArray(merged.tasks[0].attachments)).toBe(true);
+            expect(merged.tasks[0].attachments).toEqual([]);
+        });
+
         it('should preserve attachment deletions using attachment timestamps', () => {
             const localAttachment: Attachment = {
                 id: 'att-1',

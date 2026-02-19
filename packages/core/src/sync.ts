@@ -755,9 +755,12 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
     };
 
     const mergeAttachments = (local?: Attachment[], incoming?: Attachment[]): Attachment[] | undefined => {
+        const hadExplicitAttachments = local !== undefined || incoming !== undefined;
         const localList = local || [];
         const incomingList = incoming || [];
-        if (localList.length === 0 && incomingList.length === 0) return undefined;
+        if (localList.length === 0 && incomingList.length === 0) {
+            return hadExplicitAttachments ? [] : undefined;
+        }
         const localById = new Map(localList.map((item) => [item.id, item]));
         const incomingById = new Map(incomingList.map((item) => [item.id, item]));
         const hasAvailableUri = (attachment?: Attachment): boolean => {
@@ -817,7 +820,8 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
             };
         });
 
-        return normalized.length > 0 ? normalized : undefined;
+        if (normalized.length > 0) return normalized;
+        return hadExplicitAttachments ? [] : undefined;
     };
 
     const tasksResult = mergeEntitiesWithStats(localNormalized.tasks, incomingNormalized.tasks, (localTask: Task, incomingTask: Task, winner: Task) => {
