@@ -22,7 +22,6 @@ import {
   isSupportedLanguage,
   generateUUID,
   sendDailyHeartbeat,
-  HEARTBEAT_LAST_SENT_DAY_KEY,
 } from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
@@ -32,7 +31,7 @@ import { SYNC_BACKEND_KEY } from '../lib/sync-constants';
 import { updateAndroidWidgetFromStore } from '../lib/widget-service';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
-import { logError, logInfo, logWarn, setupGlobalErrorLogging } from '../lib/app-log';
+import { logError, logWarn, setupGlobalErrorLogging } from '../lib/app-log';
 import { useThemeColors } from '../hooks/use-theme-colors';
 
 type AutoSyncCadence = {
@@ -132,18 +131,6 @@ const getDeviceLocale = (): string => {
   } catch {
     return '';
   }
-};
-
-const getHeartbeatSkipReason = (
-  isFossBuild: boolean,
-  isExpoGo: boolean,
-  hasHeartbeatEndpoint: boolean
-): string | null => {
-  if (isFossBuild) return 'foss-build';
-  if (isExpoGo) return 'expo-go';
-  if (__DEV__) return 'development-build';
-  if (!hasHeartbeatEndpoint) return 'missing-endpoint-url';
-  return null;
 };
 
 const isBackendMismatchedSyncConfigError = (backend: SyncBackend, errorMessage?: string): boolean => {
@@ -478,25 +465,13 @@ function RootLayoutContent() {
         const store = useTaskStore.getState();
         await store.fetchData();
         if (cancelled) return;
-        const hasHeartbeatEndpoint = analyticsHeartbeatUrl.length > 0;
-        const heartbeatSkipReason = getHeartbeatSkipReason(isFossBuild, isExpoGo, hasHeartbeatEndpoint);
-        if (heartbeatSkipReason) {
-          void logInfo('Mobile analytics heartbeat skipped', {
-            scope: 'app',
-            extra: {
-              reason: heartbeatSkipReason,
-              platform: Platform.OS,
-            },
-          });
-        } else {
+        if (!isFossBuild && !isExpoGo && !__DEV__ && analyticsHeartbeatUrl) {
           try {
             const [distinctId, channel] = await Promise.all([
               getOrCreateAnalyticsDistinctId(),
               getMobileAnalyticsChannel(isFossBuild),
             ]);
-            const todayUtc = new Date().toISOString().slice(0, 10);
-            const previousSentDay = (await AsyncStorage.getItem(HEARTBEAT_LAST_SENT_DAY_KEY) || '').trim();
-            const sent = await sendDailyHeartbeat({
+            await sendDailyHeartbeat({
               enabled: true,
               endpointUrl: analyticsHeartbeatUrl,
               distinctId,
@@ -508,21 +483,8 @@ function RootLayoutContent() {
               locale: getDeviceLocale(),
               storage: AsyncStorage,
             });
-            if (!sent) {
-              void logWarn('Mobile analytics heartbeat not sent', {
-                scope: 'app',
-                extra: {
-                  reason: previousSentDay === todayUtc ? 'already-sent-today' : 'request-failed-or-invalid-config',
-                  platform: Platform.OS,
-                  channel,
-                },
-              });
-            }
-          } catch (error) {
-            void logWarn('Mobile analytics heartbeat failed', {
-              scope: 'app',
-              extra: { error: error instanceof Error ? error.message : String(error) },
-            });
+          } catch {
+            // Keep analytics heartbeat failures silent on mobile.
           }
         }
         if (store.settings.notificationsEnabled !== false) {
