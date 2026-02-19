@@ -52,6 +52,22 @@ function App() {
     const lastSyncErrorAtRef = useRef(0);
     const [closePromptOpen, setClosePromptOpen] = useState(false);
     const [closePromptRemember, setClosePromptRemember] = useState(false);
+    const closePromptRememberRef = useRef(false);
+
+    const setClosePromptRememberValue = useCallback((next: boolean) => {
+        closePromptRememberRef.current = next;
+        setClosePromptRemember(next);
+    }, []);
+
+    const persistCloseBehavior = useCallback(async (behavior: 'tray' | 'quit') => {
+        await updateSettings({
+            window: {
+                ...(useTaskStore.getState().settings?.window ?? {}),
+                closeBehavior: behavior,
+            },
+        });
+        await flushPendingSave();
+    }, [updateSettings]);
 
     useEffect(() => {
         const normalizedTheme = mapSyncedThemeToDesktop(settingsTheme);
@@ -299,7 +315,7 @@ function App() {
                     return;
                 }
                 if (!closePromptOpen) {
-                    setClosePromptRemember(false);
+                    setClosePromptRememberValue(false);
                     setClosePromptOpen(true);
                 }
             });
@@ -310,7 +326,7 @@ function App() {
         return () => {
             if (unlisten) unlisten();
         };
-    }, [closeBehavior, closePromptOpen, hideToTray, isFlatpak, quitApp, setError, showTray]);
+    }, [closeBehavior, closePromptOpen, hideToTray, isFlatpak, quitApp, setClosePromptRememberValue, setError, showTray]);
 
     useEffect(() => {
         if (!isTauriRuntime()) return;
@@ -475,18 +491,12 @@ function App() {
                         quitLabel={translateOrFallback('settings.closeBehaviorQuit', 'Quit the app')}
                         cancelLabel={translateOrFallback('common.cancel', 'Cancel')}
                         remember={closePromptRemember}
-                        onRememberChange={setClosePromptRemember}
+                        onRememberChange={setClosePromptRememberValue}
                         onCancel={() => setClosePromptOpen(false)}
                         onStay={() => {
                             const apply = async () => {
-                                if (closePromptRemember) {
-                                    await updateSettings({
-                                        window: {
-                                            ...(useTaskStore.getState().settings?.window ?? {}),
-                                            closeBehavior: 'tray',
-                                        },
-                                    });
-                                    await flushPendingSave();
+                                if (closePromptRememberRef.current) {
+                                    await persistCloseBehavior('tray');
                                 }
                                 setClosePromptOpen(false);
                                 await hideToTray();
@@ -498,14 +508,8 @@ function App() {
                         }}
                         onQuit={() => {
                             const apply = async () => {
-                                if (closePromptRemember) {
-                                    await updateSettings({
-                                        window: {
-                                            ...(useTaskStore.getState().settings?.window ?? {}),
-                                            closeBehavior: 'quit',
-                                        },
-                                    });
-                                    await flushPendingSave();
+                                if (closePromptRememberRef.current) {
+                                    await persistCloseBehavior('quit');
                                 }
                                 setClosePromptOpen(false);
                                 await quitApp();

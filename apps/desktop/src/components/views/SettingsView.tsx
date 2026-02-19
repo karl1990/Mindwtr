@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import {
     DEFAULT_ANTHROPIC_THINKING_BUDGET,
+    flushPendingSave,
     safeFormatDate,
     useTaskStore,
     type AppData,
@@ -433,17 +434,19 @@ export function SettingsView() {
                 closeBehavior: behavior,
             },
         })
+            .then(() => flushPendingSave())
             .then(showSaved)
             .catch((error) => reportError('Failed to update close behavior', error));
     }, [settings?.window, showSaved, updateSettings]);
 
-    const handleTrayVisibleChange = useCallback(async (visible: boolean) => {
+    const handleTrayVisibleChange = useCallback((visible: boolean) => {
         updateSettings({
             window: {
                 ...(settings?.window ?? {}),
                 showTray: visible,
             },
         })
+            .then(() => flushPendingSave())
             .then(showSaved)
             .catch((error) => reportError('Failed to update tray visibility setting', error));
     }, [settings?.window, showSaved, updateSettings]);
