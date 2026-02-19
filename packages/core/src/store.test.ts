@@ -4,6 +4,21 @@ import { safeParseDate } from './date';
 import { useTaskStore, flushPendingSave, setStorageAdapter } from './store';
 import type { StorageAdapter } from './storage';
 
+const waitForExpectation = async (assertion: () => void, timeoutMs = 1000, intervalMs = 10): Promise<void> => {
+    const startedAt = Date.now();
+    let lastError: unknown = null;
+    while (Date.now() - startedAt < timeoutMs) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+    }
+    throw lastError ?? new Error('Timed out waiting for expectation');
+};
+
 describe('TaskStore', () => {
     let mockStorage: StorageAdapter;
 
@@ -356,7 +371,7 @@ describe('TaskStore', () => {
         expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
 
         rejectFirstSave?.(new Error('disk full'));
-        await vi.waitFor(() => {
+        await waitForExpectation(() => {
             expect(mockStorage.saveData).toHaveBeenCalledTimes(2);
         });
 

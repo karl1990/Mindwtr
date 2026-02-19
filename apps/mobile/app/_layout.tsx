@@ -653,7 +653,8 @@ function RootLayoutContent() {
           </Stack>
           {syncStatusBanner && (
             <View
-              accessibilityRole="status"
+              accessibilityRole="text"
+              accessibilityLiveRegion="polite"
               style={{
                 position: 'absolute',
                 top: 8,

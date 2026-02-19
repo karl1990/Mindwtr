@@ -1,10 +1,20 @@
 import { vi } from 'vitest';
 
 // Minimal globals for Expo modules in node test env.
-// @ts-expect-error test-only global
-globalThis.__DEV__ = false;
-// @ts-expect-error test-only global
-globalThis.expo = globalThis.expo ?? {
+const testGlobal = globalThis as typeof globalThis & {
+  __DEV__?: boolean;
+  expo?: {
+    EventEmitter: new () => {
+      addListener: () => { remove: () => void };
+      removeAllListeners: () => void;
+      emit: () => void;
+    };
+    modules: Record<string, unknown>;
+  };
+};
+
+testGlobal.__DEV__ = false;
+testGlobal.expo = testGlobal.expo ?? {
   EventEmitter: class {
     addListener() {
       return { remove: () => {} };
