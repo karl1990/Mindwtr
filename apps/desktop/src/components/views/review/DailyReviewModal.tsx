@@ -407,13 +407,13 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div className="bg-card border border-border rounded-lg p-3 space-y-2">
                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    {safeFormatDate(today, 'MMM d')} · {t('calendar.events')}
+                                    {safeFormatDate(today, 'P')} · {t('calendar.events')}
                                 </h4>
                                 {renderCalendarEventList(todayCalendarEvents)}
                             </div>
                             <div className="bg-card border border-border rounded-lg p-3 space-y-2">
                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    {safeFormatDate(tomorrow, 'MMM d')} · {t('calendar.events')}
+                                    {safeFormatDate(tomorrow, 'P')} · {t('calendar.events')}
                                 </h4>
                                 {renderCalendarEventList(tomorrowCalendarEvents)}
                             </div>

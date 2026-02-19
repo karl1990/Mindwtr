@@ -3,6 +3,8 @@ import {
     buildCaptureExtra,
     getCaptureFileExtension,
     getCaptureMimeType,
+    normalizeContextToken,
+    parseContextQueryTokens,
 } from './quick-capture-sheet.utils';
 
 describe('quick-capture utils', () => {
@@ -25,5 +27,19 @@ describe('quick-capture utils', () => {
             error: 'boom',
         });
         expect(buildCaptureExtra()).toBeUndefined();
+    });
+
+    it('normalizes context tokens with @ prefix', () => {
+        expect(normalizeContextToken(' @Work ')).toBe('@Work');
+        expect(normalizeContextToken('＠home')).toBe('@home');
+        expect(normalizeContextToken('')).toBe('');
+    });
+
+    it('parses context query tokens with dedupe', () => {
+        expect(parseContextQueryTokens(' @work,home,@Work,, ＠errands ')).toEqual([
+            '@work',
+            '@home',
+            '@errands',
+        ]);
     });
 });

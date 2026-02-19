@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { safeFormatDate, safeParseDate, isDueForReview } from './date';
+import { safeFormatDate, safeParseDate, isDueForReview, normalizeDateFormatSetting, resolveDateLocaleTag } from './date';
 
 describe('date utils', () => {
     it('parses date-only strings as local dates', () => {
@@ -27,6 +27,20 @@ describe('date utils', () => {
         expect(formatted).toBe('2025-01-02');
         const fallback = safeFormatDate('not-a-date', 'yyyy-MM-dd', 'fallback');
         expect(fallback).toBe('fallback');
+    });
+
+    it('normalizes date format settings safely', () => {
+        expect(normalizeDateFormatSetting('dmy')).toBe('dmy');
+        expect(normalizeDateFormatSetting('mdy')).toBe('mdy');
+        expect(normalizeDateFormatSetting('yyyy-MM-dd')).toBe('ymd');
+        expect(normalizeDateFormatSetting('unknown')).toBe('system');
+    });
+
+    it('resolves locale tags from language + format preferences', () => {
+        expect(resolveDateLocaleTag({ language: 'en', dateFormat: 'dmy', systemLocale: 'en-US' })).toBe('en-GB');
+        expect(resolveDateLocaleTag({ language: 'en', dateFormat: 'mdy', systemLocale: 'en-GB' })).toBe('en-US');
+        expect(resolveDateLocaleTag({ language: 'de', dateFormat: 'ymd', systemLocale: 'de-DE' })).toBe('de-DE');
+        expect(resolveDateLocaleTag({ language: 'de', dateFormat: 'system', systemLocale: 'de-DE' })).toBe('de-DE');
     });
 
     it('detects when a review date is due', () => {

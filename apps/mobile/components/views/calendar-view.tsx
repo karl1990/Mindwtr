@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   safeParseDate,
   safeParseDueDate,
+  normalizeDateFormatSetting,
+  resolveDateLocaleTag,
   translateText,
   type ExternalCalendarEvent,
   type ExternalCalendarSubscription,
@@ -87,22 +89,14 @@ export function CalendarView() {
   const weekStartIndex = settings?.weekStart === 'monday' ? 1 : 0;
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth, weekStartIndex);
-  const localeMap: Record<typeof language, string> = {
-    en: 'en-US',
-    zh: 'zh-CN',
-    es: 'es-ES',
-    hi: 'hi-IN',
-    ar: 'ar',
-    de: 'de-DE',
-    ru: 'ru-RU',
-    ja: 'ja-JP',
-    fr: 'fr-FR',
-    pt: 'pt-PT',
-    ko: 'ko-KR',
-    it: 'it-IT',
-    tr: 'tr-TR',
-  };
-  const locale = localeMap[language] ?? 'en-US';
+  const systemLocale = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
+    ? Intl.DateTimeFormat().resolvedOptions().locale
+    : '';
+  const locale = resolveDateLocaleTag({
+    language,
+    dateFormat: normalizeDateFormatSetting(settings?.dateFormat),
+    systemLocale,
+  });
   const monthLabel = new Date(currentYear, currentMonth, 1).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',

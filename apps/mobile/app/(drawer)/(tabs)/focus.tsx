@@ -182,7 +182,7 @@ export default function FocusScreen() {
               />
             )}
             <Text style={[styles.dateText, { color: tc.secondaryText }]}>
-              {format(new Date(), 'EEEE, MMMM do')}
+              {format(new Date(), 'PPPP')}
             </Text>
           </View>
         )}

@@ -197,7 +197,7 @@ export function TaskItemDisplay({
                 <MetadataBadge
                     variant="info"
                     icon={ArrowRight}
-                    label={safeFormatDate(task.startTime, hasTimeComponent(task.startTime) ? 'MMM d, HH:mm' : 'MMM d')}
+                    label={safeFormatDate(task.startTime, hasTimeComponent(task.startTime) ? 'Pp' : 'P')}
                 />
             )}
             {task.dueDate && (
@@ -205,7 +205,7 @@ export function TaskItemDisplay({
                     <MetadataBadge
                         variant="info"
                         icon={CalendarIcon}
-                        label={safeFormatDate(task.dueDate, hasTimeComponent(task.dueDate) ? 'MMM d, HH:mm' : 'MMM d')}
+                        label={safeFormatDate(task.dueDate, hasTimeComponent(task.dueDate) ? 'Pp' : 'P')}
                         className={cn(getUrgencyColor(task), isStagnant && "text-muted-foreground/70")}
                     />
                     {isStagnant && (

@@ -3,6 +3,7 @@ import type { Language } from '../../../contexts/language-context';
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
 type DensityMode = 'comfortable' | 'compact';
 type WeekStart = 'sunday' | 'monday';
+type DateFormatSetting = 'system' | 'dmy' | 'mdy';
 
 type Labels = {
     appearance: string;
@@ -20,6 +21,10 @@ type Labels = {
     weekStart: string;
     weekStartSunday: string;
     weekStartMonday: string;
+    dateFormat: string;
+    dateFormatSystem: string;
+    dateFormatDmy: string;
+    dateFormatMdy: string;
     keybindings: string;
     keybindingsDesc: string;
     keybindingVim: string;
@@ -48,6 +53,8 @@ type SettingsMainPageProps = {
     onLanguageChange: (lang: Language) => void;
     weekStart: WeekStart;
     onWeekStartChange: (weekStart: WeekStart) => void;
+    dateFormat: DateFormatSetting;
+    onDateFormatChange: (format: DateFormatSetting) => void;
     keybindingStyle: 'vim' | 'emacs';
     onKeybindingStyleChange: (style: 'vim' | 'emacs') => void;
     onOpenHelp: () => void;
@@ -123,6 +130,8 @@ export function SettingsMainPage({
     onLanguageChange,
     weekStart,
     onWeekStartChange,
+    dateFormat,
+    onDateFormatChange,
     keybindingStyle,
     onKeybindingStyleChange,
     onOpenHelp,
@@ -203,6 +212,26 @@ export function SettingsMainPage({
                     >
                         <option value="sunday">{t.weekStartSunday}</option>
                         <option value="monday">{t.weekStartMonday}</option>
+                    </select>
+                </SettingsRow>
+                <SettingsRow
+                    title={t.dateFormat}
+                    description={
+                        dateFormat === 'dmy'
+                            ? t.dateFormatDmy
+                            : dateFormat === 'mdy'
+                                ? t.dateFormatMdy
+                                : t.dateFormatSystem
+                    }
+                >
+                    <select
+                        value={dateFormat}
+                        onChange={(e) => onDateFormatChange(e.target.value as DateFormatSetting)}
+                        className={selectCls}
+                    >
+                        <option value="system">{t.dateFormatSystem}</option>
+                        <option value="dmy">{t.dateFormatDmy}</option>
+                        <option value="mdy">{t.dateFormatMdy}</option>
                     </select>
                 </SettingsRow>
             </SettingsCard>

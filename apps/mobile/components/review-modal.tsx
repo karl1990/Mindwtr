@@ -463,7 +463,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                 {days.map((day) => (
                     <View key={day.dayStart.toISOString()} style={[styles.calendarDayCard, { borderColor: tc.border }]}>
                         <Text style={[styles.calendarDayTitle, { color: tc.secondaryText }]}>
-                            {safeFormatDate(day.dayStart, 'EEE, MMM d')} · {day.totalCount}
+                            {safeFormatDate(day.dayStart, 'PP')} · {day.totalCount}
                         </Text>
                         {day.events.map((event) => {
                             const start = safeParseDate(event.start);
@@ -504,7 +504,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                             {entry.task.title}
                         </Text>
                         <Text style={[styles.calendarEventMeta, { color: tc.secondaryText }]}>
-                            {(entry.kind === 'due' ? labels.dueLabel : labels.startLabel)} · {safeFormatDate(entry.date, 'MMM d, HH:mm')}
+                            {(entry.kind === 'due' ? labels.dueLabel : labels.startLabel)} · {safeFormatDate(entry.date, 'Pp')}
                         </Text>
                     </View>
                 ))}

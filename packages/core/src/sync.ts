@@ -377,7 +377,21 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
     const incomingPrefsWins = isIncomingNewer(localPrefsAt, incomingPrefsAt);
     const mergedPrefs = incomingPrefsWins ? incomingPrefs : localPrefs;
 
-    merged.syncPreferences = mergedPrefs;
+    const cloneSettingValue = <T>(value: T): T => {
+        if (Array.isArray(value)) {
+            return value.map((item) => cloneSettingValue(item)) as unknown as T;
+        }
+        if (value && typeof value === 'object') {
+            const cloned: Record<string, unknown> = {};
+            for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+                cloned[key] = cloneSettingValue(item);
+            }
+            return cloned as T;
+        }
+        return value;
+    };
+
+    merged.syncPreferences = cloneSettingValue(mergedPrefs);
     if (incomingPrefsWins) {
         if (incomingPrefsAt) nextSyncUpdatedAt.preferences = incomingPrefsAt;
     } else if (localPrefsAt) {
@@ -389,10 +403,10 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
         return JSON.stringify(left) === JSON.stringify(right);
     };
     const chooseGroupFieldValue = <T>(localValue: T, incomingValue: T, incomingWins: boolean): T => {
-        if (incomingValue === undefined) return localValue;
-        if (localValue === undefined) return incomingValue;
-        if (isSameValue(localValue, incomingValue)) return localValue;
-        return incomingWins ? incomingValue : localValue;
+        if (incomingValue === undefined) return cloneSettingValue(localValue);
+        if (localValue === undefined) return cloneSettingValue(incomingValue);
+        if (isSameValue(localValue, incomingValue)) return cloneSettingValue(localValue);
+        return cloneSettingValue(incomingWins ? incomingValue : localValue);
     };
     const mergeRecordFields = <T extends Record<string, unknown>>(localValue: T, incomingValue: T, incomingWins: boolean): T => {
         const mergedValue: Record<string, unknown> = {};
@@ -417,7 +431,7 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
         const resolvedValue = mergeValues
             ? mergeValues(localValue, incomingValue, incomingWins)
             : (incomingWins ? incomingValue : localValue);
-        apply(resolvedValue, incomingWins);
+        apply(cloneSettingValue(resolvedValue), incomingWins);
         const winnerAt = incomingWins ? incomingAt : localAt;
         if (winnerAt) nextSyncUpdatedAt[key] = winnerAt;
     };
@@ -632,16 +646,15 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
             const deletedTimeRaw = new Date(item.deletedAt).getTime();
             if (!Number.isFinite(deletedTimeRaw)) {
-                const fallbackDeletedTime = updatedTime;
                 invalidDeletedAtWarnings += 1;
                 if (invalidDeletedAtWarnings <= 5) {
                     logWarn('Invalid deletedAt timestamp during merge; using updatedAt fallback', {
                         scope: 'sync',
                         category: 'sync',
-                        context: { id: item.id, deletedAt: item.deletedAt, updatedAt: item.updatedAt, fallbackDeletedTime },
+                        context: { id: item.id, deletedAt: item.deletedAt, updatedAt: item.updatedAt, fallbackDeletedTime: updatedTime },
                     });
                 }
-                return Math.max(updatedTime, fallbackDeletedTime);
+                return updatedTime;
             }
 
             return Math.max(updatedTime, deletedTimeRaw);
@@ -756,9 +769,12 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
     };
 
     const mergeAttachments = (local?: Attachment[], incoming?: Attachment[]): Attachment[] | undefined => {
+        const hadExplicitAttachments = local !== undefined || incoming !== undefined;
         const localList = local || [];
         const incomingList = incoming || [];
-        if (localList.length === 0 && incomingList.length === 0) return undefined;
+        if (localList.length === 0 && incomingList.length === 0) {
+            return hadExplicitAttachments ? [] : undefined;
+        }
         const localById = new Map(localList.map((item) => [item.id, item]));
         const incomingById = new Map(incomingList.map((item) => [item.id, item]));
         const hasAvailableUri = (attachment?: Attachment): boolean => {
@@ -818,7 +834,8 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeR
             };
         });
 
-        return normalized.length > 0 ? normalized : undefined;
+        if (normalized.length > 0) return normalized;
+        return hadExplicitAttachments ? [] : undefined;
     };
 
     const tasksResult = mergeEntitiesWithStats(localNormalized.tasks, incomingNormalized.tasks, (localTask: Task, incomingTask: Task, winner: Task) => {

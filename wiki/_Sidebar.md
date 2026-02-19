@@ -51,7 +51,7 @@
 * [[Deployment Guide]]
 * [[Testing Strategy]]
 * [[Performance Guide]]
-* [[Contributing]]
+* [Contributing (Repository Guide)](https://github.com/dongdongbh/Mindwtr/blob/main/docs/CONTRIBUTING.md)
 
 ---
 

@@ -232,6 +232,11 @@ function parseAllowedAuthTokens(rawValue?: string): Set<string> | null {
     return tokens.length > 0 ? new Set(tokens) : null;
 }
 
+function parseBoolEnv(value: string | undefined): boolean {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 function resolveAllowedAuthTokensFromEnv(env: Record<string, string | undefined>): Set<string> | null {
     const values = [
         env.MINDWTR_CLOUD_AUTH_TOKENS,
@@ -239,7 +244,12 @@ function resolveAllowedAuthTokensFromEnv(env: Record<string, string | undefined>
     ]
         .map((value) => String(value || '').trim())
         .filter((value) => value.length > 0);
-    if (values.length === 0) return null;
+    if (values.length === 0) {
+        if (parseBoolEnv(env.MINDWTR_CLOUD_ALLOW_ANY_TOKEN)) return null;
+        throw new Error(
+            'Cloud auth is not configured. Set MINDWTR_CLOUD_AUTH_TOKENS (or legacy MINDWTR_CLOUD_TOKEN), or explicitly set MINDWTR_CLOUD_ALLOW_ANY_TOKEN=true to enable token namespace mode.'
+        );
+    }
     return parseAllowedAuthTokens(values.join(','));
 }
 
@@ -448,6 +458,7 @@ export const __cloudTestUtils = {
     getToken,
     tokenToKey,
     parseAllowedAuthTokens,
+    parseBoolEnv,
     resolveAllowedAuthTokensFromEnv,
     isAuthorizedToken,
     toRateLimitRoute,
@@ -524,8 +535,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     if (allowedAuthTokens) {
         logInfo('token auth allowlist enabled', { allowedTokens: String(allowedAuthTokens.size) });
     } else {
-        logInfo('token namespace mode enabled (no auth allowlist)', {
-            hint: 'set MINDWTR_CLOUD_AUTH_TOKENS to enforce bearer authentication (or legacy MINDWTR_CLOUD_TOKEN)',
+        logInfo('token namespace mode enabled by explicit opt-in', {
+            hint: 'set MINDWTR_CLOUD_AUTH_TOKENS to enforce a strict token allowlist',
         });
     }
     if (!ensureWritableDir(dataDir)) {
@@ -696,6 +707,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
                         }
                         if (!body || typeof body !== 'object') return errorResponse('Invalid JSON body');
+                        if (typeof (body as any).title === 'string' && (body as any).title.length > MAX_TASK_TITLE_LENGTH) {
+                            return errorResponse(`Task title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+                        }
 
                         return await withWriteLock(key, async () => {
                             const data = loadAppData(filePath);

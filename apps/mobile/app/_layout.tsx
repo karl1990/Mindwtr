@@ -14,7 +14,15 @@ import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quic
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
-import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage, generateUUID, sendDailyHeartbeat } from '@mindwtr/core';
+import {
+  configureDateFormatting,
+  setStorageAdapter,
+  useTaskStore,
+  flushPendingSave,
+  isSupportedLanguage,
+  generateUUID,
+  sendDailyHeartbeat,
+} from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
 import { performMobileSync } from '../lib/sync-service';
@@ -145,7 +153,7 @@ function RootLayoutContent() {
   const router = useRouter();
   const { isDark, isReady: themeReady } = useTheme();
   const tc = useThemeColors();
-  const { language, setLanguage, isReady: languageReady } = useLanguage();
+  const { language, setLanguage, isReady: languageReady, t } = useLanguage();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const extraConfig = Constants.expoConfig?.extra as MobileExtraConfig | undefined;
   const isFossBuild = parseBool(extraConfig?.isFossBuild);
@@ -155,6 +163,7 @@ function RootLayoutContent() {
   const [storageWarningShown, setStorageWarningShown] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const settingsLanguage = useTaskStore((state) => state.settings?.language);
+  const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -313,6 +322,14 @@ function RootLayoutContent() {
   }, [language, settingsLanguage, setLanguage]);
 
   useEffect(() => {
+    configureDateFormatting({
+      language: settingsLanguage || language,
+      dateFormat: settingsDateFormat,
+      systemLocale: getDeviceLocale(),
+    });
+  }, [language, settingsDateFormat, settingsLanguage]);
+
+  useEffect(() => {
     if (!hasShareIntent) return;
     const sharedText =
       typeof shareIntent?.text === 'string'
@@ -447,11 +464,8 @@ function RootLayoutContent() {
               locale: getDeviceLocale(),
               storage: AsyncStorage,
             });
-          } catch (error) {
-            void logWarn('Mobile analytics heartbeat failed', {
-              scope: 'app',
-              extra: { error: error instanceof Error ? error.message : String(error) },
-            });
+          } catch {
+            // Keep analytics heartbeat failures silent on mobile.
           }
         }
         if (store.settings.notificationsEnabled !== false) {
@@ -531,7 +545,6 @@ function RootLayoutContent() {
   }, []);
 
   const isAppReady = isDataLoaded && themeReady && languageReady;
-
   useEffect(() => {
     if (!isAppReady) return;
     if (typeof SplashScreen?.hideAsync === 'function') {
@@ -617,8 +630,6 @@ function RootLayoutContent() {
           </Stack>
           <StatusBar
             barStyle={isDark ? 'light-content' : 'dark-content'}
-            backgroundColor={tc.cardBg}
-            translucent={false}
           />
         </NavigationThemeProvider>
       </QuickCaptureProvider>

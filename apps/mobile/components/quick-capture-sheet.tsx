@@ -17,30 +17,11 @@ import {
   buildCaptureExtra,
   getCaptureFileExtension,
   getCaptureMimeType,
+  normalizeContextToken,
+  parseContextQueryTokens,
 } from './quick-capture-sheet.utils';
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
-const normalizeContextToken = (token: string): string => {
-  const trimmed = token.trim();
-  if (!trimmed) return '';
-  const stripped = trimmed.replace(/^[@＠]+/, '');
-  if (!stripped) return '';
-  return `@${stripped}`;
-};
-const parseContextQueryTokens = (value: string): string[] => {
-  const parts = value.split(',');
-  const seen = new Set<string>();
-  const tokens: string[] = [];
-  for (const part of parts) {
-    const normalized = normalizeContextToken(part);
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    tokens.push(normalized);
-  }
-  return tokens;
-};
 
 const logCaptureWarn = (message: string, error?: unknown) => {
   void logWarn(message, { scope: 'capture', extra: buildCaptureExtra(undefined, error) });
@@ -700,7 +681,7 @@ export function QuickCaptureSheet({
         }
         const now = new Date();
         const nowIso = now.toISOString();
-        const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+        const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'Pp')}`;
         const speech = settings.ai?.speechToText;
         const provider = speech?.provider ?? 'gemini';
         const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
@@ -885,7 +866,7 @@ export function QuickCaptureSheet({
         logCaptureWarn('Audio info lookup failed', error);
       }
       const nowIso = now.toISOString();
-      const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'MMM d, HH:mm')}`;
+      const displayTitle = `${t('quickAdd.audioNoteTitle')} ${safeFormatDate(now, 'Pp')}`;
       const speech = settings.ai?.speechToText;
       const provider = speech?.provider ?? 'gemini';
       const model = speech?.model ?? (provider === 'openai' ? 'gpt-4o-transcribe' : provider === 'gemini' ? 'gemini-2.5-flash' : 'whisper-tiny');
@@ -1051,7 +1032,7 @@ export function QuickCaptureSheet({
   }, [autoRecord, recording, recordingBusy, startRecording, visible]);
 
   const selectedProject = projectId ? projects.find((project) => project.id === projectId) : null;
-  const dueLabel = dueDate ? safeFormatDate(dueDate, 'MMM d') : t('taskEdit.dueDateLabel');
+  const dueLabel = dueDate ? safeFormatDate(dueDate, 'P') : t('taskEdit.dueDateLabel');
   const contextLabel = contextTags.length === 0
     ? t('taskEdit.contextsLabel')
     : `${contextTags[0].replace(/^@+/, '')}${contextTags.length > 1 ? ` +${contextTags.length - 1}` : ''}`;
@@ -1152,6 +1133,8 @@ export function QuickCaptureSheet({
               style={[styles.optionChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
               onPress={openDueDatePicker}
               onLongPress={() => setDueDate(null)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('taskEdit.dueDate')}: ${dueLabel}`}
             >
               <CalendarDays size={16} color={tc.text} />
               <Text style={[styles.optionText, { color: tc.text }]} numberOfLines={1}>{dueLabel}</Text>
@@ -1161,6 +1144,8 @@ export function QuickCaptureSheet({
               style={[styles.optionChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
               onPress={() => setShowContextPicker(true)}
               onLongPress={() => setContextTags([])}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('taskEdit.contextsLabel')}: ${contextLabel}`}
             >
               <AtSign size={16} color={tc.text} />
               <Text style={[styles.optionText, { color: tc.text }]} numberOfLines={1}>{contextLabel}</Text>
@@ -1170,6 +1155,8 @@ export function QuickCaptureSheet({
               style={[styles.optionChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
               onPress={() => setShowProjectPicker(true)}
               onLongPress={() => setProjectId(null)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('taskEdit.project')}: ${projectLabel}`}
             >
               <Folder size={16} color={tc.text} />
               <Text style={[styles.optionText, { color: tc.text }]} numberOfLines={1}>{projectLabel}</Text>
@@ -1180,6 +1167,8 @@ export function QuickCaptureSheet({
                 style={[styles.optionChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
                 onPress={() => setShowPriorityPicker(true)}
                 onLongPress={() => setPriority(null)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('taskEdit.priorityLabel')}: ${priorityLabel}`}
               >
                 <Flag size={16} color={tc.text} />
                 <Text style={[styles.optionText, { color: tc.text }]} numberOfLines={1}>{priorityLabel}</Text>
@@ -1194,6 +1183,7 @@ export function QuickCaptureSheet({
                 onValueChange={setAddAnother}
                 thumbColor={addAnother ? tc.tint : tc.border}
                 trackColor={{ false: tc.border, true: `${tc.tint}55` }}
+                accessibilityLabel={t('quickAdd.addAnother')}
               />
               <Text style={[styles.toggleText, { color: tc.text }]}>{t('quickAdd.addAnother')}</Text>
             </View>
@@ -1201,6 +1191,8 @@ export function QuickCaptureSheet({
               onPress={handleSave}
               style={[styles.saveButton, { backgroundColor: tc.tint, opacity: value.trim() ? 1 : 0.5 }]}
               disabled={!value.trim()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.save')}
             >
               <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>

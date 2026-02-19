@@ -1,3 +1,4 @@
-- Se estabilizo el flujo de edicion y navegacion en iOS en pantallas sensibles a teclado/safe-area.
-- Se mejoro la seguridad del sync entre dispositivos con validacion mas fuerte de adjuntos en la nube y correcciones de condiciones de carrera.
-- Se agregaron salvaguardas adicionales de consentimiento/privacidad al habilitar funciones de IA.
+- Corregimos el banner de sync en mobile (“Conflicts resolved”) que aparecia de forma inesperada.
+- Mejoramos la fiabilidad de subida a App Store cuando no existe una version editable.
+- Estandarizamos la configuracion del endpoint de heartbeat en pipelines de release oficiales.
+- Mantuvimos el comportamiento de heartbeat totalmente silencioso para usuarios de mobile.

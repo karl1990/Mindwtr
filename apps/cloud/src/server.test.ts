@@ -53,6 +53,15 @@ describe('cloud server utils', () => {
         });
         expect(combined?.has('new-token')).toBe(true);
         expect(combined?.has('legacy-token')).toBe(true);
+
+        const allowAny = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
+            MINDWTR_CLOUD_ALLOW_ANY_TOKEN: 'true',
+        });
+        expect(allowAny).toBeNull();
+
+        expect(() => __cloudTestUtils.resolveAllowedAuthTokensFromEnv({})).toThrow(
+            'Cloud auth is not configured.'
+        );
     });
 
     test('rejects invalid app data payload', () => {

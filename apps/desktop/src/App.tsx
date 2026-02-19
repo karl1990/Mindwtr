@@ -12,7 +12,7 @@ import { ArchiveView } from './components/views/ArchiveView';
 import { TrashView } from './components/views/TrashView';
 import { AgendaView } from './components/views/AgendaView';
 import { SearchView } from './components/views/SearchView';
-import { useTaskStore, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
+import { useTaskStore, configureDateFormatting, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
 import { GlobalSearch } from './components/GlobalSearch';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLanguage } from './contexts/language-context';
@@ -38,6 +38,7 @@ function App() {
     const showTray = useTaskStore((state) => state.settings?.window?.showTray);
     const settingsTheme = useTaskStore((state) => state.settings?.theme);
     const settingsLanguage = useTaskStore((state) => state.settings?.language);
+    const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
     const updateSettings = useTaskStore((state) => state.updateSettings);
     const showToast = useUiStore((state) => state.showToast);
     const isFlatpak = isFlatpakRuntime();
@@ -52,6 +53,22 @@ function App() {
     const lastSyncErrorAtRef = useRef(0);
     const [closePromptOpen, setClosePromptOpen] = useState(false);
     const [closePromptRemember, setClosePromptRemember] = useState(false);
+    const closePromptRememberRef = useRef(false);
+
+    const setClosePromptRememberValue = useCallback((next: boolean) => {
+        closePromptRememberRef.current = next;
+        setClosePromptRemember(next);
+    }, []);
+
+    const persistCloseBehavior = useCallback(async (behavior: 'tray' | 'quit') => {
+        await updateSettings({
+            window: {
+                ...(useTaskStore.getState().settings?.window ?? {}),
+                closeBehavior: behavior,
+            },
+        });
+        await flushPendingSave();
+    }, [updateSettings]);
 
     useEffect(() => {
         const normalizedTheme = mapSyncedThemeToDesktop(settingsTheme);
@@ -71,6 +88,18 @@ function App() {
         if (settingsLanguage === language) return;
         setLanguage(settingsLanguage);
     }, [settingsLanguage, language, setLanguage]);
+
+    useEffect(() => {
+        const systemLocale = (() => {
+            const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+            return String(candidates?.[0] || '').trim();
+        })();
+        configureDateFormatting({
+            language: settingsLanguage || language,
+            dateFormat: settingsDateFormat,
+            systemLocale,
+        });
+    }, [language, settingsDateFormat, settingsLanguage]);
 
     const translateOrFallback = useCallback((key: string, fallback: string) => {
         const value = t(key);
@@ -299,7 +328,7 @@ function App() {
                     return;
                 }
                 if (!closePromptOpen) {
-                    setClosePromptRemember(false);
+                    setClosePromptRememberValue(false);
                     setClosePromptOpen(true);
                 }
             });
@@ -310,7 +339,7 @@ function App() {
         return () => {
             if (unlisten) unlisten();
         };
-    }, [closeBehavior, closePromptOpen, hideToTray, isFlatpak, quitApp, setError, showTray]);
+    }, [closeBehavior, closePromptOpen, hideToTray, isFlatpak, quitApp, setClosePromptRememberValue, setError, showTray]);
 
     useEffect(() => {
         if (!isTauriRuntime()) return;
@@ -342,6 +371,21 @@ function App() {
             cancelled = true;
         };
     }, [showTray]);
+
+    useEffect(() => {
+        if (!isTauriRuntime()) return;
+        const hideFromDock = closeBehavior === 'tray' && showTray !== false;
+        let cancelled = false;
+        import('@tauri-apps/api/core')
+            .then(async ({ invoke }) => {
+                if (cancelled) return;
+                await invoke('set_macos_activation_policy', { accessory: hideFromDock });
+            })
+            .catch((error) => void logError(error, { scope: 'window', step: 'setActivationPolicy' }));
+        return () => {
+            cancelled = true;
+        };
+    }, [closeBehavior, showTray]);
 
     useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
@@ -460,18 +504,12 @@ function App() {
                         quitLabel={translateOrFallback('settings.closeBehaviorQuit', 'Quit the app')}
                         cancelLabel={translateOrFallback('common.cancel', 'Cancel')}
                         remember={closePromptRemember}
-                        onRememberChange={setClosePromptRemember}
+                        onRememberChange={setClosePromptRememberValue}
                         onCancel={() => setClosePromptOpen(false)}
                         onStay={() => {
                             const apply = async () => {
-                                if (closePromptRemember) {
-                                    await updateSettings({
-                                        window: {
-                                            ...(useTaskStore.getState().settings?.window ?? {}),
-                                            closeBehavior: 'tray',
-                                        },
-                                    });
-                                    await flushPendingSave();
+                                if (closePromptRememberRef.current) {
+                                    await persistCloseBehavior('tray');
                                 }
                                 setClosePromptOpen(false);
                                 await hideToTray();
@@ -483,14 +521,8 @@ function App() {
                         }}
                         onQuit={() => {
                             const apply = async () => {
-                                if (closePromptRemember) {
-                                    await updateSettings({
-                                        window: {
-                                            ...(useTaskStore.getState().settings?.window ?? {}),
-                                            closeBehavior: 'quit',
-                                        },
-                                    });
-                                    await flushPendingSave();
+                                if (closePromptRememberRef.current) {
+                                    await persistCloseBehavior('quit');
                                 }
                                 setClosePromptOpen(false);
                                 await quitApp();

@@ -297,7 +297,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                             <div className="text-xs text-muted-foreground">
                                 {(entry.kind === 'due' ? t('taskEdit.dueDateLabel') : t('review.startTime'))}
                                 {' / '}
-                                {safeFormatDate(entry.date, 'MMM d, HH:mm')}
+                                {safeFormatDate(entry.date, 'Pp')}
                             </div>
                         </div>
                     </div>
@@ -320,7 +320,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                 {days.map((day) => (
                     <div key={day.dayStart.toISOString()} className="rounded-md border border-border/70 p-2.5">
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            {safeFormatDate(day.dayStart, 'EEE, MMM d')} · {day.totalCount} {t('calendar.events')}
+                            {safeFormatDate(day.dayStart, 'PP')} · {day.totalCount} {t('calendar.events')}
                         </div>
                         <div className="mt-1.5 space-y-1">
                             {day.events.map((event) => {

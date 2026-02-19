@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { TaskItem } from '../components/TaskItem';
-import { Task } from '@mindwtr/core';
+import { Task, configureDateFormatting, safeFormatDate } from '@mindwtr/core';
 import { LanguageProvider } from '../contexts/language-context';
 
 const mockTask: Task = {
@@ -62,6 +62,7 @@ describe('TaskItem', () => {
     });
 
     it('shows due date metadata when compact details are enabled', () => {
+        configureDateFormatting({ language: 'en', dateFormat: 'mdy', systemLocale: 'en-US' });
         const taskWithDueDate: Task = {
             ...mockTask,
             id: 'task-with-due-date',
@@ -72,7 +73,7 @@ describe('TaskItem', () => {
                 <TaskItem task={taskWithDueDate} compactMetaEnabled />
             </LanguageProvider>
         );
-        expect(getByText('Mar 20')).toBeInTheDocument();
+        expect(getByText(safeFormatDate('2026-03-20', 'P'))).toBeInTheDocument();
     });
 
     it('applies inset ring style when selected to avoid clipped borders', () => {

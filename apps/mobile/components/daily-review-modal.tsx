@@ -291,13 +291,13 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
                         <View style={styles.calendarGrid}>
                             <View style={[styles.calendarCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                                 <Text style={[styles.calendarCardTitle, { color: tc.secondaryText }]}>
-                                    {safeFormatDate(today, 'MMM d')} · {t('calendar.events')}
+                                    {safeFormatDate(today, 'P')} · {t('calendar.events')}
                                 </Text>
                                 {renderExternalEventList(todayEvents)}
                             </View>
                             <View style={[styles.calendarCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                                 <Text style={[styles.calendarCardTitle, { color: tc.secondaryText }]}>
-                                    {safeFormatDate(tomorrow, 'MMM d')} · {t('calendar.events')}
+                                    {safeFormatDate(tomorrow, 'P')} · {t('calendar.events')}
                                 </Text>
                                 {renderExternalEventList(tomorrowEvents)}
                             </View>
