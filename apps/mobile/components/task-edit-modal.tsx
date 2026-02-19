@@ -2984,6 +2984,58 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     );
 }
 
+type TaskEditModalErrorBoundaryProps = {
+    visible: boolean;
+    resetKey: string;
+    onClose: () => void;
+    children: React.ReactNode;
+};
+
+type TaskEditModalErrorBoundaryState = {
+    hasError: boolean;
+};
+
+class TaskEditModalErrorBoundary extends React.Component<TaskEditModalErrorBoundaryProps, TaskEditModalErrorBoundaryState> {
+    state: TaskEditModalErrorBoundaryState = { hasError: false };
+
+    static getDerivedStateFromError(): TaskEditModalErrorBoundaryState {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error: unknown) {
+        logTaskError('Task edit modal render failed', error);
+    }
+
+    componentDidUpdate(prevProps: TaskEditModalErrorBoundaryProps) {
+        if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+            this.setState({ hasError: false });
+        }
+    }
+
+    render() {
+        if (!this.state.hasError) return this.props.children;
+
+        return (
+            <Modal
+                visible={this.props.visible}
+                transparent
+                animationType="fade"
+                onRequestClose={this.props.onClose}
+            >
+                <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 16 }}>
+                    <View style={[styles.modalCard, { backgroundColor: '#111827', borderColor: '#334155' }]}>
+                        <Text style={[styles.modalTitle, { color: '#F8FAFC' }]}>Something went wrong</Text>
+                        <Text style={{ color: '#CBD5E1', marginBottom: 14 }}>The editor encountered an error and was safely closed.</Text>
+                        <TouchableOpacity style={styles.modalButton} onPress={this.props.onClose}>
+                            <Text style={[styles.modalButtonText, { color: '#93C5FD' }]}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </Modal>
+        );
+    }
+}
+
 const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModalProps): boolean => (
     prev.visible === next.visible
     && prev.task === next.task
@@ -2993,5 +3045,18 @@ const areTaskEditModalPropsEqual = (prev: TaskEditModalProps, next: TaskEditModa
     && prev.defaultTab === next.defaultTab
 );
 
-export const TaskEditModal = React.memo(TaskEditModalInner, areTaskEditModalPropsEqual);
+const TaskEditModalWithBoundary = (props: TaskEditModalProps) => {
+    const resetKey = `${props.visible ? 'open' : 'closed'}:${props.task?.id ?? 'new'}`;
+    return (
+        <TaskEditModalErrorBoundary
+            visible={props.visible}
+            resetKey={resetKey}
+            onClose={props.onClose}
+        >
+            <TaskEditModalInner {...props} />
+        </TaskEditModalErrorBoundary>
+    );
+};
+
+export const TaskEditModal = React.memo(TaskEditModalWithBoundary, areTaskEditModalPropsEqual);
 TaskEditModal.displayName = 'TaskEditModal';
