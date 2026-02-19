@@ -1,19 +1,20 @@
 import '../polyfills';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
-import { StatusBar } from 'react-native';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, AppState, AppStateStatus, SafeAreaView, Text, View } from 'react-native';
+import { Alert, AppState, AppStateStatus, Platform, SafeAreaView, StatusBar, Text, View } from 'react-native';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QuickCaptureProvider, type QuickCaptureOptions } from '../contexts/quick-capture-context';
 
 import { ThemeProvider, useTheme } from '../contexts/theme-context';
 import { LanguageProvider, useLanguage } from '../contexts/language-context';
-import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage } from '@mindwtr/core';
+import { setStorageAdapter, useTaskStore, flushPendingSave, isSupportedLanguage, generateUUID, sendDailyHeartbeat } from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
 import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotifications } from '../lib/notification-service';
 import { performMobileSync } from '../lib/sync-service';
@@ -51,11 +52,77 @@ const AUTO_SYNC_CADENCE_OFF: AutoSyncCadence = {
   debounceContinuousChangeMs: 30_000,
   foregroundMinIntervalMs: 60_000,
 };
+const ANALYTICS_DISTINCT_ID_KEY = 'mindwtr-analytics-distinct-id';
+
+type MobileExtraConfig = {
+  isFossBuild?: boolean | string;
+  analyticsHeartbeatUrl?: string;
+};
 
 const getCadenceForBackend = (backend: SyncBackend): AutoSyncCadence => {
   if (backend === 'file') return AUTO_SYNC_CADENCE_FILE;
   if (backend === 'webdav' || backend === 'cloud') return AUTO_SYNC_CADENCE_REMOTE;
   return AUTO_SYNC_CADENCE_OFF;
+};
+
+const parseBool = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true';
+
+type PlatformExtras = typeof Platform & {
+  isPad?: boolean;
+  constants?: {
+    Release?: string;
+  };
+};
+
+const platformExtras = Platform as PlatformExtras;
+
+const getMobileAnalyticsChannel = async (isFossBuild: boolean): Promise<string> => {
+  if (Platform.OS === 'ios') return 'app-store';
+  if (Platform.OS !== 'android') return Platform.OS || 'mobile';
+  if (isFossBuild) return 'android-sideload';
+  try {
+    const referrer = await Application.getInstallReferrerAsync();
+    return (referrer || '').trim() ? 'play-store' : 'android-sideload';
+  } catch {
+    return 'android-unknown';
+  }
+};
+
+const getOrCreateAnalyticsDistinctId = async (): Promise<string> => {
+  const existing = (await AsyncStorage.getItem(ANALYTICS_DISTINCT_ID_KEY) || '').trim();
+  if (existing) return existing;
+  const generated = generateUUID();
+  await AsyncStorage.setItem(ANALYTICS_DISTINCT_ID_KEY, generated);
+  return generated;
+};
+
+const getMobileDeviceClass = (): string => {
+  if (Platform.OS === 'ios') return platformExtras.isPad === true ? 'tablet' : 'phone';
+  if (Platform.OS === 'android') return 'phone';
+  return 'desktop';
+};
+
+const getMobileOsMajor = (): string => {
+  if (Platform.OS === 'ios') {
+    const raw = String(Platform.Version ?? '');
+    const major = raw.match(/\d+/)?.[0];
+    return major ? `ios-${major}` : 'ios';
+  }
+  if (Platform.OS === 'android') {
+    const raw = String(platformExtras.constants?.Release ?? Platform.Version ?? '');
+    const major = raw.match(/\d+/)?.[0];
+    return major ? `android-${major}` : 'android';
+  }
+  return Platform.OS || 'mobile';
+};
+
+const getDeviceLocale = (): string => {
+  try {
+    return String(Intl.DateTimeFormat().resolvedOptions().locale || '').trim();
+  } catch {
+    return '';
+  }
 };
 
 // Initialize storage for mobile
@@ -80,6 +147,11 @@ function RootLayoutContent() {
   const tc = useThemeColors();
   const { language, setLanguage, isReady: languageReady } = useLanguage();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  const extraConfig = Constants.expoConfig?.extra as MobileExtraConfig | undefined;
+  const isFossBuild = parseBool(extraConfig?.isFossBuild);
+  const analyticsHeartbeatUrl = String(extraConfig?.analyticsHeartbeatUrl || '').trim();
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const appVersion = Constants.expoConfig?.version ?? '0.0.0';
   const [storageWarningShown, setStorageWarningShown] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const settingsLanguage = useTaskStore((state) => state.settings?.language);
@@ -357,6 +429,31 @@ function RootLayoutContent() {
         const store = useTaskStore.getState();
         await store.fetchData();
         if (cancelled) return;
+        if (!isFossBuild && !isExpoGo && !__DEV__ && analyticsHeartbeatUrl) {
+          try {
+            const [distinctId, channel] = await Promise.all([
+              getOrCreateAnalyticsDistinctId(),
+              getMobileAnalyticsChannel(isFossBuild),
+            ]);
+            await sendDailyHeartbeat({
+              enabled: true,
+              endpointUrl: analyticsHeartbeatUrl,
+              distinctId,
+              platform: Platform.OS,
+              channel,
+              appVersion,
+              deviceClass: getMobileDeviceClass(),
+              osMajor: getMobileOsMajor(),
+              locale: getDeviceLocale(),
+              storage: AsyncStorage,
+            });
+          } catch (error) {
+            void logWarn('Mobile analytics heartbeat failed', {
+              scope: 'app',
+              extra: { error: error instanceof Error ? error.message : String(error) },
+            });
+          }
+        }
         if (store.settings.notificationsEnabled !== false) {
           startMobileNotifications().catch(logAppError);
         }
@@ -414,7 +511,7 @@ function RootLayoutContent() {
         widgetRefreshTimer.current = null;
       }
     };
-  }, [storageWarningShown, storageInitError, requestSync]);
+  }, [analyticsHeartbeatUrl, appVersion, isExpoGo, isFossBuild, storageWarningShown, storageInitError, requestSync]);
 
   useEffect(() => {
     let previousEnabled = useTaskStore.getState().settings.notificationsEnabled;
