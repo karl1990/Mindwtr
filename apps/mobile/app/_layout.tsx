@@ -125,6 +125,21 @@ const getDeviceLocale = (): string => {
   }
 };
 
+const isBackendMismatchedSyncConfigError = (backend: SyncBackend, errorMessage?: string): boolean => {
+  const message = (errorMessage || '').trim();
+  if (!message) return false;
+  if (/self-hosted url not configured/i.test(message)) {
+    return backend !== 'cloud';
+  }
+  if (/webdav url not configured|webdav unauthorized/i.test(message)) {
+    return backend !== 'webdav';
+  }
+  if (/no sync folder configured|selected ios sync file is in a temporary inbox location/i.test(message)) {
+    return backend !== 'file';
+  }
+  return false;
+};
+
 // Initialize storage for mobile
 let storageInitError: Error | null = null;
 const logAppError = (error: unknown) => {
@@ -547,6 +562,9 @@ function RootLayoutContent() {
   const syncStatusBanner = useMemo(() => {
     if (syncBackendForUi === 'off') return null;
     if (lastSyncStatus === 'idle' || lastSyncStatus === 'success') return null;
+    if (lastSyncStatus === 'error' && isBackendMismatchedSyncConfigError(syncBackendForUi, lastSyncError)) {
+      return null;
+    }
     if (lastSyncStatus === 'syncing') {
       return {
         text: `${t('settings.lastSync')}: ${t('common.loading')}`,

@@ -1349,6 +1349,13 @@ export default function SettingsPage() {
         }
     };
 
+    const resetSyncStatusForBackendSwitch = useCallback(() => {
+        updateSettings({
+            lastSyncStatus: 'idle',
+            lastSyncError: undefined,
+        }).catch(logSettingsError);
+    }, [updateSettings]);
+
     // Set sync folder (Android) or sync file (iOS)
     const handleSetSyncPath = async () => {
         try {
@@ -1361,6 +1368,7 @@ export default function SettingsPage() {
                     setSyncPath(fileUri);
                     await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file');
                     setSyncBackend('file');
+                    resetSyncStatusForBackendSwitch();
                     Alert.alert(
                         localize('Success', '成功'),
                         localize('Sync folder set successfully', '同步文件夹已设置')
@@ -1443,6 +1451,7 @@ export default function SettingsPage() {
                 await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file');
             }
 
+            resetSyncStatusForBackendSwitch();
             const result = await performMobileSync(syncBackend === 'file' ? syncPath || undefined : undefined);
             if (result.success) {
                 const conflictCount = (result.stats?.tasks.conflicts || 0) + (result.stats?.projects.conflicts || 0);
@@ -3721,10 +3730,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off').catch(logSettingsError);
                                         setSyncBackend('off');
-                                        void updateSettings({
-                                            lastSyncStatus: 'idle',
-                                            lastSyncError: undefined,
-                                        }).catch(logSettingsError);
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'off' ? tc.tint : tc.secondaryText }]}>
@@ -3739,6 +3745,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'file').catch(logSettingsError);
                                         setSyncBackend('file');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'file' ? tc.tint : tc.secondaryText }]}>
@@ -3752,6 +3759,7 @@ export default function SettingsPage() {
                                     ]}
                                     onPress={() => {
                                         setSyncBackend('webdav');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'webdav' ? tc.tint : tc.secondaryText }]}>
@@ -3766,6 +3774,7 @@ export default function SettingsPage() {
                                     onPress={() => {
                                         AsyncStorage.setItem(SYNC_BACKEND_KEY, 'cloud').catch(logSettingsError);
                                         setSyncBackend('cloud');
+                                        resetSyncStatusForBackendSwitch();
                                     }}
                                 >
                                     <Text style={[styles.backendOptionText, { color: syncBackend === 'cloud' ? tc.tint : tc.secondaryText }]}>
@@ -3960,6 +3969,7 @@ export default function SettingsPage() {
                                             [WEBDAV_USERNAME_KEY, webdavUsername.trim()],
                                             [WEBDAV_PASSWORD_KEY, webdavPassword],
                                         ]).then(() => {
+                                            resetSyncStatusForBackendSwitch();
                                             Alert.alert(localize('Success', '成功'), t('settings.webdavSave'));
                                         }).catch(logSettingsError);
                                     }}
@@ -4112,6 +4122,7 @@ export default function SettingsPage() {
                                             [CLOUD_URL_KEY, cloudUrl.trim()],
                                             [CLOUD_TOKEN_KEY, cloudToken],
                                         ]).then(() => {
+                                            resetSyncStatusForBackendSwitch();
                                             Alert.alert(localize('Success', '成功'), t('settings.cloudSave'));
                                         }).catch(logSettingsError);
                                     }}
