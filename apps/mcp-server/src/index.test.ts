@@ -56,8 +56,12 @@ describe('mcp server index', () => {
     expect(addHandler).toBeTruthy();
     expect(deleteHandler).toBeTruthy();
 
-    await expect(addHandler?.({ title: 'Task' })).rejects.toThrow('read-only');
-    await expect(deleteHandler?.({ id: 't1' })).rejects.toThrow('read-only');
+    const addResult = await addHandler?.({ title: 'Task' });
+    const deleteResult = await deleteHandler?.({ id: 't1' });
+    expect(addResult?.isError).toBe(true);
+    expect(addResult?.content[0]?.text).toContain('read-only');
+    expect(deleteResult?.isError).toBe(true);
+    expect(deleteResult?.content[0]?.text).toContain('read-only');
   });
 
   test('validates add_task requires title or quickAdd', async () => {
@@ -65,6 +69,24 @@ describe('mcp server index', () => {
     registerMindwtrTools(server, createMockService(), false);
     const addHandler = tools.get('mindwtr.add_task')?.handler;
     expect(addHandler).toBeTruthy();
-    await expect(addHandler?.({})).rejects.toThrow('Either title or quickAdd is required');
+    const result = await addHandler?.({});
+    expect(result?.isError).toBe(true);
+    expect(result?.content[0]?.text).toContain('Either title or quickAdd is required');
+  });
+
+  test('wraps service exceptions in MCP error response format', async () => {
+    const { server, tools } = createMockServer();
+    const failingService = {
+      ...createMockService(),
+      listTasks: async () => {
+        throw new Error('boom');
+      },
+    };
+    registerMindwtrTools(server, failingService, false);
+    const listHandler = tools.get('mindwtr.list_tasks')?.handler;
+    expect(listHandler).toBeTruthy();
+    const result = await listHandler?.({});
+    expect(result?.isError).toBe(true);
+    expect(result?.content?.[0]?.text).toContain('boom');
   });
 });
