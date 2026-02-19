@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Dimensions } from 'react-native';
+import { View, Text, TextInput, Modal, TouchableOpacity, ScrollView, Platform, Share, Alert, Animated, Pressable, Keyboard, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Attachment,
@@ -218,6 +218,7 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     const [isTagInputFocused, setIsTagInputFocused] = useState(false);
     const [linkModalVisible, setLinkModalVisible] = useState(false);
     const [audioModalVisible, setAudioModalVisible] = useState(false);
+    const [imagePreviewAttachment, setImagePreviewAttachment] = useState<Attachment | null>(null);
     const [audioAttachment, setAudioAttachment] = useState<Attachment | null>(null);
     const [audioLoading, setAudioLoading] = useState(false);
     const audioPlayer = useAudioPlayer(null, { updateInterval: 500 });
@@ -910,6 +911,10 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         void unloadAudio();
     }, [unloadAudio]);
 
+    const closeImagePreview = useCallback(() => {
+        setImagePreviewAttachment(null);
+    }, []);
+
     const toggleAudioPlayback = useCallback(async () => {
         if (!audioStatus?.isLoaded || !audioLoadedRef.current) return;
         try {
@@ -987,6 +992,10 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
             openAudioAttachment(resolved).catch((error) => logTaskError('Failed to open audio attachment', error));
             return;
         }
+        if (isImageAttachment(resolved)) {
+            setImagePreviewAttachment(resolved);
+            return;
+        }
         const available = await Sharing.isAvailableAsync().catch((error) => {
             logTaskWarn('[Sharing] availability check failed', error);
             return false;
@@ -1015,8 +1024,9 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
     useEffect(() => {
         if (!visible) {
             closeAudioModal();
+            closeImagePreview();
         }
-    }, [closeAudioModal, visible]);
+    }, [closeAudioModal, closeImagePreview, visible]);
 
     useEffect(() => {
         if (!audioStatus?.isLoaded) {
@@ -2789,6 +2799,40 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
                                     <Text style={[styles.modalButtonText, { color: tc.secondaryText }]}>{t('common.close')}</Text>
                                 </TouchableOpacity>
                             </View>
+                        </Pressable>
+                    </Pressable>
+                </Modal>
+                <Modal
+                    visible={Boolean(imagePreviewAttachment)}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={closeImagePreview}
+                >
+                    <Pressable style={styles.previewOverlay} onPress={closeImagePreview}>
+                        <Pressable
+                            style={[styles.previewCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                            onPress={(event) => event.stopPropagation()}
+                        >
+                            <View style={styles.previewHeader}>
+                                <Text
+                                    numberOfLines={1}
+                                    style={[styles.previewTitle, { color: tc.text }]}
+                                >
+                                    {imagePreviewAttachment?.title || t('attachments.title')}
+                                </Text>
+                                <TouchableOpacity onPress={closeImagePreview} style={styles.modalButton}>
+                                    <Text style={[styles.modalButtonText, { color: tc.secondaryText }]}>{t('common.close')}</Text>
+                                </TouchableOpacity>
+                            </View>
+                            {imagePreviewAttachment?.uri ? (
+                                <Image
+                                    source={{ uri: imagePreviewAttachment.uri }}
+                                    style={styles.previewImage}
+                                    resizeMode="contain"
+                                />
+                            ) : (
+                                <Text style={[styles.modalLabel, { color: tc.secondaryText }]}>{t('attachments.missing')}</Text>
+                            )}
                         </Pressable>
                     </Pressable>
                 </Modal>

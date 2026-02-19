@@ -623,17 +623,16 @@ export function AgendaView() {
                 </div>
             ) : (
                 <>
-                    {/* Today's Focus Section */}
-                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/40 dark:to-amber-900/25 border border-yellow-200 dark:border-amber-500/30 rounded-xl p-6">
-                        <h3 className="font-bold text-lg flex items-center gap-2 mb-4 text-slate-900 dark:text-amber-100">
-                            <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 dark:text-amber-300 dark:fill-amber-300" />
-                            {t('agenda.todaysFocus')}
-                            <span className="text-sm font-normal text-slate-600 dark:text-amber-200">
-                                ({focusedCount}/3)
-                            </span>
-                        </h3>
+                    {focusedTasks.length > 0 && (
+                        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/40 dark:to-amber-900/25 border border-yellow-200 dark:border-amber-500/30 rounded-xl p-6">
+                            <h3 className="font-bold text-lg flex items-center gap-2 mb-4 text-slate-900 dark:text-amber-100">
+                                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 dark:text-amber-300 dark:fill-amber-300" />
+                                {t('agenda.todaysFocus')}
+                                <span className="text-sm font-normal text-slate-600 dark:text-amber-200">
+                                    ({focusedCount}/3)
+                                </span>
+                            </h3>
 
-                        {focusedTasks.length > 0 ? (
                             <div className="divide-y divide-border/30">
                                 {focusedTasks.map(task => (
                                     <TaskItem
@@ -646,13 +645,8 @@ export function AgendaView() {
                                     />
                                 ))}
                             </div>
-                        ) : (
-                            <p className="text-muted-foreground text-center py-4 flex items-center justify-center gap-2">
-                                <Star className="w-4 h-4 text-amber-400" />
-                                {t('agenda.focusHint')}
-                            </p>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Other Sections */}
                     <div className="space-y-6">
