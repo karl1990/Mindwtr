@@ -288,7 +288,7 @@ export async function startMcpServer(argv: string[] = process.argv.slice(2)) {
   const flags = parseArgs(argv);
 
   const dbPath = typeof flags.db === 'string' ? flags.db : undefined;
-  const allowWrite = Boolean(flags.write || flags.allowWrite || flags.allowWrites);
+  const allowWrite = Boolean(flags.write);
   const readonly = Boolean(flags.readonly) || !allowWrite;
   const keepAlive = !(flags.nowait || flags.noWait);
 
