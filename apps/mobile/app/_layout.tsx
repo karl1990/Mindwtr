@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Alert, AppState, AppStateStatus, Platform, SafeAreaView, StatusBar, Text, View } from 'react-native';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
@@ -145,7 +145,7 @@ function RootLayoutContent() {
   const router = useRouter();
   const { isDark, isReady: themeReady } = useTheme();
   const tc = useThemeColors();
-  const { language, setLanguage, isReady: languageReady } = useLanguage();
+  const { language, setLanguage, isReady: languageReady, t } = useLanguage();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const extraConfig = Constants.expoConfig?.extra as MobileExtraConfig | undefined;
   const isFossBuild = parseBool(extraConfig?.isFossBuild);
@@ -156,6 +156,8 @@ function RootLayoutContent() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const settingsLanguage = useTaskStore((state) => state.settings?.language);
   const settingsDateFormat = useTaskStore((state) => state.settings?.dateFormat);
+  const lastSyncStatus = useTaskStore((state) => state.settings?.lastSyncStatus ?? 'idle');
+  const lastSyncError = useTaskStore((state) => state.settings?.lastSyncError);
   const appState = useRef(AppState.currentState);
   const lastAutoSyncAt = useRef(0);
   const syncDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -540,6 +542,31 @@ function RootLayoutContent() {
   }, []);
 
   const isAppReady = isDataLoaded && themeReady && languageReady;
+  const syncStatusBanner = useMemo(() => {
+    if (lastSyncStatus === 'idle' || lastSyncStatus === 'success') return null;
+    if (lastSyncStatus === 'syncing') {
+      return {
+        text: `${t('settings.lastSync')}: ${t('common.loading')}`,
+        backgroundColor: isDark ? '#0F172A' : '#E2E8F0',
+        borderColor: isDark ? '#334155' : '#CBD5E1',
+        textColor: isDark ? '#E2E8F0' : '#0F172A',
+      };
+    }
+    if (lastSyncStatus === 'conflict') {
+      return {
+        text: t('settings.lastSyncConflict'),
+        backgroundColor: isDark ? '#422006' : '#FEF3C7',
+        borderColor: isDark ? '#B45309' : '#F59E0B',
+        textColor: isDark ? '#FDE68A' : '#92400E',
+      };
+    }
+    return {
+      text: lastSyncError ? `${t('settings.lastSyncError')}: ${lastSyncError}` : t('settings.lastSyncError'),
+      backgroundColor: isDark ? '#3F1D1D' : '#FEE2E2',
+      borderColor: isDark ? '#991B1B' : '#FCA5A5',
+      textColor: isDark ? '#FECACA' : '#991B1B',
+    };
+  }, [isDark, lastSyncError, lastSyncStatus, t]);
 
   useEffect(() => {
     if (!isAppReady) return;
@@ -624,6 +651,34 @@ function RootLayoutContent() {
               }}
             />
           </Stack>
+          {syncStatusBanner && (
+            <View
+              accessibilityRole="status"
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: 12,
+                right: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: syncStatusBanner.backgroundColor,
+                borderColor: syncStatusBanner.borderColor,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: syncStatusBanner.textColor,
+                  fontSize: 12,
+                  fontWeight: '600',
+                }}
+              >
+                {syncStatusBanner.text}
+              </Text>
+            </View>
+          )}
           <StatusBar
             barStyle={isDark ? 'light-content' : 'dark-content'}
             backgroundColor={tc.cardBg}
