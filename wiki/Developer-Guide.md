@@ -158,6 +158,7 @@ Mindwtr/
 | **State**     | Zustand (shared) | Zustand (shared)      | N/A              |
 | **Platform**  | Tauri v2 (Rust)  | Expo (iOS/Android)    | Bun              |
 | **Router**    | React Router     | Expo Router           | N/A              |
+| **Language**  | TypeScript       | TypeScript            | TypeScript       |
 
 ---
 
@@ -165,7 +166,6 @@ Mindwtr/
 
 We track key technical decisions as ADRs under `docs/adr/`. See:
 - `docs/adr/README.md`
-| **Language**  | TypeScript       | TypeScript            | TypeScript       |
 
 ---
 
