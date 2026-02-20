@@ -809,7 +809,12 @@ export const syncWebdavAttachments = async (
       }
       uploadCount += 1;
       try {
-        const size = await getAttachmentByteSize(attachment, uri);
+        let size = await getAttachmentByteSize(attachment, uri);
+        let fileData: Uint8Array | null = null;
+        if (!Number.isFinite(size ?? NaN)) {
+          fileData = await readFileAsBytes(uri);
+          size = fileData.byteLength;
+        }
         const validation = await validateAttachmentForUpload(attachment, size);
         if (!validation.valid) {
           logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
@@ -817,9 +822,9 @@ export const syncWebdavAttachments = async (
         }
         const cloudKey = buildCloudKey(attachment);
         const startedAt = Date.now();
-        reportProgress(attachment.id, 'upload', 0, size ?? 0, 'active');
+        const uploadBytes = Math.max(0, Number(size ?? 0));
+        reportProgress(attachment.id, 'upload', 0, uploadBytes, 'active');
         const uploadUrl = `${baseSyncUrl}/${cloudKey}`;
-        const uploadBytes = size ?? 0;
         let uploadedWithFileSystem = false;
         if (uploadUrl) {
           logAttachmentInfo('WebDAV attachment upload start', {
@@ -859,13 +864,13 @@ export const syncWebdavAttachments = async (
             id: attachment.id,
             uri,
           });
-          const fileData = await readFileAsBytes(uri);
+          const uploadData = fileData ?? await readFileAsBytes(uri);
           logAttachmentInfo('WebDAV attachment read done', {
             id: attachment.id,
-            bytes: String(fileData.byteLength),
+            bytes: String(uploadData.byteLength),
             ms: String(Date.now() - readStart),
           });
-          const buffer = toArrayBuffer(fileData);
+          const buffer = toArrayBuffer(uploadData);
           await withRetry(
             async () => {
               await waitForSlot();
@@ -893,12 +898,15 @@ export const syncWebdavAttachments = async (
           );
         }
         attachment.cloudKey = cloudKey;
+        if (!Number.isFinite(attachment.size ?? NaN) && Number.isFinite(size ?? NaN)) {
+          attachment.size = Number(size);
+        }
         attachment.localStatus = 'available';
         didMutate = true;
-        reportProgress(attachment.id, 'upload', size ?? 0, size ?? 0, 'completed');
+        reportProgress(attachment.id, 'upload', uploadBytes, uploadBytes, 'completed');
         logAttachmentInfo('Attachment uploaded', {
           id: attachment.id,
-          bytes: String(size ?? 0),
+          bytes: String(uploadBytes),
           ms: String(Date.now() - startedAt),
         });
       } catch (error) {
