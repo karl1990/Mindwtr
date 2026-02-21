@@ -18,6 +18,7 @@ import {
 import { Archive, ArrowRight, Calendar, Check, CheckSquare, ChevronLeft, Layers, RefreshCw, Sparkles, X, type LucideIcon } from 'lucide-react';
 
 import { TaskItem } from '../../TaskItem';
+import { PromptModal } from '../../PromptModal';
 import { cn } from '../../../lib/utils';
 import { useLanguage } from '../../../contexts/language-context';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
@@ -42,6 +43,7 @@ type WeeklyReviewGuideModalProps = {
 export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps) {
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
     const [expandedExternalDays, setExpandedExternalDays] = useState<Set<string>>(new Set());
+    const [projectTaskPrompt, setProjectTaskPrompt] = useState<{ projectId: string; projectTitle: string } | null>(null);
     const { tasks, projects, areas, settings, batchUpdateTasks } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -52,6 +54,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         }),
         shallow
     );
+    const addTask = useTaskStore((state) => state.addTask);
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const { t } = useLanguage();
     const [aiSuggestions, setAiSuggestions] = useState<ReviewSuggestion[]>([]);
@@ -345,7 +348,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                             return (
                                 <>
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            {safeFormatDate(day.dayStart, 'PP')} · {day.totalCount} {t('calendar.events')}
+                            {safeFormatDate(day.dayStart, 'EEEE, PP')} · {day.totalCount} {t('calendar.events')}
                         </div>
                         <div className="mt-1.5 space-y-1">
                             {visibleEvents.map((event) => {
@@ -597,7 +600,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => openQuickAdd({ projectId: project.id, status: 'next' })}
+                                                    onClick={() => setProjectTaskPrompt({ projectId: project.id, projectTitle: project.title })}
                                                     className="px-2.5 py-1 rounded-md border border-border text-xs text-foreground hover:bg-muted/40 transition-colors"
                                                 >
                                                     {t('projects.addTask')}
@@ -758,6 +761,25 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                     )}
                 </div>
             </div>
+            <PromptModal
+                isOpen={Boolean(projectTaskPrompt)}
+                title={t('projects.addTask')}
+                description={projectTaskPrompt ? `${projectTaskPrompt.projectTitle}` : undefined}
+                placeholder={t('nav.addTask')}
+                defaultValue=""
+                confirmLabel={t('common.add')}
+                cancelLabel={t('common.cancel')}
+                onCancel={() => setProjectTaskPrompt(null)}
+                onConfirm={(value) => {
+                    const trimmed = value.trim();
+                    const targetProject = projectTaskPrompt;
+                    if (!trimmed || !targetProject) return;
+                    void (async () => {
+                        await addTask(trimmed, { projectId: targetProject.projectId, status: 'next' });
+                        setProjectTaskPrompt(null);
+                    })();
+                }}
+            />
         </div>
     );
 }
