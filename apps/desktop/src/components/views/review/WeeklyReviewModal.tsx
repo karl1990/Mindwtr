@@ -41,6 +41,7 @@ type WeeklyReviewGuideModalProps = {
 
 export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps) {
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
+    const [expandedExternalDays, setExpandedExternalDays] = useState<Set<string>>(new Set());
     const { tasks, projects, areas, settings, batchUpdateTasks } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
@@ -117,7 +118,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             if (dayEvents.length > 0) {
                 summaries.push({
                     dayStart,
-                    events: dayEvents.slice(0, 2),
+                    events: dayEvents,
                     totalCount: dayEvents.length,
                 });
             }
@@ -284,6 +285,24 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         await batchUpdateTasks(updates);
     };
 
+    const openQuickAdd = (initialProps?: Partial<Task>) => {
+        window.dispatchEvent(new CustomEvent('mindwtr:quick-add', {
+            detail: { initialProps: initialProps ?? {} },
+        }));
+    };
+
+    const toggleExternalDayExpanded = (dayKey: string) => {
+        setExpandedExternalDays((prev) => {
+            const next = new Set(prev);
+            if (next.has(dayKey)) {
+                next.delete(dayKey);
+            } else {
+                next.add(dayKey);
+            }
+            return next;
+        });
+    };
+
     const renderCalendarList = (items: CalendarReviewEntry[]) => {
         if (items.length === 0) {
             return <div className="text-sm text-muted-foreground">{t('calendar.noTasks')}</div>;
@@ -319,11 +338,17 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             <div className="space-y-2">
                 {days.map((day) => (
                     <div key={day.dayStart.toISOString()} className="rounded-md border border-border/70 p-2.5">
+                        {(() => {
+                            const dayKey = day.dayStart.toISOString();
+                            const isExpanded = expandedExternalDays.has(dayKey);
+                            const visibleEvents = isExpanded ? day.events : day.events.slice(0, 2);
+                            return (
+                                <>
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                             {safeFormatDate(day.dayStart, 'PP')} · {day.totalCount} {t('calendar.events')}
                         </div>
                         <div className="mt-1.5 space-y-1">
-                            {day.events.map((event) => {
+                            {visibleEvents.map((event) => {
                                 const start = safeParseDate(event.start);
                                 const timeLabel = event.allDay || !start ? t('calendar.allDay') : safeFormatDate(start, 'HH:mm');
                                 return (
@@ -333,12 +358,21 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                                     </div>
                                 );
                             })}
-                            {day.totalCount > day.events.length && (
-                                <div className="text-xs text-muted-foreground">
-                                    +{day.totalCount - day.events.length} {t('common.more').toLowerCase()}
-                                </div>
+                            {day.totalCount > 2 && (
+                                <button
+                                    type="button"
+                                    onClick={() => toggleExternalDayExpanded(dayKey)}
+                                    className="text-xs text-primary hover:text-primary/80 font-medium"
+                                >
+                                    {isExpanded
+                                        ? t('common.less')
+                                        : `+${day.totalCount - visibleEvents.length} ${t('common.more').toLowerCase()}`}
+                                </button>
                             )}
                         </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 ))}
             </div>
@@ -395,6 +429,15 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             case 'calendar':
                 return (
                     <div className="space-y-6">
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => openQuickAdd({ status: 'inbox' })}
+                                className="px-3 py-1.5 rounded-md border border-border text-sm text-foreground hover:bg-muted/40 transition-colors"
+                            >
+                                {t('calendar.addTask')}
+                            </button>
+                        </div>
                         <div className="space-y-2">
                             <h3 className="font-semibold text-muted-foreground uppercase text-xs tracking-wider">
                                 {t('calendar.events')}
@@ -546,14 +589,24 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
                                 return (
                                     <div key={project.id} className="border border-border rounded-lg p-4">
-                                        <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center justify-between gap-3 mb-3">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: (project.areaId ? areaById.get(project.areaId)?.color : undefined) || DEFAULT_AREA_COLOR }} />
                                                 <h3 className="font-semibold">{project.title}</h3>
                                             </div>
-                                            <div className={cn("text-xs px-2 py-1 rounded-full", hasNextAction ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600")}
-                                            >
-                                                {hasNextAction ? t('review.hasNextAction') : t('review.needsAction')}
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openQuickAdd({ projectId: project.id, status: 'next' })}
+                                                    className="px-2.5 py-1 rounded-md border border-border text-xs text-foreground hover:bg-muted/40 transition-colors"
+                                                >
+                                                    {t('projects.addTask')}
+                                                </button>
+                                                <div
+                                                    className={cn("text-xs px-2 py-1 rounded-full", hasNextAction ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600")}
+                                                >
+                                                    {hasNextAction ? t('review.hasNextAction') : t('review.needsAction')}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="space-y-2 pl-5">

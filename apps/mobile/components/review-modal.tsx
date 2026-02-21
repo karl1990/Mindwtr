@@ -16,6 +16,7 @@ import {
 } from '@mindwtr/core';
 import { useTheme } from '../contexts/theme-context';
 import { useLanguage } from '../contexts/language-context';
+import { useQuickCapture } from '../contexts/quick-capture-context';
 
 import { SwipeableTaskItem } from './swipeable-task-item';
 import { TaskEditModal } from './task-edit-modal';
@@ -86,6 +87,8 @@ const getReviewLabels = (lang: string) => {
             startLabel: '开始',
             allDay: '全天',
             more: '更多',
+            less: '收起',
+            addTask: '添加任务',
             waitingDesc: '跟进等待项目',
             waitingGuide: '检查每个等待项：是否需要跟进？已完成可以标记完成，需要再次跟进可以加注释。',
             nothingWaiting: '没有等待项目',
@@ -141,6 +144,8 @@ const getReviewLabels = (lang: string) => {
         startLabel: 'Start',
         allDay: 'All day',
         more: 'more',
+        less: 'less',
+        addTask: 'Add task',
         waitingDesc: 'Follow Up on Waiting Items',
         waitingGuide: 'Check each item: need to follow up? Mark done if resolved. Add notes for context.',
         nothingWaiting: 'Nothing waiting - all clear!',
@@ -167,6 +172,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const { isDark } = useTheme();
     const { language } = useLanguage();
+    const { openQuickCapture } = useQuickCapture();
     const [currentStep, setCurrentStep] = useState<ReviewStep>('intro');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -179,6 +185,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     const [externalCalendarEvents, setExternalCalendarEvents] = useState<ExternalCalendarEvent[]>([]);
     const [externalCalendarLoading, setExternalCalendarLoading] = useState(false);
     const [externalCalendarError, setExternalCalendarError] = useState<string | null>(null);
+    const [expandedExternalDays, setExpandedExternalDays] = useState<Set<string>>(new Set());
 
     const labels = getReviewLabels(language);
     const tc = useThemeColors();
@@ -229,6 +236,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
 
     const handleClose = () => {
         setCurrentStep('intro');
+        setExpandedExternalDays(new Set());
         onClose();
     };
 
@@ -243,6 +251,22 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
 
     const handleDelete = (taskId: string) => {
         deleteTask(taskId);
+    };
+
+    const openReviewQuickAdd = (initialProps?: Partial<Task>) => {
+        openQuickCapture({ initialProps });
+    };
+
+    const toggleExternalDayExpanded = (dayKey: string) => {
+        setExpandedExternalDays((prev) => {
+            const next = new Set(prev);
+            if (next.has(dayKey)) {
+                next.delete(dayKey);
+            } else {
+                next.add(dayKey);
+            }
+            return next;
+        });
     };
 
     useEffect(() => {
@@ -424,7 +448,7 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
             if (dayEvents.length > 0) {
                 summaries.push({
                     dayStart,
-                    events: dayEvents.slice(0, 2),
+                    events: dayEvents,
                     totalCount: dayEvents.length,
                 });
             }
@@ -462,10 +486,16 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
             <View style={styles.calendarEventList}>
                 {days.map((day) => (
                     <View key={day.dayStart.toISOString()} style={[styles.calendarDayCard, { borderColor: tc.border }]}>
+                        {(() => {
+                            const dayKey = day.dayStart.toISOString();
+                            const isExpanded = expandedExternalDays.has(dayKey);
+                            const visibleEvents = isExpanded ? day.events : day.events.slice(0, 2);
+                            return (
+                                <>
                         <Text style={[styles.calendarDayTitle, { color: tc.secondaryText }]}>
                             {safeFormatDate(day.dayStart, 'PP')} · {day.totalCount}
                         </Text>
-                        {day.events.map((event) => {
+                        {visibleEvents.map((event) => {
                             const start = safeParseDate(event.start);
                             const timeLabel = event.allDay || !start ? labels.allDay : safeFormatDate(start, 'HH:mm');
                             return (
@@ -479,11 +509,18 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                 </View>
                             );
                         })}
-                        {day.totalCount > day.events.length && (
-                            <Text style={[styles.calendarEventMeta, { color: tc.secondaryText }]}>
-                                +{day.totalCount - day.events.length} {labels.more}
-                            </Text>
+                        {day.totalCount > 2 && (
+                            <TouchableOpacity onPress={() => toggleExternalDayExpanded(dayKey)}>
+                                <Text style={[styles.calendarEventMeta, styles.calendarToggleText, { color: tc.secondaryText }]}>
+                                    {isExpanded
+                                        ? labels.less
+                                        : `+${day.totalCount - visibleEvents.length} ${labels.more}`}
+                                </Text>
+                            </TouchableOpacity>
                         )}
+                                </>
+                            );
+                        })()}
                     </View>
                 ))}
             </View>
@@ -654,6 +691,12 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                         <Text style={[styles.stepTitle, { color: tc.text }]}>
                             📅 {labels.calendar}
                         </Text>
+                        <TouchableOpacity
+                            style={[styles.reviewAddTaskButton, { borderColor: tc.border }]}
+                            onPress={() => openReviewQuickAdd({ status: 'inbox' })}
+                        >
+                            <Text style={[styles.reviewAddTaskButtonText, { color: tc.text }]}>{labels.addTask}</Text>
+                        </TouchableOpacity>
                         <Text style={[styles.hint, { color: tc.secondaryText }]}>
                             {labels.calendarDesc}
                         </Text>
@@ -721,6 +764,17 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                                 <View style={styles.projectHeader}>
                                                     <View style={[styles.projectDot, { backgroundColor: (project.areaId ? areaById.get(project.areaId)?.color : undefined) || tc.tint }]} />
                                                     <Text style={[styles.projectTitle, { color: tc.text }]}>{project.title}</Text>
+                                                    <TouchableOpacity
+                                                        style={[styles.reviewProjectAddTaskButton, { borderColor: tc.border }]}
+                                                        onPress={(event) => {
+                                                            event.stopPropagation();
+                                                            openReviewQuickAdd({ projectId: project.id, status: 'next' });
+                                                        }}
+                                                    >
+                                                        <Text style={[styles.reviewProjectAddTaskButtonText, { color: tc.text }]}>
+                                                            {labels.addTask}
+                                                        </Text>
+                                                    </TouchableOpacity>
                                                     <View style={[styles.statusBadge, { backgroundColor: hasNextAction ? '#10B98120' : '#EF444420' }]}>
                                                         <Text style={[styles.statusText, { color: hasNextAction ? '#10B981' : '#EF4444' }]}>
                                                             {hasNextAction ? labels.hasNext : labels.needsAction}
@@ -1031,6 +1085,22 @@ const styles = StyleSheet.create({
     calendarEventMeta: {
         fontSize: 12,
     },
+    calendarToggleText: {
+        textDecorationLine: 'underline',
+        marginTop: 2,
+    },
+    reviewAddTaskButton: {
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 10,
+    },
+    reviewAddTaskButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
     projectItem: {
         padding: 12,
         borderRadius: 8,
@@ -1052,6 +1122,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         flex: 1,
+    },
+    reviewProjectAddTaskButton: {
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginRight: 8,
+    },
+    reviewProjectAddTaskButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     statusBadge: {
         paddingHorizontal: 8,
