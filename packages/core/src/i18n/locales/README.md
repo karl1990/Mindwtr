@@ -6,8 +6,8 @@ Mindwtr keeps translations under this folder so community contributions are easy
 - `zh.ts`: Full Chinese dictionary.
 - `*.ts` for other languages: manual override dictionaries.
 
-For languages using overrides, only add keys that need custom wording.
-Any missing key is automatically translated from English by the i18n build step.
+For languages using overrides, prefer adding explicit translations for all keys.
+Any missing key falls back to the English source string at runtime.
 
 ## How to contribute a language fix
 

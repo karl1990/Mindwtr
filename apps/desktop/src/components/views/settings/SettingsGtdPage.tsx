@@ -89,6 +89,7 @@ export function SettingsGtdPage({
             ja: translateText('days', 'ja'),
             fr: translateText('days', 'fr'),
             pt: translateText('days', 'pt'),
+            pl: translateText('days', 'pl'),
             ko: translateText('days', 'ko'),
             it: translateText('days', 'it'),
             tr: translateText('days', 'tr'),

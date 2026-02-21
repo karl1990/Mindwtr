@@ -1,13 +1,12 @@
 import type { Language } from './i18n-types';
-import { autoTranslate } from './i18n-translate';
 
 const translationsCache = new Map<Language, Record<string, string>>();
 const loadPromises = new Map<Language, Promise<void>>();
 
-const buildTranslations = (lang: Language, base: Record<string, string>, overrides: Record<string, string>) => {
+const buildTranslations = (base: Record<string, string>, overrides: Record<string, string>) => {
     const result: Record<string, string> = {};
     for (const [key, value] of Object.entries(base)) {
-        result[key] = overrides[key] ?? autoTranslate(value, lang);
+        result[key] = overrides[key] ?? value;
     }
     return result;
 };
@@ -165,7 +164,7 @@ async function ensureLoaded(lang: Language): Promise<void> {
         const base = await ensureEnglishLoaded();
         const overrides = await loadOverrides(lang);
         if (overrides) {
-            translationsCache.set(lang, buildTranslations(lang, base, overrides));
+            translationsCache.set(lang, buildTranslations(base, overrides));
             return;
         }
         translationsCache.set(lang, base);

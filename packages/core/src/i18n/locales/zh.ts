@@ -1,9 +1,6 @@
 // Split from i18n-translations.ts to make community translation contributions easier.
 export const zh: Record<string, string> = {
-        // App
         'app.name': 'Mindwtr',
-
-        // Navigation
         'nav.main': '主页',
         'nav.inbox': '收集箱',
         'nav.board': '看板',
@@ -26,8 +23,6 @@ export const zh: Record<string, string> = {
         'nav.sectionLists': '列表',
         'nav.sectionOrganize': '整理',
         'nav.sectionArchive': '归档',
-
-        // Quick Add
         'quickAdd.help': '快速添加支持 /start:<when>、/due:<when>、/review:<when>、/note:<text>、/next、/area:<name> 或 !Area、@context、#tag、+Project。',
         'quickAdd.example': '示例：给妈妈打电话 /start:tomorrow /due:tomorrow 5pm @phone #family',
         'quickAdd.placeholder': '添加任务… 支持 @情境 +项目 #标签 /start:tomorrow /due:tomorrow',
@@ -41,11 +36,7 @@ export const zh: Record<string, string> = {
         'quickAdd.audioPermissionBody': '请允许麦克风权限以录制语音捕捉。',
         'quickAdd.audioErrorTitle': '录音失败',
         'quickAdd.audioErrorBody': '无法录制语音，请重试。',
-
-        // Checklist
         'checklist.progress': '清单进度',
-
-        // Keybindings (Desktop)
         'keybindings.helpTitle': '快捷键',
         'keybindings.helpSubtitle': '按 Esc 关闭',
         'keybindings.styleLabel': '快捷键风格',
@@ -83,8 +74,6 @@ export const zh: Record<string, string> = {
         'keybindings.list.newTask': '聚焦添加任务输入框',
         'keybindings.list.toggleDetails': '切换详情显示',
         'keybindings.list.toggleDensity': '切换密度',
-
-        // Tabs (Mobile)
         'tab.inbox': '收集箱',
         'tab.next': '专注',
         'tab.board': '看板',
@@ -92,8 +81,6 @@ export const zh: Record<string, string> = {
         'tab.agenda': '日程',
         'tab.calendar': '日历',
         'tab.review': '回顾',
-
-        // List Views
         'list.inbox': '收集箱',
         'list.todo': '待办',
         'list.inProgress': '进行中',
@@ -112,8 +99,6 @@ export const zh: Record<string, string> = {
         'list.densityComfortable': '舒适',
         'list.densityCompact': '紧凑',
         'reference.empty': '暂无参考条目。',
-
-        // Status Labels
         'status.inbox': '收集箱',
         'status.todo': '待办',
         'status.next': '下一步',
@@ -124,14 +109,10 @@ export const zh: Record<string, string> = {
         'status.done': '已完成',
         'status.archived': '归档',
         'status.active': '活跃',
-
-        // Priority Labels
         'priority.low': '低',
         'priority.medium': '中',
         'priority.high': '高',
         'priority.urgent': '紧急',
-
-        // Task Edit
         'taskEdit.editTask': '编辑任务',
         'taskEdit.checklist': '清单',
         'taskEdit.tab.task': '任务',
@@ -161,6 +142,10 @@ export const zh: Record<string, string> = {
         'taskEdit.recurrenceLabel': '重复',
         'taskEdit.descriptionLabel': '描述',
         'taskEdit.descriptionPlaceholder': '添加备注...',
+        'taskEdit.textDirectionLabel': 'Text direction',
+        'taskEdit.textDirection.auto': 'Auto',
+        'taskEdit.textDirection.ltr': 'Left to right',
+        'taskEdit.textDirection.rtl': 'Right to left',
         'taskEdit.basic': '基础',
         'taskEdit.scheduling': '时间安排',
         'taskEdit.schedulingEmpty': 'All scheduling fields are hidden. Show them in Settings > GTD > Task editor layout.',
@@ -190,6 +175,8 @@ export const zh: Record<string, string> = {
         'taskEdit.locationPlaceholder': '例如：办公室',
         'taskEdit.projectLabel': '项目',
         'taskEdit.noProjectOption': '无项目',
+        'taskEdit.sectionLabel': 'Section',
+        'taskEdit.noSectionOption': 'No Section',
         'taskEdit.areaLabel': '领域',
         'taskEdit.noAreaOption': '无领域',
         'taskEdit.moreOptions': '更多选项',
@@ -218,8 +205,6 @@ export const zh: Record<string, string> = {
         'task.aria.dueDate': '截止日期',
         'task.aria.dueTime': '截止时间',
         'task.aria.location': '地点',
-
-        // Recurrence Labels
         'recurrence.none': '无',
         'recurrence.daily': '每天',
         'recurrence.weekly': '每周',
@@ -247,8 +232,6 @@ export const zh: Record<string, string> = {
         'recurrence.strategyFluidDesc': '按完成时间后顺延（如洗衣）',
         'recurrence.afterCompletion': '完成后重复',
         'recurrence.afterCompletionShort': '完成后',
-
-        // Inbox (Mobile)
         'inbox.title': '收集箱',
         'inbox.processButton': '处理收集箱',
         'inbox.addPlaceholder': '添加任务到收集箱...',
@@ -284,8 +267,6 @@ export const zh: Record<string, string> = {
         'inbox.assignProjectQuestion': '要归入项目吗？（可选）',
         'inbox.noProject': '不归入项目',
         'inbox.skip': '跳过',
-
-        // Next Actions (Mobile)
         'next.title': '下一步行动',
         'next.ready': '个任务准备就绪',
         'next.current': '当前行动',
@@ -295,8 +276,6 @@ export const zh: Record<string, string> = {
         'next.noContext': '没有此情境的下一步行动',
         'next.warningCount': '个任务在下一步行动中',
         'next.warningHint': '建议减少同时推进的项目。GTD 推荐保持 10–15 个下一步行动以保持清晰。',
-
-        // Contact / Contexts (Mobile updates)
         'contexts.title': '情境',
         'contexts.filter': '按情境筛选任务',
         'filters.label': '筛选',
@@ -312,8 +291,6 @@ export const zh: Record<string, string> = {
         'contexts.none': '无情境',
         'contexts.noContexts': '未找到情境。为任务添加 @家, @工作, @电脑 等情境',
         'contexts.noTasks': '此情境没有活跃任务',
-
-        // Board
         'board.title': '看板',
         'board.next': '下一步行动',
         'board.todo': '待办',
@@ -321,9 +298,8 @@ export const zh: Record<string, string> = {
         'board.done': '已完成',
         'board.noTasks': '没有任务',
         'board.hint': '长按拖动 • 左滑删除',
+        'board.dragTask': 'Drag task',
         'board.delete': '删除',
-
-        // Calendar
         'calendar.title': '日历',
         'calendar.addTask': '添加新任务...',
         'calendar.schedulePlaceholder': '搜索要安排的任务...',
@@ -337,8 +313,6 @@ export const zh: Record<string, string> = {
         'calendar.noTasks': '这一天没有任务',
         'calendar.noFreeTime': '当天没有可用时间段。',
         'calendar.overlapWarning': '该时间与已有日程冲突，请选择空闲时间段。',
-
-        // Projects
         'projects.title': '项目',
         'projects.statusLabel': '状态',
         'projects.activeSection': '活跃项目',
@@ -367,6 +341,11 @@ export const zh: Record<string, string> = {
         'projects.reviewAt': '回顾日期',
         'projects.areaLabel': '领域',
         'projects.areaPlaceholder': '例如：工作',
+        'projects.sectionsLabel': 'Sections',
+        'projects.addSection': 'Add Section',
+        'projects.sectionPlaceholder': 'Section title',
+        'projects.noSection': 'No Section',
+        'projects.deleteSectionConfirm': 'Are you sure you want to delete this section?',
         'projects.areaFilter': '领域筛选',
         'projects.allAreas': '所有领域',
         'projects.noArea': '无领域',
@@ -391,7 +370,6 @@ export const zh: Record<string, string> = {
         'projects.parallelTooltip': '并行：所有任务都显示为下一步行动',
         'projects.reviewAtHint': '用于提醒你回顾此项目的日期。',
         'projects.noNextAction': '没有下一步行动',
-        // Tutorial
         'tutorial.title': '搞定一切 GTD 方法',
         'tutorial.subtitle': '掌握这个应用程序提高您效率的指南。',
         'tutorial.capture': '1. 收集（收集箱）',
@@ -431,8 +409,6 @@ export const zh: Record<string, string> = {
         'tutorial.perfectionismText': '你的系统不需要完美。它只需要比你的大脑工作得更好。',
         'tutorial.unstuck': '摆脱停滞',
         'tutorial.unstuckText': '如果一个任务没有进展，问问自己：下一步行动清晰吗？我需要把它分解吗？它仍然重要吗？',
-
-        // Review Steps
         'review.title': '回顾',
         'review.intro': '保持清晰、保持当前、保持创意。',
         'review.openGuide': '每周回顾',
@@ -508,7 +484,6 @@ export const zh: Record<string, string> = {
         'review.nextStepBtn': '下一步',
         'review.stuckQuestion': '这个项目卡住了吗？',
         'review.stuckPrompt': '尝试重新措辞使其更具可执行性，或者如果不再相关则删除/放入将来列表。',
-        // Mobile Review keys
         'review.notSet': '未设置',
         'review.description': '描述',
         'review.startTime': '推迟至',
@@ -516,8 +491,6 @@ export const zh: Record<string, string> = {
         'review.contexts': '情境',
         'review.markDone': '标记完成',
         'review.noTasks': '没有要回顾的任务',
-
-        // Processing
         'process.title': '处理事项',
         'process.refineTitle': '先澄清任务内容',
         'process.refineDesc': '先明确它是什么，再决定如何处理。',
@@ -541,6 +514,13 @@ export const zh: Record<string, string> = {
         'process.nextStepDesc': '是你自己做，还是指派给他人？',
         'process.doIt': '📋 我来做',
         'process.delegate': '指派他人',
+        'process.delegateTitle': 'Delegate',
+        'process.delegateDesc': 'Optionally note who and a follow-up date.',
+        'process.delegateWhoLabel': 'Who? (optional)',
+        'process.delegateWhoPlaceholder': 'e.g., Alex',
+        'process.delegateFollowUpLabel': 'Follow-up date (optional)',
+        'process.delegateSendRequest': 'Send request...',
+        'process.delegateMoveToWaiting': 'Move to Waiting',
         'process.context': '在哪里执行？',
         'process.contextDesc': '添加情境以便稍后查找',
         'process.selectMultipleHint': '（可多选或不选）',
@@ -564,8 +544,6 @@ export const zh: Record<string, string> = {
         'process.newContextPlaceholder': '新情境...',
         'process.remaining': '项剩余',
         'process.btn': '处理收件箱',
-
-        // Settings
         'settings.title': '设置',
         'settings.subtitle': '自定义您的 Mindwtr 体验',
         'settings.appearance': '外观',
@@ -613,7 +591,6 @@ export const zh: Record<string, string> = {
         'settings.logMissing': '日志尚未生成，请先开启日志并复现问题。',
         'settings.logCleared': '日志已清除。',
         'settings.shareUnavailable': '此设备不支持分享。',
-        // Mobile Settings
         'settings.useSystem': '跟随系统',
         'settings.followDevice': '跟随设备外观设置',
         'settings.darkMode': '深色模式',
@@ -673,6 +650,9 @@ export const zh: Record<string, string> = {
         'settings.aiEnable': '启用 AI 助手',
         'settings.aiProvider': '服务商',
         'settings.aiModel': '模型',
+        'settings.aiBaseUrl': 'Custom base URL',
+        'settings.aiBaseUrlHint': 'Optional. For local OpenAI-compatible servers (e.g., http://localhost:11434/v1).',
+        'settings.aiBaseUrlPlaceholder': 'http://localhost:11434/v1',
         'settings.aiApiKey': 'API 密钥',
         'settings.aiApiKeyHint': '仅保存在本机，不会同步。',
         'settings.aiApiKeyPlaceholder': '粘贴 API 密钥',
@@ -706,8 +686,10 @@ export const zh: Record<string, string> = {
         'settings.speechFieldDescription': '描述',
         'settings.aiReasoning': '推理强度',
         'settings.aiReasoningHint': '仅用于 GPT-5 模型。',
+        'settings.aiReasoningHintFoss': 'Used by supported models.',
         'settings.aiProviderOpenAI': 'OpenAI',
         'settings.aiProviderGemini': 'Gemini',
+        'settings.aiProviderAnthropic': 'Anthropic (Claude)',
         'settings.aiEffortLow': '低',
         'settings.aiEffortMedium': '中',
         'settings.aiEffortHigh': '高',
@@ -781,7 +763,6 @@ export const zh: Record<string, string> = {
         'settings.weeklyReviewIncludeContextsStep': '包含情境步骤',
         'settings.weeklyReviewIncludeContextsStepDesc': '在“等待中”和“项目”之间显示专门的情境回顾步骤。',
         'widget.capture': '快速记录',
-
         'digest.morningTitle': '早间简报',
         'digest.morningBody': '打开 Mindwtr 规划今天。',
         'digest.eveningTitle': '晚间回顾',
@@ -793,8 +774,6 @@ export const zh: Record<string, string> = {
         'digest.focus': '今日重点',
         'digest.reviewDue': '待回顾',
         'digest.noItems': '今天没有紧急事项。',
-
-        // Common
         'common.tasks': '个任务',
         'common.cancel': '取消',
         'common.save': '保存',
@@ -818,9 +797,10 @@ export const zh: Record<string, string> = {
         'common.less': '收起',
         'common.loading': '加载中...',
         'common.offline': '离线',
+        'errorBoundary.title': 'Something went wrong',
+        'errorBoundary.message': 'The app encountered an unexpected error.',
+        'errorBoundary.retry': 'Try again',
         'audio.loading': '正在加载音频...',
-
-        // Bulk Actions
         'bulk.select': '选择',
         'bulk.exitSelect': '完成',
         'bulk.selected': '已选择',
@@ -831,8 +811,6 @@ export const zh: Record<string, string> = {
         'bulk.delete': '删除所选',
         'bulk.confirmDeleteTitle': '删除任务',
         'bulk.confirmDeleteBody': '删除选中的任务？',
-
-        // Sorting
         'sort.label': '排序',
         'sort.default': '默认',
         'sort.due': '按截止日期',
@@ -841,8 +819,6 @@ export const zh: Record<string, string> = {
         'sort.title': '按标题',
         'sort.created': '按创建时间（最早）',
         'sort.created-desc': '按创建时间（最新）',
-
-        // Agenda
         'agenda.title': '日程',
         'agenda.active': '个活动项目',
         'agenda.top3Only': '仅显示前三项',
@@ -867,22 +843,16 @@ export const zh: Record<string, string> = {
         'agenda.noTasks': '目前没有紧急任务。',
         'focus.schedule': '今天',
         'focus.nextActions': '下一步行动',
-
-        // Task Age
         'taskAge.day': '天前',
         'taskAge.days': '天前',
         'taskAge.week': '周前',
         'taskAge.weeks': '周前',
         'taskAge.month': '个月前',
         'taskAge.months': '个月前',
-
-        // Energy Contexts
         'context.energy.focused': '专注',
         'context.energy.lowenergy': '低能量',
         'context.energy.creative': '创意',
         'context.energy.routine': '常规',
-
-        // Waiting (Mobile)
         'waiting.title': '等待中',
         'waiting.subtitle': '等待他人或外部事件的任务',
         'waiting.count': '等待中',
@@ -891,8 +861,6 @@ export const zh: Record<string, string> = {
         'waiting.markDone': '标记完成',
         'waiting.empty': '没有等待中的任务',
         'waiting.emptyHint': '使用"等待中"状态标记依赖他人或外部事件的任务',
-
-        // Someday (Mobile)
         'someday.title': '将来/也许',
         'someday.subtitle': '未来可能想要追求的想法和目标',
         'someday.ideas': '想法',
@@ -901,8 +869,6 @@ export const zh: Record<string, string> = {
         'someday.archive': '归档',
         'someday.empty': '没有将来/也许项目',
         'someday.emptyHint': '使用"将来"状态存储未来可能想做的想法、目标和项目',
-
-        // Search
         'search.title': '搜索',
         'search.placeholder': '搜索任务和项目...',
         'search.noResults': '未找到结果',
@@ -934,8 +900,6 @@ export const zh: Record<string, string> = {
         'search.due.thisWeek': '本周',
         'search.due.nextWeek': '下周',
         'search.due.none': '无截止日期',
-
-        // Archived
         'archived.title': '归档',
         'archived.searchPlaceholder': '搜索归档任务...',
         'archived.noTasksFound': '未找到归档任务。',
@@ -953,5 +917,8 @@ export const zh: Record<string, string> = {
         'trash.deletedAt': '删除于',
         'trash.deleteConfirm': '永久删除？',
         'trash.deleteConfirmBody': '此操作无法撤销。',
+        'trash.clearAll': 'Clear Trash',
+        'trash.clearAllConfirm': 'Clear all trashed tasks?',
+        'trash.clearAllConfirmBody': 'This will permanently delete all trashed tasks.',
         'contexts.search': '搜索情境...',
 };
