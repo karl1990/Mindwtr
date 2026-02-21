@@ -65,8 +65,8 @@
           "widgets": [
             {
               "name": "TasksWidget",
-              "label": "Mindwtr Focus",
-              "description": "Today's focus and next actions",
+              "label": "Mindwtr",
+              "description": "Inbox, focus, and quick capture",
               "minWidth": "160dp",
               "minHeight": "160dp",
               "targetCellWidth": 2,

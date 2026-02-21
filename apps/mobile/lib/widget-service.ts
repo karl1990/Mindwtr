@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Appearance, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type AppData, useTaskStore } from '@mindwtr/core';
 
@@ -9,6 +9,16 @@ import { logError, logWarn } from './app-log';
 export function isAndroidWidgetSupported(): boolean {
     return Platform.OS === 'android';
 }
+
+const getSystemColorScheme = (): 'light' | 'dark' | undefined => {
+    try {
+        const scheme = Appearance.getColorScheme();
+        if (scheme === 'light' || scheme === 'dark') return scheme;
+        return undefined;
+    } catch {
+        return undefined;
+    }
+};
 
 async function getWidgetApi() {
     if (Platform.OS !== 'android') return null;
@@ -36,7 +46,9 @@ export async function updateAndroidWidgetFromData(data: AppData): Promise<boolea
     try {
         const languageValue = await AsyncStorage.getItem(WIDGET_LANGUAGE_KEY);
         const language = resolveWidgetLanguage(languageValue, data.settings?.language);
-        const payload = buildWidgetPayload(data, language);
+        const payload = buildWidgetPayload(data, language, {
+            systemColorScheme: getSystemColorScheme(),
+        });
         for (let attempt = 0; attempt < 2; attempt += 1) {
             try {
                 await widgetApi.requestWidgetUpdate({

@@ -4,17 +4,17 @@ import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { TasksWidgetPayload } from '../lib/widget-data';
 
 export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
-    const { headerTitle, inboxLabel, inboxCount, items, emptyMessage, captureLabel } = payload;
+    const { headerTitle, subtitle, items, emptyMessage, captureLabel, palette } = payload;
     const children: React.ReactElement[] = [
         React.createElement(TextWidget, {
             key: 'header',
             text: headerTitle,
-            style: { color: '#F9FAFB', fontSize: 14, fontWeight: '600' },
+            style: { color: palette.text, fontSize: 14, fontWeight: '600' },
         }),
         React.createElement(TextWidget, {
-            key: 'inbox',
-            text: `${inboxLabel}: ${inboxCount}`,
-            style: { color: '#CBD5F5', fontSize: 11, marginTop: 4 },
+            key: 'subtitle',
+            text: subtitle,
+            style: { color: palette.mutedText, fontSize: 11, marginTop: 4 },
         }),
     ];
 
@@ -24,7 +24,17 @@ export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
                 React.createElement(TextWidget, {
                     key: `item-${item.id}`,
                     text: `• ${item.title}`,
-                    style: { color: '#F8FAFC', fontSize: 12, marginTop: index === 0 ? 10 : 6 },
+                    style: {
+                        color: palette.text,
+                        fontSize: 12,
+                        marginTop: index === 0 ? 10 : 6,
+                        backgroundColor: palette.card,
+                        borderRadius: 6,
+                        borderColor: palette.border,
+                        borderWidth: 1,
+                        paddingVertical: 4,
+                        paddingHorizontal: 8,
+                    },
                     maxLines: 1,
                     truncate: 'END',
                 })
@@ -35,7 +45,17 @@ export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
             React.createElement(TextWidget, {
                 key: 'empty',
                 text: emptyMessage,
-                style: { color: '#CBD5F5', fontSize: 12, marginTop: 10 },
+                style: {
+                    color: palette.mutedText,
+                    fontSize: 12,
+                    marginTop: 10,
+                    backgroundColor: palette.card,
+                    borderRadius: 6,
+                    borderColor: palette.border,
+                    borderWidth: 1,
+                    paddingVertical: 4,
+                    paddingHorizontal: 8,
+                },
             })
         );
     }
@@ -45,16 +65,17 @@ export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
             key: 'capture',
             text: captureLabel,
             style: {
-                color: '#FFFFFF',
+                color: palette.onAccent,
                 fontSize: 12,
                 fontWeight: '600',
-                backgroundColor: '#2563EB',
+                backgroundColor: palette.accent,
                 paddingVertical: 6,
                 paddingHorizontal: 10,
                 marginTop: 12,
+                borderRadius: 999,
             },
             clickAction: 'OPEN_URI',
-            clickActionData: { uri: 'mindwtr:///capture-quick' },
+            clickActionData: { uri: 'mindwtr:///capture-quick?mode=text' },
         })
     );
 
@@ -65,7 +86,7 @@ export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
                 width: 'match_parent',
                 height: 'match_parent',
                 padding: 12,
-                backgroundColor: '#111827',
+                backgroundColor: palette.background,
             },
             clickAction: 'OPEN_URI',
             clickActionData: { uri: 'mindwtr:///focus' },
