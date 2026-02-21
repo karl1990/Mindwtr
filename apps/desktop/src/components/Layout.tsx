@@ -28,12 +28,14 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     const { t } = useLanguage();
     const isCollapsed = settings?.sidebarCollapsed ?? false;
     const isFocusMode = useUiStore((state) => state.isFocusMode);
-    const showToast = useUiStore((state) => state.showToast);
+    const tOrFallback = (key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    };
     const [syncStatus, setSyncStatus] = useState(() => SyncService.getSyncStatus());
     const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
     const lastSyncAt = settings?.lastSyncAt;
     const lastSyncStatus = settings?.lastSyncStatus;
-    const lastSyncDisplay = lastSyncAt ? safeFormatDate(lastSyncAt, 'PPp', lastSyncAt) : t('settings.lastSyncNever');
     const lastSyncAgeMs = lastSyncAt ? Math.max(0, Date.now() - Date.parse(lastSyncAt)) : Number.POSITIVE_INFINITY;
     const syncFreshnessDotClass = !isOnline
         ? 'bg-destructive'
@@ -46,12 +48,26 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                 : lastSyncAgeMs > 30 * 60 * 1000
                         ? 'bg-amber-400'
                         : 'bg-emerald-400';
+    const fullSyncTimestamp = lastSyncAt ? safeFormatDate(lastSyncAt, 'PPpp', lastSyncAt) : t('settings.lastSyncNever');
+    const syncTooltip = !isOnline
+        ? (t('common.offline') || 'Offline')
+        : `${tOrFallback('settings.lastSync', 'Last sync')}: ${fullSyncTimestamp}`;
+    const formatCompactSyncTime = (iso: string) => {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return iso;
+        return new Intl.DateTimeFormat(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        }).format(date);
+    };
+    const compactSyncLabel = syncStatus.inFlight
+        ? tOrFallback('settings.syncing', 'Syncing...')
+        : lastSyncAt
+            ? `Synced ${formatCompactSyncTime(lastSyncAt)}`
+            : tOrFallback('settings.lastSyncNever', 'Never');
     const dismissLabel = t('common.dismiss');
     const dismissText = dismissLabel && dismissLabel !== 'common.dismiss' ? dismissLabel : 'Dismiss';
-    const tOrFallback = (key: string, fallback: string) => {
-        const value = t(key);
-        return value === key ? fallback : value;
-    };
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const resolvedAreaFilter = useMemo(
@@ -170,45 +186,6 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     useEffect(() => {
         return SyncService.subscribeSyncStatus(setSyncStatus);
     }, []);
-
-    const triggerManualSync = async () => {
-        const backend = await SyncService.getSyncBackend();
-        if (backend === 'off') {
-            showToast('Sync is off. Enable a sync backend in Settings.', 'info');
-            return;
-        }
-        if (backend === 'file') {
-            const syncPath = await SyncService.getSyncPath();
-            if (!syncPath) {
-                showToast('Select a sync folder first in Settings.', 'error');
-                return;
-            }
-        } else if (backend === 'webdav') {
-            const { url } = await SyncService.getWebDavConfig({ silent: true });
-            if (!url) {
-                showToast('Set your WebDAV URL in Settings first.', 'error');
-                return;
-            }
-        } else if (backend === 'cloud') {
-            const { url } = await SyncService.getCloudConfig({ silent: true });
-            if (!url) {
-                showToast('Set your self-hosted URL in Settings first.', 'error');
-                return;
-            }
-        }
-        const result = await SyncService.performSync();
-        if (!result.success) {
-            showToast(result.error || 'Sync failed.', 'error');
-            return;
-        }
-        const conflicts = (result.stats?.tasks.conflicts || 0) + (result.stats?.projects.conflicts || 0);
-        showToast(
-            conflicts > 0
-                ? `Sync completed with ${conflicts} conflict${conflicts === 1 ? '' : 's'} resolved.`
-                : 'Sync completed.',
-            'success'
-        );
-    };
 
     const handleAreaFilterChange = (value: string) => {
         updateSettings({ filters: { ...(settings?.filters ?? {}), areaId: value } })
@@ -363,58 +340,36 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                         </div>
                     )}
                     <div className="border-t border-border" />
-                    <button
-                        onClick={() => onViewChange('settings')}
-                        className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset",
-                            currentView === 'settings'
-                                ? "bg-primary/10 text-primary"
-                                : "hover:bg-accent text-muted-foreground",
-                            isCollapsed && "justify-center px-2"
-                        )}
-                        aria-current={currentView === 'settings' ? 'page' : undefined}
-                        title={t('nav.settings')}
-                    >
-                        <Settings className="w-4 h-4" />
-                        {!isCollapsed && (
-                            <div className="flex-1 flex items-center justify-between">
-                                <span>{t('nav.settings')}</span>
-                                <div className="flex items-center gap-1.5">
-                                    <span className={cn(
-                                        "w-1.5 h-1.5 rounded-full shrink-0",
-                                        syncFreshnessDotClass
-                                    )} />
-                                    <span className="text-[10px] text-muted-foreground/60 truncate max-w-[100px]">
-                                        {!isOnline
-                                            ? (t('common.offline') || 'Offline')
-                                            : lastSyncAt
-                                                ? lastSyncDisplay
-                                                : t('settings.lastSyncNever')}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </button>
-                    {!isCollapsed && (
-                        <div className="px-3 pb-2 pt-1">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    triggerManualSync().catch((error) => reportError('Sync failed', error));
-                                }}
-                                disabled={syncStatus.inFlight}
-                                className={cn(
-                                    "w-full flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-                                    syncStatus.inFlight
-                                        ? "border-border bg-muted/40 text-muted-foreground cursor-not-allowed"
-                                        : "border-border bg-muted/60 hover:bg-accent text-foreground"
-                                )}
-                            >
-                                <RefreshCw className={cn("w-3.5 h-3.5", syncStatus.inFlight && "animate-spin")} />
-                                {syncStatus.inFlight ? tOrFallback('settings.syncing', 'Syncing...') : tOrFallback('settings.syncNow', 'Sync now')}
-                            </button>
-                        </div>
-                    )}
+                    <div className="px-2 pb-2 pt-2">
+                        <button
+                            onClick={() => onViewChange('settings')}
+                            className={cn(
+                                "w-full rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset text-xs font-medium h-9 px-3 flex items-center",
+                                isCollapsed ? "justify-center" : "justify-between",
+                                currentView === 'settings'
+                                    ? "border-primary/50 bg-primary/10 text-primary"
+                                    : "border-border bg-muted/40 hover:bg-accent text-muted-foreground"
+                            )}
+                            aria-current={currentView === 'settings' ? 'page' : undefined}
+                            title={!isCollapsed ? `${t('nav.settings')} • ${syncTooltip}` : t('nav.settings')}
+                            aria-label={t('nav.settings')}
+                        >
+                            <span className="inline-flex items-center gap-2">
+                                <Settings className="w-4 h-4" />
+                                {!isCollapsed && <span>{t('nav.settings')}</span>}
+                            </span>
+                            {!isCollapsed && (
+                                <span className="inline-flex items-center gap-2 text-[11px]">
+                                    <RefreshCw className={cn("w-3.5 h-3.5", syncStatus.inFlight && "animate-spin")} />
+                                    <span>{compactSyncLabel}</span>
+                                    <span
+                                        className={cn("w-2 h-2 rounded-full shrink-0", syncFreshnessDotClass)}
+                                        title={syncTooltip}
+                                    />
+                                </span>
+                            )}
+                        </button>
+                    </div>
                 </div>
                 </aside>
             )}
