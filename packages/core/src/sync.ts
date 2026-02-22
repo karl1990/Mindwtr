@@ -702,13 +702,14 @@ const mergeSettingsForSync = (localSettings: AppData['settings'], incomingSettin
 };
 
 /**
- * Merge entities with soft-delete support using Last-Write-Wins (LWW) strategy.
- * 
+ * Merge entities with soft-delete support using revision-aware conflict resolution.
+ *
  * Rules:
- * 1. If an item exists only in one source, include it
- * 2. If an item exists in both, take the one with newer updatedAt
- * 3. Deleted items (deletedAt set) are preserved - deletion syncs across devices
- * 4. If one version is deleted and one is not, the newer version wins
+ * 1. If an item exists only in one source, include it.
+ * 2. When revisions are present, resolve by operation semantics:
+ *    deletion op time, revision number, timestamp, then deterministic tie-break.
+ * 3. Without revisions, fall back to timestamp-based conflict resolution.
+ * 4. Deleted items (deletedAt set) are preserved so deletion propagates cross-device.
  */
 function createEmptyEntityStats(localTotal: number, incomingTotal: number): EntityMergeStats {
     return {
@@ -961,8 +962,8 @@ export function filterDeleted<T extends { deletedAt?: string }>(items: T[]): T[]
 
 /**
  * Merge two AppData objects for synchronization.
- * Uses Last-Write-Wins for tasks and projects.
- * Preserves local settings (device-specific preferences).
+ * Uses revision-aware entity merge plus deterministic tie-breakers for convergence.
+ * Preserves local-only settings while merging sync-enabled settings groups.
  */
 export function mergeAppDataWithStats(local: AppData, incoming: AppData): MergeResult {
     const nowIso = new Date().toISOString();
