@@ -74,6 +74,23 @@ Mindwtr supports natural language quick-add. Type directly in the task input:
 
 ---
 
+## Organizing Model
+
+Mindwtr uses four different grouping tools. Use each for what it is good at:
+
+- **Projects**: Multi-step outcomes you want to complete (for example, "Launch v2 website").
+- **Areas**: Ongoing responsibility domains with no finish line (for example, "Health", "Family", "Career").
+- **Contexts**: Where/how a task can be done (for example, `@home`, `@phone`, `@errands`).
+- **Tags**: Flexible labels for energy, theme, or custom grouping (for example, `#focused`, `#lowenergy`).
+
+Practical rule:
+- If it has an end state, use a **Project**.
+- If it is a long-term life/work domain, use an **Area**.
+- If it depends on place/tool/person, use a **Context**.
+- If you want optional filtering, use a **Tag**.
+
+---
+
 ## Next Steps
 
 - Learn about [[GTD Overview]]

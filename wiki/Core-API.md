@@ -28,7 +28,7 @@ interface Task {
     id: string;                    // UUID
     title: string;                 // Task title
     status: TaskStatus;            // Current status
-    taskMode?: 'task' | 'list';    // Default: 'task'
+    taskMode?: 'task' | 'list';    // 'list' = checklist-first task
     priority?: TaskPriority;       // 'low' | 'medium' | 'high' | 'urgent'
     startTime?: string;            // ISO date string
     dueDate?: string;              // ISO date string
@@ -40,11 +40,16 @@ interface Task {
     attachments?: Attachment[];    // Files/Links
     location?: string;             // Physical location
     projectId?: string;            // Parent project ID
+    sectionId?: string;            // Parent section ID
+    areaId?: string;               // Parent area ID (optional direct grouping)
     isFocusedToday?: boolean;      // Today's priority
     pushCount?: number;            // Number of times due date was pushed later
+    textDirection?: 'auto' | 'ltr' | 'rtl';
     timeEstimate?: TimeEstimate;   // '5min' | '10min' | '15min' | '30min' | '1hr' | '2hr' | '3hr' | '4hr' | '4hr+'
     reviewAt?: string;             // Tickler date
     completedAt?: string;          // When completed
+    rev?: number;                  // Monotonic revision counter for sync
+    revBy?: string;                // Device ID that issued `rev`
     createdAt: string;             // Creation timestamp
     updatedAt: string;             // Last update timestamp
     deletedAt?: string;            // Soft-delete timestamp
@@ -61,6 +66,7 @@ type TaskStatus =
     | 'next' 
     | 'waiting' 
     | 'someday' 
+    | 'reference'
     | 'done' 
     | 'archived';
 ```
@@ -81,9 +87,29 @@ interface Project {
     supportNotes?: string;         // Planning notes
     attachments?: Attachment[];    // Files/Links
     reviewAt?: string;             // Tickler date
+    rev?: number;                  // Monotonic revision counter for sync
+    revBy?: string;                // Device ID that issued `rev`
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+}
+```
+
+### Section
+
+```typescript
+interface Section {
+    id: string;
+    projectId: string;
+    title: string;
+    description?: string;
+    order: number;                 // Sort order within project
+    isCollapsed?: boolean;         // UI collapsed state
+    rev?: number;                  // Monotonic revision counter for sync
+    revBy?: string;                // Device ID that issued `rev`
+    createdAt: string;
+    updatedAt: string;
+    deletedAt?: string;            // Soft-delete timestamp
 }
 ```
 
@@ -96,8 +122,11 @@ interface Area {
     color?: string;
     icon?: string;
     order: number;
+    rev?: number;
+    revBy?: string;
     createdAt?: string;
     updatedAt?: string;
+    deletedAt?: string;            // Soft-delete tombstone for sync
 }
 ```
 
@@ -123,6 +152,7 @@ interface Attachment {
 interface AppData {
     tasks: Task[];
     projects: Project[];
+    sections: Section[];
     areas: Area[];
     settings: {
         theme?: 'light' | 'dark' | 'system';
