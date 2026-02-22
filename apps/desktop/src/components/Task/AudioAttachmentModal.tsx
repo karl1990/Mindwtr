@@ -61,7 +61,7 @@ export function AudioAttachmentModal({
                     onError={onAudioError}
                 />
                 {audioError ? (
-                    <div className="flex items-center justify-between text-xs text-red-500">
+                    <div className="flex items-center justify-between text-xs text-red-500" role="alert" aria-live="assertive">
                         <span>{audioError}</span>
                         <button
                             type="button"
