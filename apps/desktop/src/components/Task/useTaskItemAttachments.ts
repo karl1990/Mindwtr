@@ -33,6 +33,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
     const [textLoading, setTextLoading] = useState(false);
     const [showLinkPrompt, setShowLinkPrompt] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const audioLoadRequestRef = useRef(0);
 
     const resolveValidationMessage = useCallback((error?: string) => {
         if (error === 'file_too_large') return t('attachments.fileTooLarge');
@@ -98,6 +99,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
     }, [t]);
 
     const closeAudio = useCallback(() => {
+        audioLoadRequestRef.current += 1;
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -169,16 +171,26 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
 
     const openAttachment = useCallback((attachment: Attachment) => {
         if (isAudioAttachment(attachment)) {
+            const requestId = audioLoadRequestRef.current + 1;
+            audioLoadRequestRef.current = requestId;
             setAudioAttachment(attachment);
             setAudioError(null);
             void resolveAudioBlobSource(attachment).then((blobUrl) => {
+                if (audioLoadRequestRef.current !== requestId) {
+                    if (blobUrl) URL.revokeObjectURL(blobUrl);
+                    return;
+                }
                 if (blobUrl) {
-                    if (audioObjectUrl) {
-                        URL.revokeObjectURL(audioObjectUrl);
-                    }
-                    setAudioObjectUrl(blobUrl);
+                    setAudioObjectUrl((previousUrl) => {
+                        if (previousUrl) URL.revokeObjectURL(previousUrl);
+                        return blobUrl;
+                    });
                     setAudioSource(blobUrl);
                 } else {
+                    setAudioObjectUrl((previousUrl) => {
+                        if (previousUrl) URL.revokeObjectURL(previousUrl);
+                        return null;
+                    });
                     setAudioSource(resolveAttachmentSource(attachment.uri));
                 }
             });
@@ -212,7 +224,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
             return;
         }
         void openExternal(attachment.uri);
-    }, [audioObjectUrl, loadTextAttachment, openExternal, resolveAudioBlobSource, t]);
+    }, [loadTextAttachment, openExternal, resolveAudioBlobSource, t]);
 
     const addFileAttachment = useCallback(async () => {
         if (!isTauriRuntime()) {
