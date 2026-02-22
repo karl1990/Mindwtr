@@ -215,6 +215,7 @@ export const createSettingsActions = ({
             });
             let didProjectOrderMigration = false;
             let didAreaMigration = false;
+            let didRunAreaDedupePass = false;
             let allProjects = rawProjects;
             let allSections = rawSections;
             let allAreas = rawAreas;
@@ -279,6 +280,7 @@ export const createSettingsActions = ({
                 }
                 const shouldRunAreaMigration = hasLegacyAreaTitle || hasMissingAreaId || hasDuplicateNames;
                 if (shouldRunAreaMigration) {
+                    didRunAreaDedupePass = true;
                     const areaByName = new Map<string, string>();
                     const areaIdRemap = new Map<string, string>();
                     const uniqueAreas: Area[] = [];
@@ -353,7 +355,7 @@ export const createSettingsActions = ({
                         .sort((a, b) => a.order - b.order);
                 }
             }
-            {
+            if (!didRunAreaDedupePass) {
                 const areaByName = new Map<string, string>();
                 const areaIdRemap = new Map<string, string>();
                 const uniqueAreas: Area[] = [];
