@@ -61,8 +61,14 @@ const normalizeDesktopChannel = (value: string | null | undefined): string => {
         case 'appstore':
             return 'app-store';
         case 'microsoft-store':
+        case 'microsoftstore':
+        case 'windows-store':
+        case 'ms-store':
         case 'msstore':
             return 'microsoft-store';
+        case 'brew':
+        case 'home-brew':
+            return 'homebrew';
         case 'github-release':
         case 'winget':
         case 'homebrew':

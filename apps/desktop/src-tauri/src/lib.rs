@@ -452,6 +452,49 @@ fn command_succeeds(cmd: &str, args: &[&str]) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(target_os = "macos")]
+fn is_homebrew_cask_installed() -> bool {
+    if command_succeeds("brew", &["list", "--cask", "mindwtr"]) {
+        return true;
+    }
+    let brew_paths = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
+    if brew_paths
+        .iter()
+        .any(|path| command_succeeds(path, &["list", "--cask", "mindwtr"]))
+    {
+        return true;
+    }
+    let caskroom_paths = ["/opt/homebrew/Caskroom/mindwtr", "/usr/local/Caskroom/mindwtr"];
+    caskroom_paths.iter().any(|path| Path::new(path).exists())
+}
+
+#[cfg(target_os = "linux")]
+fn is_homebrew_install_linux() -> bool {
+    if command_succeeds("brew", &["list", "--cask", "mindwtr"])
+        || command_succeeds("brew", &["list", "mindwtr"])
+    {
+        return true;
+    }
+    let brew_paths = [
+        "/home/linuxbrew/.linuxbrew/bin/brew",
+        "/opt/homebrew/bin/brew",
+        "/usr/local/bin/brew",
+    ];
+    if brew_paths.iter().any(|path| {
+        command_succeeds(path, &["list", "--cask", "mindwtr"])
+            || command_succeeds(path, &["list", "mindwtr"])
+    }) {
+        return true;
+    }
+    let install_paths = [
+        "/home/linuxbrew/.linuxbrew/Caskroom/mindwtr",
+        "/home/linuxbrew/.linuxbrew/Cellar/mindwtr",
+        "/linuxbrew/.linuxbrew/Caskroom/mindwtr",
+        "/linuxbrew/.linuxbrew/Cellar/mindwtr",
+    ];
+    install_paths.iter().any(|path| Path::new(path).exists())
+}
+
 #[cfg(target_os = "windows")]
 fn command_output_lowercase(cmd: &str, args: &[&str]) -> Option<String> {
     let output = Command::new(cmd)
@@ -490,9 +533,18 @@ fn get_install_source() -> String {
         if is_windows_store_install() {
             return "microsoft-store".to_string();
         }
+        if env::var_os("MSIX_PACKAGE_ROOT").is_some()
+            || env::var_os("PACKAGE_FAMILY_NAME").is_some()
+            || env::var_os("PACKAGE_FULL_NAME").is_some()
+        {
+            return "microsoft-store".to_string();
+        }
         let is_windows_store_path = |path: &str| {
-            (path.contains("\\windowsapps\\") || path.contains("/windowsapps/"))
-                && path.contains("tech.dongdongbh.mindwtr")
+            if !(path.contains("\\windowsapps\\") || path.contains("/windowsapps/")) {
+                return false;
+            }
+            path.contains("mindwtr")
+                && (path.contains("dongdongbh") || path.contains("tech.dongdongbh"))
         };
         if let Some(path) = current_exe_path_lowercase() {
             if is_windows_store_path(&path) {
@@ -557,7 +609,7 @@ fn get_install_source() -> String {
                 return "homebrew".to_string();
             }
         }
-        if command_succeeds("brew", &["list", "--cask", "mindwtr"]) {
+        if is_homebrew_cask_installed() {
             return "homebrew".to_string();
         }
         return "direct".to_string();
@@ -582,7 +634,7 @@ fn get_install_source() -> String {
                 return "homebrew".to_string();
             }
         }
-        if command_succeeds("brew", &["list", "--cask", "mindwtr"]) {
+        if is_homebrew_install_linux() {
             return "homebrew".to_string();
         }
         if command_succeeds("pacman", &["-Q", "mindwtr"]) {
