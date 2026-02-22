@@ -61,6 +61,11 @@ const configuredCorsOrigin = (process.env.MINDWTR_CLOUD_CORS_ORIGIN || '').trim(
 if (configuredCorsOrigin === '*') {
     throw new Error('MINDWTR_CLOUD_CORS_ORIGIN cannot be "*" in production. Set an explicit origin.');
 }
+const nodeEnv = String(process.env.NODE_ENV || '').trim().toLowerCase();
+const isProductionEnv = nodeEnv === 'production';
+if (!configuredCorsOrigin && isProductionEnv) {
+    throw new Error('MINDWTR_CLOUD_CORS_ORIGIN must be set in production.');
+}
 const corsOrigin = configuredCorsOrigin || 'http://localhost:5173';
 const maxTaskTitleLengthValue = Number(process.env.MINDWTR_CLOUD_MAX_TASK_TITLE_LENGTH || 500);
 const MAX_TASK_TITLE_LENGTH = Number.isFinite(maxTaskTitleLengthValue) && maxTaskTitleLengthValue > 0
@@ -70,9 +75,21 @@ const maxItemsPerCollectionValue = Number(process.env.MINDWTR_CLOUD_MAX_ITEMS_PE
 const MAX_ITEMS_PER_COLLECTION = Number.isFinite(maxItemsPerCollectionValue) && maxItemsPerCollectionValue > 0
     ? Math.floor(maxItemsPerCollectionValue)
     : 50_000;
+const listDefaultLimitValue = Number(process.env.MINDWTR_CLOUD_LIST_DEFAULT_LIMIT || 200);
+const LIST_DEFAULT_LIMIT = Number.isFinite(listDefaultLimitValue) && listDefaultLimitValue > 0
+    ? Math.floor(listDefaultLimitValue)
+    : 200;
+const listMaxLimitValue = Number(process.env.MINDWTR_CLOUD_LIST_MAX_LIMIT || 1000);
+const LIST_MAX_LIMIT = Number.isFinite(listMaxLimitValue) && listMaxLimitValue > 0
+    ? Math.floor(listMaxLimitValue)
+    : 1000;
+const rateLimitMaxKeysValue = Number(process.env.MINDWTR_CLOUD_RATE_MAX_KEYS || 10_000);
+const RATE_LIMIT_MAX_KEYS = Number.isFinite(rateLimitMaxKeysValue) && rateLimitMaxKeysValue > 0
+    ? Math.floor(rateLimitMaxKeysValue)
+    : 10_000;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
 const ATTACHMENT_PATH_MAX_DECODE_PASSES = 3;
-const BEARER_TOKEN_PATTERN = /^[\x21-\x7E]{8,512}$/;
+const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{8,512}$/;
 
 function decodeAttachmentPath(rawPath: string): string | null {
     let decoded = rawPath;
@@ -196,6 +213,22 @@ function parseArgs(argv: string[]) {
         }
     }
     return flags;
+}
+
+function parsePagination(searchParams: URLSearchParams): { limit: number; offset: number } | { error: string } {
+    const limitRaw = searchParams.get('limit');
+    const offsetRaw = searchParams.get('offset');
+    const parsedLimit = limitRaw == null ? LIST_DEFAULT_LIMIT : Number(limitRaw);
+    const parsedOffset = offsetRaw == null ? 0 : Number(offsetRaw);
+    if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+        return { error: 'Invalid limit' };
+    }
+    if (!Number.isFinite(parsedOffset) || parsedOffset < 0) {
+        return { error: 'Invalid offset' };
+    }
+    const limit = Math.min(LIST_MAX_LIMIT, Math.floor(parsedLimit));
+    const offset = Math.floor(parsedOffset);
+    return { limit, offset };
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
@@ -513,13 +546,43 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         return run;
     };
     const rateLimitCleanupMs = Number(process.env.MINDWTR_CLOUD_RATE_CLEANUP_MS || 60_000);
-    const cleanupTimer = setInterval(() => {
-        const now = Date.now();
+    const pruneExpiredRateLimits = (now: number) => {
         for (const [key, state] of rateLimits.entries()) {
             if (now > state.resetAt) {
                 rateLimits.delete(key);
             }
         }
+    };
+    const ensureRateLimitCapacity = (now: number) => {
+        pruneExpiredRateLimits(now);
+        while (rateLimits.size >= RATE_LIMIT_MAX_KEYS) {
+            const oldestKey = rateLimits.keys().next().value;
+            if (!oldestKey) break;
+            rateLimits.delete(oldestKey);
+        }
+    };
+    const checkRateLimit = (rateKey: string, maxAllowed: number): Response | null => {
+        const now = Date.now();
+        const state = rateLimits.get(rateKey);
+        if (state && now < state.resetAt) {
+            state.count += 1;
+            if (state.count > maxAllowed) {
+                const retryAfter = Math.ceil((state.resetAt - now) / 1000);
+                return jsonResponse(
+                    { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
+                    { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+                );
+            }
+            return null;
+        }
+        if (!state && rateLimits.size >= RATE_LIMIT_MAX_KEYS) {
+            ensureRateLimitCapacity(now);
+        }
+        rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs });
+        return null;
+    };
+    const cleanupTimer = setInterval(() => {
+        pruneExpiredRateLimits(Date.now());
     }, rateLimitCleanupMs);
     if (typeof cleanupTimer.unref === 'function') {
         cleanupTimer.unref();
@@ -570,20 +633,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 const key = tokenToKey(token);
                 const routeKey = toRateLimitRoute(pathname);
                 const rateKey = `${key}:${req.method}:${routeKey}`;
-                const now = Date.now();
-                const state = rateLimits.get(rateKey);
-                if (state && now < state.resetAt) {
-                    state.count += 1;
-                    if (state.count > maxPerWindow) {
-                        const retryAfter = Math.ceil((state.resetAt - now) / 1000);
-                        return jsonResponse(
-                            { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
-                            { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-                        );
-                    }
-                } else {
-                    rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs });
-                }
+                const rateLimitResponse = checkRateLimit(rateKey, maxPerWindow);
+                if (rateLimitResponse) return rateLimitResponse;
                 const filePath = join(dataDir, `${key}.json`);
 
                 if (req.method === 'GET' && pathname === '/v1/tasks') {
@@ -591,6 +642,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     const includeAll = url.searchParams.get('all') === '1';
                     const includeDeleted = url.searchParams.get('deleted') === '1';
                     const rawStatus = url.searchParams.get('status');
+                    const pagination = parsePagination(url.searchParams);
+                    if ('error' in pagination) return errorResponse(pagination.error, 400);
                     const status = asStatus(rawStatus);
                     if (rawStatus !== null && status === null) {
                         return errorResponse('Invalid task status');
@@ -602,7 +655,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         status,
                         query,
                     });
-                    return jsonResponse({ tasks });
+                    const total = tasks.length;
+                    const pageTasks = tasks.slice(pagination.offset, pagination.offset + pagination.limit);
+                    return jsonResponse({ tasks: pageTasks, total, limit: pagination.limit, offset: pagination.offset });
                 }
 
                 if (req.method === 'POST' && pathname === '/v1/tasks') {
@@ -620,6 +675,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         const input = typeof (body as any).input === 'string' ? String((body as any).input) : '';
                         const rawTitle = typeof (body as any).title === 'string' ? String((body as any).title) : '';
                         const initialProps = typeof (body as any).props === 'object' && (body as any).props ? (body as any).props : {};
+                        if (input.trim().length > MAX_TASK_TITLE_LENGTH) {
+                            return errorResponse(`Quick-add input too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+                        }
 
                         const parsed = input ? parseQuickAdd(input, data.projects, new Date(nowIso), data.areas) : { title: rawTitle, props: {} };
                         const title = (parsed.title || rawTitle || input).trim();
@@ -744,9 +802,18 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 }
 
                 if (req.method === 'GET' && pathname === '/v1/projects') {
+                    const pagination = parsePagination(url.searchParams);
+                    if ('error' in pagination) return errorResponse(pagination.error, 400);
                     const data = loadAppData(filePath);
                     const projects = data.projects.filter((p: any) => !p.deletedAt);
-                    return jsonResponse({ projects });
+                    const total = projects.length;
+                    const pageProjects = projects.slice(pagination.offset, pagination.offset + pagination.limit);
+                    return jsonResponse({
+                        projects: pageProjects,
+                        total,
+                        limit: pagination.limit,
+                        offset: pagination.offset,
+                    });
                 }
 
                 if (req.method === 'GET' && pathname === '/v1/search') {
@@ -769,20 +836,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
                 const key = tokenToKey(token);
                 const dataRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
-                const now = Date.now();
-                const state = rateLimits.get(dataRateKey);
-                if (state && now < state.resetAt) {
-                    state.count += 1;
-                    if (state.count > maxPerWindow) {
-                        const retryAfter = Math.ceil((state.resetAt - now) / 1000);
-                        return jsonResponse(
-                            { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
-                            { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-                        );
-                    }
-                } else {
-                    rateLimits.set(dataRateKey, { count: 1, resetAt: now + windowMs });
-                }
+                const dataRateLimitResponse = checkRateLimit(dataRateKey, maxPerWindow);
+                if (dataRateLimitResponse) return dataRateLimitResponse;
                 const filePath = join(dataDir, `${key}.json`);
 
                 if (req.method === 'GET') {
@@ -825,21 +880,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 if (!token) return errorResponse('Unauthorized', 401);
                 if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
                 const key = tokenToKey(token);
-                const now = Date.now();
                 const attachmentRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
-                const state = rateLimits.get(attachmentRateKey);
-                if (state && now < state.resetAt) {
-                    state.count += 1;
-                    if (state.count > maxAttachmentPerWindow) {
-                        const retryAfter = Math.ceil((state.resetAt - now) / 1000);
-                        return jsonResponse(
-                            { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
-                            { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-                        );
-                    }
-                } else {
-                    rateLimits.set(attachmentRateKey, { count: 1, resetAt: now + windowMs });
-                }
+                const attachmentRateLimitResponse = checkRateLimit(attachmentRateKey, maxAttachmentPerWindow);
+                if (attachmentRateLimitResponse) return attachmentRateLimitResponse;
 
                 const resolvedAttachmentPath = resolveAttachmentPath(dataDir, key, pathname.slice('/v1/attachments/'.length));
                 if (!resolvedAttachmentPath) {
