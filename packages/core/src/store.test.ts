@@ -128,6 +128,33 @@ describe('TaskStore', () => {
         expect((purged.revBy ?? '').length).toBeGreaterThan(0);
     });
 
+    it('clears attachment remote metadata when purging tasks', () => {
+        const { addTask, deleteTask, purgeTask } = useTaskStore.getState();
+        addTask('Task with attachment', {
+            attachments: [
+                {
+                    id: 'a1',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/tmp/doc.txt',
+                    cloudKey: 'attachments/doc.txt',
+                    localStatus: 'available',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        });
+
+        const task = useTaskStore.getState()._allTasks[0];
+        deleteTask(task.id);
+        purgeTask(task.id);
+
+        const purged = useTaskStore.getState()._allTasks.find((item) => item.id === task.id)!;
+        expect(purged.purgedAt).toBeTruthy();
+        expect(purged.attachments?.[0]?.cloudKey).toBeUndefined();
+        expect(purged.attachments?.[0]?.localStatus).toBeUndefined();
+    });
+
     it('skips fetch while edits are in progress', async () => {
         const { lockEditing, unlockEditing, fetchData } = useTaskStore.getState();
         lockEditing();

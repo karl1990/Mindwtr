@@ -13,6 +13,17 @@ import {
 } from './store-helpers';
 import { generateUUID as uuidv4 } from './uuid';
 
+const stripAttachmentRemoteMetadata = (attachments: Task['attachments']): Task['attachments'] =>
+    attachments?.map((attachment) => (
+        attachment.kind === 'file'
+            ? {
+                ...attachment,
+                cloudKey: undefined,
+                localStatus: undefined,
+            }
+            : attachment
+    ));
+
 type TaskActions = Pick<
     TaskStore,
     | 'addTask'
@@ -299,6 +310,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave }: TaskA
                 ...oldTask,
                 deletedAt: oldTask.deletedAt ?? now,
                 purgedAt: now,
+                attachments: stripAttachmentRemoteMetadata(oldTask.attachments),
                 updatedAt: now,
                 rev: normalizeRevision(oldTask.rev) + 1,
                 revBy: deviceState.deviceId,
@@ -337,6 +349,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave }: TaskA
                     ? {
                         ...task,
                         purgedAt: now,
+                        attachments: stripAttachmentRemoteMetadata(task.attachments),
                         updatedAt: now,
                         rev: normalizeRevision(task.rev) + 1,
                         revBy: deviceState.deviceId,
