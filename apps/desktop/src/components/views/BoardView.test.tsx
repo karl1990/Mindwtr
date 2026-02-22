@@ -45,7 +45,7 @@ describe('BoardView', () => {
 
     it('renders the column headers', () => {
         const { getByRole } = renderWithProviders();
-        expect(getByRole('heading', { name: /list\.inbox/ })).toBeInTheDocument();
-        expect(getByRole('heading', { name: /list\.next/ })).toBeInTheDocument();
+        expect(getByRole('heading', { name: /inbox/i })).toBeInTheDocument();
+        expect(getByRole('heading', { name: /next actions/i })).toBeInTheDocument();
     });
 });

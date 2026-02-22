@@ -23,66 +23,66 @@ vi.mock('../../lib/external-calendar-events', () => ({
 
 describe('ReviewView', () => {
     it('renders the review list with a guide button', () => {
-        const { getByText } = renderWithProviders(<ReviewView />);
-        expect(getByText('review.title')).toBeInTheDocument();
-        expect(getByText('review.openGuide')).toBeInTheDocument();
+        const { getByRole } = renderWithProviders(<ReviewView />);
+        expect(getByRole('heading', { name: /^review$/i })).toBeInTheDocument();
+        expect(getByRole('button', { name: /weekly review/i })).toBeInTheDocument();
     });
 
     it('navigates through the wizard steps', () => {
         const { getByText, getAllByText, queryByText } = renderWithProviders(<ReviewView />);
 
         // Open guide
-        fireEvent.click(getByText('review.openGuide'));
-        expect(getByText('review.inboxStep')).toBeInTheDocument();
-        expect(getByText('review.inboxZero')).toBeInTheDocument();
+        fireEvent.click(getByText('Weekly Review'));
+        expect(getByText('Process Inbox')).toBeInTheDocument();
+        expect(getByText('Inbox Zero Goal')).toBeInTheDocument();
 
         // Inbox -> AI or Calendar (AI step is hidden when AI is disabled)
-        fireEvent.click(getByText('review.nextStepBtn'));
-        const aiVisible = queryByText('review.aiStep');
+        fireEvent.click(getByText('Next Step'));
+        const aiVisible = queryByText('AI insight');
         if (aiVisible) {
             expect(aiVisible).toBeInTheDocument();
-            fireEvent.click(getByText('review.nextStepBtn'));
+            fireEvent.click(getByText('Next Step'));
         }
 
         // -> Calendar
-        expect(getAllByText('review.calendarStep').length).toBeGreaterThan(0);
-        expect(getByText('calendar.events')).toBeInTheDocument();
-        expect(getByText('review.upcoming14Desc')).toBeInTheDocument();
+        expect(getAllByText('Review Calendar').length).toBeGreaterThan(0);
+        expect(getByText('Events')).toBeInTheDocument();
+        expect(getByText('Look at the next week. What do you need to prepare for? Capture any new next actions.')).toBeInTheDocument();
 
         // Calendar -> Waiting For
-        fireEvent.click(getByText('review.nextStepBtn'));
-        expect(getByText('review.waitingStep')).toBeInTheDocument();
+        fireEvent.click(getByText('Next Step'));
+        expect(getByText('Waiting For')).toBeInTheDocument();
 
         // Waiting For -> Contexts (optional) -> Projects
-        fireEvent.click(getByText('review.nextStepBtn'));
-        const contextsVisible = queryByText('review.contexts');
+        fireEvent.click(getByText('Next Step'));
+        const contextsVisible = queryByText('Contexts');
         if (contextsVisible) {
             expect(contextsVisible).toBeInTheDocument();
-            fireEvent.click(getByText('review.nextStepBtn'));
+            fireEvent.click(getByText('Next Step'));
         }
-        expect(getByText('review.projectsStep')).toBeInTheDocument();
+        expect(getByText('Review Projects')).toBeInTheDocument();
 
         // Projects -> Someday/Maybe
-        fireEvent.click(getByText('review.nextStepBtn'));
-        expect(getByText('review.somedayStep')).toBeInTheDocument();
+        fireEvent.click(getByText('Next Step'));
+        expect(getByText('Someday/Maybe')).toBeInTheDocument();
 
         // Someday/Maybe -> Completed
-        fireEvent.click(getByText('review.nextStepBtn'));
-        expect(getByText('review.complete')).toBeInTheDocument();
-        expect(getByText('review.finish')).toBeInTheDocument();
+        fireEvent.click(getByText('Next Step'));
+        expect(getByText('Review Complete!')).toBeInTheDocument();
+        expect(getByText('Finish')).toBeInTheDocument();
     });
 
     it('can navigate back', () => {
         const { getByText, queryByText } = renderWithProviders(<ReviewView />);
 
         // Open guide
-        fireEvent.click(getByText('review.openGuide'));
-        expect(getByText('review.inboxStep')).toBeInTheDocument();
+        fireEvent.click(getByText('Weekly Review'));
+        expect(getByText('Process Inbox')).toBeInTheDocument();
 
         // Go forward then back to Inbox
-        fireEvent.click(getByText('review.nextStepBtn'));
-        expect(queryByText('review.inboxStep')).not.toBeInTheDocument();
-        fireEvent.click(getByText('review.back'));
-        expect(getByText('review.inboxStep')).toBeInTheDocument();
+        fireEvent.click(getByText('Next Step'));
+        expect(queryByText('Process Inbox')).not.toBeInTheDocument();
+        fireEvent.click(getByText('Back'));
+        expect(getByText('Process Inbox')).toBeInTheDocument();
     });
 });

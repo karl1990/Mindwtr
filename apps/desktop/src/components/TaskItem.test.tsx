@@ -30,7 +30,7 @@ describe('TaskItem', () => {
                 <TaskItem task={mockTask} />
             </LanguageProvider>
         );
-        const editButtons = getAllByRole('button', { name: 'common.edit' });
+        const editButtons = getAllByRole('button', { name: /edit/i });
         fireEvent.click(editButtons[0]);
         expect(getByDisplayValue('Test Task')).toBeInTheDocument();
     });
@@ -93,7 +93,7 @@ describe('TaskItem', () => {
                 <TaskItem task={mockTask} />
             </LanguageProvider>
         );
-        const statusSelect = getByLabelText('task.aria.status') as HTMLSelectElement;
+        const statusSelect = getByLabelText(/task status/i) as HTMLSelectElement;
         const archivedOption = Array.from(statusSelect.options).find((option) => option.value === 'archived');
         expect(archivedOption).toBeTruthy();
     });
