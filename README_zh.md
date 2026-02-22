@@ -137,8 +137,9 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 
 ### 数据与同步
 - 🔄 **同步选项** - 支持后端与配置方式请见 [数据与同步 Wiki](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
+- ☁️ **Dropbox OAuth 同步（可选）** - 在支持的非 FOSS 构建中提供原生 Dropbox App Folder 同步
 - 📤 **导出/备份** - 导出 JSON 数据
-- 🗓️ **外部日历（ICS）** - 只读日历叠加
+- 🗓️ **外部日历（系统日历 + ICS）** - 移动端读取系统日历；桌面端支持 ICS 订阅
 
 ### 自动化
 - 🔌 **CLI** - 终端添加/列出/完成/搜索

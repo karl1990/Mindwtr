@@ -1,6 +1,6 @@
 # Privacy Policy for Mindwtr
 
-**Effective Date:** February 22, 2026
+**Last updated:** February 22, 2026
 
 Mindwtr ("we", "our", or "us") is designed as a local-first application. We respect your privacy and aim to minimize data collection by design.
 

@@ -137,8 +137,9 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 
 ### Data & Sync
 - 🔄 **Sync Options** - See the [Data & Sync wiki](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync) for supported backends and setup
+- ☁️ **Dropbox OAuth Sync (Optional)** - Native Dropbox App Folder sync in supported non-FOSS builds
 - 📤 **Export/Backup** - Export data to JSON
-- 🗓️ **External Calendars (ICS)** - View-only calendar overlay
+- 🗓️ **External Calendars (System + ICS)** - Mobile reads system calendars; desktop supports ICS subscriptions
 
 ### Automation
 - 🔌 **CLI** - Add, list, complete, search from terminal

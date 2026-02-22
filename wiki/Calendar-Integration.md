@@ -1,6 +1,9 @@
 # Calendar Integration (Hard + Soft Landscape)
 
-Mindwtr supports **view-only external calendars** (ICS subscriptions) so you can see hard events alongside your task schedule.
+Mindwtr supports **view-only external calendars** so you can see hard events alongside your task schedule.
+
+- **Mobile (iOS/Android):** system calendars already synced on the device
+- **Desktop/Web:** ICS subscription URLs
 
 ## Concepts
 
@@ -25,7 +28,25 @@ Mindwtr supports **view-only external calendars** (ICS subscriptions) so you can
 2. Assign a start time (and optionally use the time estimate).
 3. Adjust timing later from the task editor or day list.
 
-## External Calendars (ICS)
+## External Calendars
+
+### Mobile: System Calendar Integration
+
+On mobile, Mindwtr reads calendars from the device calendar database:
+
+- **Android:** via system calendar provider (includes DAVx5, Google, Exchange, Outlook, etc. once synced on device)
+- **iOS:** via EventKit-backed system calendars (iCloud, Google, Exchange, Outlook, etc. once enabled in iOS Settings)
+
+Setup:
+
+1. Open **Settings → Calendar**
+2. Enable **System calendar**
+3. Grant calendar permission
+4. Choose which device calendars to display
+
+Mindwtr stays read-only and does not perform provider OAuth for calendar sources.
+
+### Desktop/Web: ICS URLs
 
 1. Open **Settings → Calendar**
 2. Add your **ICS URL**

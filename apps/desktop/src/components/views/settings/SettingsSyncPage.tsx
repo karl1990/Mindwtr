@@ -4,6 +4,7 @@ import { safeFormatDate } from '@mindwtr/core';
 import { Info, RefreshCw, Trash2 } from 'lucide-react';
 
 import { cn } from '../../../lib/utils';
+import { ConfirmModal } from '../../ConfirmModal';
 
 type Labels = {
     diagnostics: string;
@@ -71,6 +72,8 @@ type Labels = {
     recoverySnapshotsEmpty: string;
     recoverySnapshotsRestore: string;
     recoverySnapshotsConfirm: string;
+    recoverySnapshotsConfirmTitle: string;
+    recoverySnapshotsConfirmCancel: string;
     attachmentsCleanup: string;
     attachmentsCleanupDesc: string;
     attachmentsCleanupLastRun: string;
@@ -266,6 +269,7 @@ export function SettingsSyncPage({
     const [syncOptionsOpen, setSyncOptionsOpen] = useState(false);
     const [syncHistoryOpen, setSyncHistoryOpen] = useState(false);
     const [snapshotsOpen, setSnapshotsOpen] = useState(false);
+    const [snapshotToRestore, setSnapshotToRestore] = useState<string | null>(null);
     const formatSnapshotLabel = (fileName: string) => {
         const match = fileName.match(/^data\.(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})\.snapshot\.json$/);
         if (!match) return fileName;
@@ -383,12 +387,12 @@ export function SettingsSyncPage({
                                     value={syncPath}
                                     onChange={(e) => onSyncPathChange(e.target.value)}
                                     placeholder="/path/to/your/sync/folder"
-                                    className="flex-1 bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="flex-1 bg-muted p-2 rounded text-sm font-mono border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                                 <button
                                     onClick={onSaveSyncPath}
                                     disabled={!syncPath.trim() || !isTauri}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400 whitespace-nowrap"
+                                    className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed whitespace-nowrap"
                                 >
                                     {t.savePath}
                                 </button>
@@ -414,7 +418,7 @@ export function SettingsSyncPage({
                                     onChange={(e) => onWebdavUrlChange(e.target.value)}
                                     placeholder="https://example.com/remote.php/dav/files/user/data.json"
                                     className={cn(
-                                        "bg-muted p-2 rounded text-sm font-mono border focus:outline-none focus:ring-2 focus:ring-blue-500",
+                                        "bg-muted p-2 rounded text-sm font-mono border focus:outline-none focus:ring-2 focus:ring-primary",
                                         webdavUrlError ? "border-destructive" : "border-border",
                                     )}
                                 />
@@ -431,7 +435,7 @@ export function SettingsSyncPage({
                                         type="text"
                                         value={webdavUsername}
                                         onChange={(e) => onWebdavUsernameChange(e.target.value)}
-                                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -441,7 +445,7 @@ export function SettingsSyncPage({
                                         value={webdavPassword}
                                         onChange={(e) => onWebdavPasswordChange(e.target.value)}
                                         placeholder={webdavHasPassword && !webdavPassword ? '••••••••' : ''}
-                                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
                             </div>
@@ -456,7 +460,7 @@ export function SettingsSyncPage({
                                     onClick={onSaveWebDav}
                                     disabled={webdavUrlError || isSavingWebDav}
                                     aria-busy={isSavingWebDav}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 whitespace-nowrap disabled:bg-gray-400"
+                                    className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 whitespace-nowrap disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                                 >
                                     {t.webdavSave}
                                 </button>
@@ -504,7 +508,7 @@ export function SettingsSyncPage({
                                             onChange={(e) => onCloudUrlChange(e.target.value)}
                                             placeholder="https://example.com/v1/data"
                                             className={cn(
-                                                "bg-muted p-2 rounded text-sm font-mono border focus:outline-none focus:ring-2 focus:ring-blue-500",
+                                                "bg-muted p-2 rounded text-sm font-mono border focus:outline-none focus:ring-2 focus:ring-primary",
                                                 cloudUrlError ? "border-destructive" : "border-border",
                                             )}
                                         />
@@ -520,7 +524,7 @@ export function SettingsSyncPage({
                                             type="password"
                                             value={cloudToken}
                                             onChange={(e) => onCloudTokenChange(e.target.value)}
-                                            className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                                         />
                                     </div>
 
@@ -528,7 +532,7 @@ export function SettingsSyncPage({
                                         <button
                                             onClick={onSaveCloud}
                                             disabled={cloudUrlError}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
+                                            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 whitespace-nowrap disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                                         >
                                             {t.cloudSave}
                                         </button>
@@ -558,7 +562,7 @@ export function SettingsSyncPage({
                                         <button
                                             onClick={dropboxConnected ? onDisconnectDropbox : onConnectDropbox}
                                             disabled={dropboxBusy || !dropboxConfigured}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 whitespace-nowrap disabled:bg-gray-400"
+                                            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 whitespace-nowrap disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                                         >
                                             {dropboxConnected ? t.dropboxDisconnect : t.dropboxConnect}
                                         </button>
@@ -615,8 +619,8 @@ export function SettingsSyncPage({
                                 onClick={onSyncNow}
                                 disabled={isSyncing}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white transition-colors",
-                                    isSyncing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700",
+                                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-primary-foreground transition-colors",
+                                    isSyncing ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-primary hover:bg-primary/90",
                                 )}
                             >
                                 <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
@@ -727,13 +731,7 @@ export function SettingsSyncPage({
                                             <button
                                                 type="button"
                                                 disabled={isRestoringSnapshot}
-                                                onClick={async () => {
-                                                    const ok = window.confirm(
-                                                        t.recoverySnapshotsConfirm.replace('{snapshot}', snapshot)
-                                                    );
-                                                    if (!ok) return;
-                                                    await onRestoreSnapshot(snapshot);
-                                                }}
+                                                onClick={() => setSnapshotToRestore(snapshot)}
                                                 className="px-2 py-1 rounded border border-border text-foreground hover:bg-muted/70 disabled:opacity-50"
                                             >
                                                 {t.recoverySnapshotsRestore}
@@ -746,6 +744,21 @@ export function SettingsSyncPage({
                     </div>
                 </div>
             </section>
+
+            <ConfirmModal
+                isOpen={snapshotToRestore !== null}
+                title={t.recoverySnapshotsConfirmTitle}
+                description={snapshotToRestore ? t.recoverySnapshotsConfirm.replace('{snapshot}', snapshotToRestore) : undefined}
+                confirmLabel={t.recoverySnapshotsRestore}
+                cancelLabel={t.recoverySnapshotsConfirmCancel}
+                onCancel={() => setSnapshotToRestore(null)}
+                onConfirm={() => {
+                    if (!snapshotToRestore) return;
+                    const nextSnapshot = snapshotToRestore;
+                    setSnapshotToRestore(null);
+                    void onRestoreSnapshot(nextSnapshot);
+                }}
+            />
 
             <section className="space-y-3">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
