@@ -56,7 +56,18 @@ import {
     useTaskStore,
 } from '@mindwtr/core';
 import { pickAndParseSyncFolder, exportData } from '../../lib/storage-file';
-import { fetchExternalCalendarEvents, getExternalCalendars, saveExternalCalendars } from '../../lib/external-calendar';
+import {
+    fetchExternalCalendarEvents,
+    getExternalCalendars,
+    getSystemCalendarPermissionStatus,
+    getSystemCalendars,
+    getSystemCalendarSettings,
+    requestSystemCalendarPermission,
+    saveExternalCalendars,
+    saveSystemCalendarSettings,
+    type SystemCalendarInfo,
+    type SystemCalendarPermissionStatus,
+} from '../../lib/external-calendar';
 import { loadAIKey, saveAIKey } from '../../lib/ai-config';
 import { clearLog, ensureLogFilePath, logError, logInfo, logWarn } from '../../lib/app-log';
 import { performMobileSync } from '../../lib/sync-service';
@@ -265,6 +276,12 @@ export default function SettingsPage() {
     const [externalCalendars, setExternalCalendars] = useState<ExternalCalendarSubscription[]>([]);
     const [newCalendarName, setNewCalendarName] = useState('');
     const [newCalendarUrl, setNewCalendarUrl] = useState('');
+    const [systemCalendarEnabled, setSystemCalendarEnabled] = useState(false);
+    const [systemCalendarSelectAll, setSystemCalendarSelectAll] = useState(true);
+    const [systemCalendarSelectedIds, setSystemCalendarSelectedIds] = useState<string[]>([]);
+    const [systemCalendarPermission, setSystemCalendarPermission] = useState<SystemCalendarPermissionStatus>('undetermined');
+    const [systemCalendars, setSystemCalendars] = useState<SystemCalendarInfo[]>([]);
+    const [isSystemCalendarLoading, setIsSystemCalendarLoading] = useState(false);
     const [aiApiKey, setAiApiKey] = useState('');
     const [speechApiKey, setSpeechApiKey] = useState('');
     const [whisperDownloadState, setWhisperDownloadState] = useState<'idle' | 'downloading' | 'success' | 'error'>('idle');
@@ -491,6 +508,50 @@ export default function SettingsPage() {
         setWeeklyReviewDayPickerOpen(true);
     };
 
+    const loadSystemCalendarState = useCallback(async (requestAccess = false) => {
+        setIsSystemCalendarLoading(true);
+        try {
+            const stored = await getSystemCalendarSettings();
+            setSystemCalendarEnabled(stored.enabled);
+            setSystemCalendarSelectAll(stored.selectAll);
+            setSystemCalendarSelectedIds(stored.selectedCalendarIds);
+
+            const permission = requestAccess
+                ? await requestSystemCalendarPermission()
+                : await getSystemCalendarPermissionStatus();
+            setSystemCalendarPermission(permission);
+
+            if (permission !== 'granted') {
+                setSystemCalendars([]);
+                return;
+            }
+
+            const calendars = await getSystemCalendars();
+            setSystemCalendars(calendars);
+            if (stored.selectAll) return;
+
+            const validIds = new Set(calendars.map((calendar) => calendar.id));
+            const filteredSelection = stored.selectedCalendarIds.filter((id) => validIds.has(id));
+            if (
+                filteredSelection.length === stored.selectedCalendarIds.length &&
+                filteredSelection.every((id, index) => id === stored.selectedCalendarIds[index])
+            ) {
+                return;
+            }
+
+            setSystemCalendarSelectedIds(filteredSelection);
+            await saveSystemCalendarSettings({
+                enabled: stored.enabled,
+                selectAll: false,
+                selectedCalendarIds: filteredSelection,
+            });
+        } catch (error) {
+            logSettingsError(error);
+        } finally {
+            setIsSystemCalendarLoading(false);
+        }
+    }, []);
+
     // Load sync path on mount
     useEffect(() => {
         AsyncStorage.multiGet([
@@ -523,6 +584,10 @@ export default function SettingsPage() {
             if (cloudSyncToken) setCloudToken(cloudSyncToken);
         }).catch(logSettingsError);
     }, []);
+
+    useEffect(() => {
+        void loadSystemCalendarState();
+    }, [loadSystemCalendarState]);
 
     useEffect(() => {
         let cancelled = false;
@@ -3586,6 +3651,53 @@ export default function SettingsPage() {
 
     // ============ CALENDAR SCREEN ============
     if (currentScreen === 'calendar') {
+        const persistSystemCalendarState = async (next: {
+            enabled?: boolean;
+            selectAll?: boolean;
+            selectedCalendarIds?: string[];
+        }) => {
+            const payload = {
+                enabled: next.enabled ?? systemCalendarEnabled,
+                selectAll: next.selectAll ?? systemCalendarSelectAll,
+                selectedCalendarIds: next.selectedCalendarIds ?? systemCalendarSelectedIds,
+            };
+            setSystemCalendarEnabled(payload.enabled);
+            setSystemCalendarSelectAll(payload.selectAll);
+            setSystemCalendarSelectedIds(payload.selectedCalendarIds);
+            await saveSystemCalendarSettings(payload);
+        };
+
+        const handleToggleSystemCalendarEnabled = async (enabled: boolean) => {
+            await persistSystemCalendarState({ enabled });
+            if (enabled && systemCalendarPermission !== 'granted') {
+                await loadSystemCalendarState(true);
+            }
+        };
+
+        const handleRequestSystemCalendarAccess = async () => {
+            await loadSystemCalendarState(true);
+        };
+
+        const handleToggleSystemCalendarSelection = async (calendarId: string, enabled: boolean) => {
+            const allIds = systemCalendars.map((calendar) => calendar.id);
+            if (allIds.length === 0) return;
+
+            const currentSelection = systemCalendarSelectAll
+                ? allIds
+                : Array.from(new Set(systemCalendarSelectedIds.filter((id) => allIds.includes(id))));
+            const nextSelection = enabled
+                ? Array.from(new Set([...currentSelection, calendarId]))
+                : currentSelection.filter((id) => id !== calendarId);
+            const selectAll = nextSelection.length === allIds.length;
+
+            await persistSystemCalendarState({
+                selectAll,
+                selectedCalendarIds: selectAll ? [] : nextSelection,
+            });
+        };
+
+        const selectedSystemCalendarSet = new Set(systemCalendarSelectedIds);
+
         const handleAddCalendar = async () => {
             const url = newCalendarUrl.trim();
             if (!url) return;
@@ -3643,6 +3755,95 @@ export default function SettingsPage() {
                     </Text>
 
                     <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                    {localize('Device calendars', '设备日历')}
+                                </Text>
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {localize(
+                                        'Read events from calendars already synced on this device (DAVx5, iCloud, Outlook, etc.).',
+                                        '读取设备上已同步的日历事件（DAVx5、iCloud、Outlook 等）。'
+                                    )}
+                                </Text>
+                            </View>
+                            <Switch
+                                value={systemCalendarEnabled}
+                                onValueChange={handleToggleSystemCalendarEnabled}
+                                trackColor={{ false: '#767577', true: '#3B82F6' }}
+                            />
+                        </View>
+
+                        {systemCalendarEnabled && (
+                            <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: tc.border }}>
+                                {systemCalendarPermission !== 'granted' ? (
+                                    <View>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {systemCalendarPermission === 'denied'
+                                                ? localize(
+                                                    'Calendar access is denied. Enable it in system settings, then refresh.',
+                                                    '日历权限被拒绝。请在系统设置中开启后刷新。'
+                                                )
+                                                : localize(
+                                                    'Calendar access is required to read device events.',
+                                                    '读取设备日历事件需要日历权限。'
+                                                )}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.backendOption,
+                                                { borderColor: tc.border, backgroundColor: tc.filterBg, marginTop: 12, alignSelf: 'flex-start' },
+                                            ]}
+                                            onPress={handleRequestSystemCalendarAccess}
+                                        >
+                                            <Text style={[styles.backendOptionText, { color: tc.text }]}>
+                                                {localize('Grant access', '授权访问')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : isSystemCalendarLoading ? (
+                                    <View style={{ paddingVertical: 8 }}>
+                                        <ActivityIndicator color={tc.tint} />
+                                    </View>
+                                ) : systemCalendars.length === 0 ? (
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {localize('No device calendars found.', '未找到设备日历。')}
+                                    </Text>
+                                ) : (
+                                    <View>
+                                        {systemCalendars.map((calendar, idx) => {
+                                            const selected = systemCalendarSelectAll || selectedSystemCalendarSet.has(calendar.id);
+                                            return (
+                                                <View
+                                                    key={calendar.id}
+                                                    style={[
+                                                        styles.settingRow,
+                                                        idx > 0 && { borderTopWidth: 1, borderTopColor: tc.border },
+                                                    ]}
+                                                >
+                                                    <View style={styles.settingInfo}>
+                                                        <Text style={[styles.settingLabel, { color: tc.text }]} numberOfLines={1}>
+                                                            {calendar.name}
+                                                        </Text>
+                                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]} numberOfLines={1}>
+                                                            {localize('Device calendar', '设备日历')}
+                                                        </Text>
+                                                    </View>
+                                                    <Switch
+                                                        value={selected}
+                                                        onValueChange={(value) => handleToggleSystemCalendarSelection(calendar.id, value)}
+                                                        trackColor={{ false: '#767577', true: '#3B82F6' }}
+                                                    />
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 16 }]}>
                         <View style={styles.inputGroup}>
                             <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.externalCalendarName')}</Text>
                             <TextInput

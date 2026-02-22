@@ -106,6 +106,12 @@
           }
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Mindwtr needs calendar access to show your events alongside tasks."
+        }
+      ],
       "expo-secure-store",
       "./plugins/android-app-shortcuts",
       "./plugins/android-manifest-fixes",
