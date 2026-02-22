@@ -620,7 +620,6 @@ export const createSettingsActions = ({
         derivedCache = {
             tasksRef: state.tasks,
             projectsRef: state.projects,
-            lastDataChangeAt: state.lastDataChangeAt,
             value: derived,
         };
         return derived;

@@ -92,6 +92,7 @@ export const zh: Record<string, string> = {
         'list.tasks': '任务列表',
         'list.confirmBatchDelete': '删除选中的任务？',
         'list.noTasks': '未找到任务',
+        'list.filtering': '正在筛选...',
         'list.details': '详情',
         'list.detailsOff': '详情关闭',
         'list.compact': '紧凑',

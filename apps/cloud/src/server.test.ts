@@ -13,6 +13,11 @@ describe('cloud server utils', () => {
         expect(token).toBe('demo-token');
         expect(__cloudTestUtils.tokenToKey(token!)).toHaveLength(64);
 
+        const base64TokenReq = new Request('http://localhost/v1/data', {
+            headers: { Authorization: 'Bearer YWxhZGRpbjpvcGVuL3Nlc2FtZT0=' },
+        });
+        expect(__cloudTestUtils.getToken(base64TokenReq)).toBe('YWxhZGRpbjpvcGVuL3Nlc2FtZT0=');
+
         const shortTokenReq = new Request('http://localhost/v1/data', {
             headers: { Authorization: 'Bearer short' },
         });

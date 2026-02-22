@@ -89,7 +89,8 @@ const RATE_LIMIT_MAX_KEYS = Number.isFinite(rateLimitMaxKeysValue) && rateLimitM
     : 10_000;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
 const ATTACHMENT_PATH_MAX_DECODE_PASSES = 3;
-const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{8,512}$/;
+// Accept URL-safe and common base64 token alphabets to avoid breaking existing deployments.
+const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{8,512}$/;
 
 function decodeAttachmentPath(rawPath: string): string | null {
     let decoded = rawPath;

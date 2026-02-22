@@ -70,7 +70,7 @@ const getCachedConfigValue = async (key: string): Promise<string | null> => {
   const now = Date.now();
   const cached = syncConfigCache.get(key);
   if (cached && now - cached.readAt <= SYNC_CONFIG_CACHE_TTL_MS) {
-    return sanitizeConfigValue(cached.value);
+    return cached.value;
   }
   const value = sanitizeConfigValue(await AsyncStorage.getItem(key));
   syncConfigCache.set(key, { value, readAt: now });

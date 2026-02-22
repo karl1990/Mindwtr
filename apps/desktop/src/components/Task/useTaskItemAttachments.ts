@@ -194,7 +194,6 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
                     setAudioSource(resolveAttachmentSource(attachment.uri));
                 }
             });
-            setAudioError(null);
             return;
         }
         if (isTextAttachment(attachment)) {

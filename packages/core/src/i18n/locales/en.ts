@@ -105,6 +105,7 @@ export const en: Record<string, string> = {
         'list.tasks': 'Task list',
         'list.confirmBatchDelete': 'Delete selected tasks?',
         'list.noTasks': 'No tasks found',
+        'list.filtering': 'Filtering...',
         'list.details': 'Details',
         'list.detailsOff': 'Details off',
         'list.compact': 'Compact',

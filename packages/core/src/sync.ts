@@ -2,6 +2,18 @@
 import type { AppData, Attachment, Project, Task, Area, SettingsSyncGroup } from './types';
 import { normalizeTaskForLoad } from './task-status';
 import { logWarn } from './logger';
+import {
+    AI_PROVIDER_VALUE_SET,
+    AI_REASONING_EFFORT_VALUE_SET,
+    SETTINGS_DENSITY_VALUE_SET,
+    SETTINGS_KEYBINDING_STYLE_VALUE_SET,
+    SETTINGS_LANGUAGE_VALUE_SET,
+    SETTINGS_THEME_VALUE_SET,
+    SETTINGS_WEEK_START_VALUE_SET,
+    STT_FIELD_STRATEGY_VALUE_SET,
+    STT_MODE_VALUE_SET,
+    STT_PROVIDER_VALUE_SET,
+} from './settings-options';
 
 export interface EntityMergeStats {
     localTotal: number;
@@ -373,42 +385,6 @@ const sanitizeAiForSync = (
 
 const SETTINGS_SYNC_GROUP_KEYS: SettingsSyncGroup[] = ['appearance', 'language', 'externalCalendars', 'ai'];
 const SETTINGS_SYNC_UPDATED_AT_KEYS: Array<SettingsSyncGroup | 'preferences'> = ['preferences', ...SETTINGS_SYNC_GROUP_KEYS];
-const SUPPORTED_THEME_VALUES = new Set([
-    'light',
-    'dark',
-    'system',
-    'eink',
-    'nord',
-    'sepia',
-    'material3-light',
-    'material3-dark',
-    'oled',
-]);
-const SUPPORTED_LANGUAGE_VALUES = new Set([
-    'en',
-    'zh',
-    'es',
-    'hi',
-    'ar',
-    'de',
-    'ru',
-    'ja',
-    'fr',
-    'pt',
-    'pl',
-    'ko',
-    'it',
-    'tr',
-    'system',
-]);
-const SUPPORTED_WEEK_START_VALUES = new Set(['monday', 'sunday']);
-const SUPPORTED_KEYBINDING_VALUES = new Set(['vim', 'emacs']);
-const SUPPORTED_DENSITY_VALUES = new Set(['comfortable', 'compact']);
-const SUPPORTED_AI_PROVIDERS = new Set(['gemini', 'openai', 'anthropic']);
-const SUPPORTED_REASONING_EFFORT = new Set(['low', 'medium', 'high']);
-const SUPPORTED_STT_PROVIDERS = new Set(['openai', 'gemini', 'whisper']);
-const SUPPORTED_STT_MODES = new Set(['smart_parse', 'transcribe_only']);
-const SUPPORTED_STT_FIELD_STRATEGIES = new Set(['smart', 'title_only', 'description_only']);
 
 const cloneSettingValue = <T>(value: T): T => {
     if (Array.isArray(value)) {
@@ -498,7 +474,7 @@ const sanitizeAiSettings = (
     if (next.enabled !== undefined && typeof next.enabled !== 'boolean') {
         next.enabled = fallback?.enabled;
     }
-    if (next.provider !== undefined && !SUPPORTED_AI_PROVIDERS.has(next.provider)) {
+    if (next.provider !== undefined && !AI_PROVIDER_VALUE_SET.has(next.provider)) {
         next.provider = fallback?.provider;
     }
     if (next.baseUrl !== undefined && !isNonEmptyString(next.baseUrl)) {
@@ -507,7 +483,7 @@ const sanitizeAiSettings = (
     if (next.model !== undefined && !isNonEmptyString(next.model)) {
         next.model = fallback?.model;
     }
-    if (next.reasoningEffort !== undefined && !SUPPORTED_REASONING_EFFORT.has(next.reasoningEffort)) {
+    if (next.reasoningEffort !== undefined && !AI_REASONING_EFFORT_VALUE_SET.has(next.reasoningEffort)) {
         next.reasoningEffort = fallback?.reasoningEffort;
     }
     if (next.thinkingBudget !== undefined && (!Number.isFinite(next.thinkingBudget) || next.thinkingBudget < 0)) {
@@ -523,7 +499,7 @@ const sanitizeAiSettings = (
         if (next.speechToText.enabled !== undefined && typeof next.speechToText.enabled !== 'boolean') {
             next.speechToText.enabled = speechFallback?.enabled;
         }
-        if (next.speechToText.provider !== undefined && !SUPPORTED_STT_PROVIDERS.has(next.speechToText.provider)) {
+        if (next.speechToText.provider !== undefined && !STT_PROVIDER_VALUE_SET.has(next.speechToText.provider)) {
             next.speechToText.provider = speechFallback?.provider;
         }
         if (next.speechToText.model !== undefined && !isNonEmptyString(next.speechToText.model)) {
@@ -532,12 +508,12 @@ const sanitizeAiSettings = (
         if (next.speechToText.language !== undefined && !isNonEmptyString(next.speechToText.language)) {
             next.speechToText.language = speechFallback?.language;
         }
-        if (next.speechToText.mode !== undefined && !SUPPORTED_STT_MODES.has(next.speechToText.mode)) {
+        if (next.speechToText.mode !== undefined && !STT_MODE_VALUE_SET.has(next.speechToText.mode)) {
             next.speechToText.mode = speechFallback?.mode;
         }
         if (
             next.speechToText.fieldStrategy !== undefined
-            && !SUPPORTED_STT_FIELD_STRATEGIES.has(next.speechToText.fieldStrategy)
+            && !STT_FIELD_STRATEGY_VALUE_SET.has(next.speechToText.fieldStrategy)
         ) {
             next.speechToText.fieldStrategy = speechFallback?.fieldStrategy;
         }
@@ -551,16 +527,16 @@ const sanitizeMergedSettingsForSync = (
 ): AppData['settings'] => {
     const next: AppData['settings'] = cloneSettingValue(merged);
 
-    if (next.theme !== undefined && !SUPPORTED_THEME_VALUES.has(next.theme)) {
+    if (next.theme !== undefined && !SETTINGS_THEME_VALUE_SET.has(next.theme)) {
         next.theme = localSettings.theme;
     }
-    if (next.language !== undefined && !SUPPORTED_LANGUAGE_VALUES.has(next.language)) {
+    if (next.language !== undefined && !SETTINGS_LANGUAGE_VALUE_SET.has(next.language)) {
         next.language = localSettings.language;
     }
-    if (next.weekStart !== undefined && !SUPPORTED_WEEK_START_VALUES.has(next.weekStart)) {
+    if (next.weekStart !== undefined && !SETTINGS_WEEK_START_VALUE_SET.has(next.weekStart)) {
         next.weekStart = localSettings.weekStart;
     }
-    if (next.keybindingStyle !== undefined && !SUPPORTED_KEYBINDING_VALUES.has(next.keybindingStyle)) {
+    if (next.keybindingStyle !== undefined && !SETTINGS_KEYBINDING_STYLE_VALUE_SET.has(next.keybindingStyle)) {
         next.keybindingStyle = localSettings.keybindingStyle;
     }
     if (next.dateFormat !== undefined && typeof next.dateFormat !== 'string') {
@@ -568,7 +544,7 @@ const sanitizeMergedSettingsForSync = (
     }
     if (next.appearance !== undefined && !isObjectRecord(next.appearance)) {
         next.appearance = localSettings.appearance ? cloneSettingValue(localSettings.appearance) : undefined;
-    } else if (next.appearance?.density !== undefined && !SUPPORTED_DENSITY_VALUES.has(next.appearance.density)) {
+    } else if (next.appearance?.density !== undefined && !SETTINGS_DENSITY_VALUE_SET.has(next.appearance.density)) {
         next.appearance = {
             ...(localSettings.appearance ? cloneSettingValue(localSettings.appearance) : {}),
             ...next.appearance,

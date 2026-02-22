@@ -1003,7 +1003,7 @@ export function ListView({ title, statusFilter }: ListViewProps) {
             >
                 {isFiltering && (
                     <div className="px-3 pb-2 text-xs text-muted-foreground">
-                        {t('common.loading') || 'Filtering...'}
+                        {t('list.filtering') || 'Filtering...'}
                     </div>
                 )}
                 {showEmptyState ? (
