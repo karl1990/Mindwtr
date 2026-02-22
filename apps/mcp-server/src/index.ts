@@ -86,16 +86,22 @@ export const parseArgs = (argv: string[]) => {
 
 const taskStatusSchema = z.enum(['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived']);
 const taskStatusOrAllSchema = z.enum(['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived', 'all']);
+const isoDateLikeSchema = z
+  .string()
+  .regex(
+    /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2}))?$/,
+    'Expected ISO date (YYYY-MM-DD) or ISO datetime'
+  );
 
 const listTasksSchema = z.object({
   status: taskStatusOrAllSchema.optional(),
   projectId: z.string().optional(),
   includeDeleted: z.boolean().optional(),
-  limit: z.number().int().optional(),
-  offset: z.number().int().optional(),
-  search: z.string().optional(),
-  dueDateFrom: z.string().optional(),
-  dueDateTo: z.string().optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().min(0).max(100000).optional(),
+  search: z.string().max(512).optional(),
+  dueDateFrom: isoDateLikeSchema.optional(),
+  dueDateTo: isoDateLikeSchema.optional(),
   sortBy: z.enum(['updatedAt', 'createdAt', 'dueDate', 'title', 'priority']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
@@ -106,8 +112,8 @@ const addTaskSchema = z.object({
   quickAdd: z.string().optional().describe('Quick-add string with natural language parsing (e.g. "Buy milk @errands #shopping /due:tomorrow +ProjectName")'),
   status: taskStatusSchema.optional().describe('Task status: inbox, next, waiting, someday, reference, done, archived'),
   projectId: z.string().optional().describe('Project ID to assign the task to'),
-  dueDate: z.string().optional().describe('Due date in ISO format'),
-  startTime: z.string().optional().describe('Start time in ISO format'),
+  dueDate: isoDateLikeSchema.optional().describe('Due date in ISO format'),
+  startTime: isoDateLikeSchema.optional().describe('Start time in ISO format'),
   contexts: z.array(z.string()).optional().describe('Context tags (e.g. ["@home", "@work"])'),
   tags: z.array(z.string()).optional().describe('Tags (e.g. ["#urgent", "#personal"])'),
   description: z.string().optional().describe('Task description/notes'),
@@ -128,14 +134,14 @@ const updateTaskSchema = z.object({
   title: z.string().optional(),
   status: taskStatusSchema.optional(),
   projectId: z.string().nullable().optional(),
-  dueDate: z.string().nullable().optional(),
-  startTime: z.string().nullable().optional(),
+  dueDate: isoDateLikeSchema.nullable().optional(),
+  startTime: isoDateLikeSchema.nullable().optional(),
   contexts: z.array(z.string()).nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
   description: z.string().nullable().optional(),
   priority: z.string().nullable().optional(),
   timeEstimate: z.string().nullable().optional(),
-  reviewAt: z.string().nullable().optional(),
+  reviewAt: isoDateLikeSchema.nullable().optional(),
   isFocusedToday: z.boolean().optional(),
 });
 
