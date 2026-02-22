@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, realpathSync, lstatSync, renameSync } from 'fs';
 import { createHash } from 'crypto';
-import { basename, dirname, join, resolve, sep } from 'path';
+import { basename, dirname, join, relative, resolve, sep } from 'path';
 import {
     applyTaskUpdates,
     generateUUID,
@@ -88,31 +88,21 @@ const RATE_LIMIT_MAX_KEYS = Number.isFinite(rateLimitMaxKeysValue) && rateLimitM
     ? Math.floor(rateLimitMaxKeysValue)
     : 10_000;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
-const ATTACHMENT_PATH_MAX_DECODE_PASSES = 3;
 // Accept URL-safe and common base64 token alphabets to avoid breaking existing deployments.
 const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{8,512}$/;
 
 function decodeAttachmentPath(rawPath: string): string | null {
-    let decoded = rawPath;
-    for (let i = 0; i < ATTACHMENT_PATH_MAX_DECODE_PASSES; i += 1) {
-        let next = '';
-        try {
-            next = decodeURIComponent(decoded);
-        } catch {
+    try {
+        const decoded = decodeURIComponent(rawPath);
+        // Reject any path that still contains a percent sign after one decode pass.
+        // This blocks multi-encoded traversal attempts and keeps parsing deterministic.
+        if (decoded.includes('%')) {
             return null;
         }
-        if (next === decoded) {
-            return next;
-        }
-        decoded = next;
-    }
-    try {
-        const next = decodeURIComponent(decoded);
-        if (next !== decoded) return null;
+        return decoded;
     } catch {
         return null;
     }
-    return decoded;
 }
 
 function isPathWithinRoot(pathValue: string, rootPath: string): boolean {
@@ -146,9 +136,32 @@ function resolveAttachmentPath(dataDir: string, key: string, rawPath: string): {
     return { rootRealPath, filePath };
 }
 
+function pathContainsSymlink(rootRealPath: string, targetPath: string): boolean {
+    if (!isPathWithinRoot(targetPath, rootRealPath)) return true;
+    const rel = relative(rootRealPath, targetPath);
+    if (!rel || rel === '.') return false;
+    const segments = rel.split(/[\\/]+/).filter(Boolean);
+    let currentPath = rootRealPath;
+    for (const segment of segments) {
+        currentPath = join(currentPath, segment);
+        if (!existsSync(currentPath)) continue;
+        try {
+            const stat = lstatSync(currentPath);
+            if (stat.isSymbolicLink()) return true;
+        } catch {
+            return true;
+        }
+    }
+    return false;
+}
+
 function writeAttachmentFileSafely(rootRealPath: string, filePath: string, body: Uint8Array): boolean {
     mkdirSync(dirname(filePath), { recursive: true });
-    const parentRealPath = realpathSync(dirname(filePath));
+    const parentPath = dirname(filePath);
+    if (pathContainsSymlink(rootRealPath, parentPath)) {
+        return false;
+    }
+    const parentRealPath = realpathSync(parentPath);
     if (!isPathWithinRoot(parentRealPath, rootRealPath)) {
         return false;
     }
@@ -502,6 +515,7 @@ export const __cloudTestUtils = {
     readJsonBody,
     normalizeAttachmentRelativePath,
     isPathWithinRoot,
+    pathContainsSymlink,
 };
 
 type CloudServerOptions = {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { __cloudTestUtils, startCloudServer } from './server';
@@ -178,6 +178,24 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.isPathWithinRoot('/data/ns/attachments', '/data/ns/attachments')).toBe(true);
         expect(__cloudTestUtils.isPathWithinRoot('/data/ns/attachments-evil/file.txt', '/data/ns/attachments')).toBe(false);
     });
+
+    test('detects symlink segments in attachment paths', () => {
+        const sandbox = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-symlink-check-'));
+        const root = join(sandbox, 'root');
+        const outside = join(sandbox, 'outside');
+        mkdirSync(root, { recursive: true });
+        mkdirSync(outside, { recursive: true });
+
+        const normalDir = join(root, 'plain');
+        mkdirSync(normalDir, { recursive: true });
+        expect(__cloudTestUtils.pathContainsSymlink(root, normalDir)).toBe(false);
+
+        const linkDir = join(root, 'linked');
+        symlinkSync(outside, linkDir);
+        expect(__cloudTestUtils.pathContainsSymlink(root, linkDir)).toBe(true);
+
+        rmSync(sandbox, { recursive: true, force: true });
+    });
 });
 
 describe('cloud server api', () => {
@@ -310,6 +328,28 @@ describe('cloud server api', () => {
         });
         expect(putResponse.status).toBe(400);
         expect(readFileSync(outsideFile, 'utf8')).toBe('original');
+
+        rmSync(outsideDir, { recursive: true, force: true });
+    });
+
+    test('rejects attachment uploads when parent directory is a symlink', async () => {
+        const token = 'integration-token';
+        const key = __cloudTestUtils.tokenToKey(token);
+        const attachmentRoot = join(dataDir, key, 'attachments');
+        mkdirSync(attachmentRoot, { recursive: true });
+
+        const outsideDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-outside-parent-'));
+        const symlinkedParent = join(attachmentRoot, 'folder');
+        symlinkSync(outsideDir, symlinkedParent);
+
+        const putResponse = await fetch(`${baseUrl}/v1/attachments/folder/file.bin`, {
+            method: 'PUT',
+            headers: authHeaders,
+            body: new TextEncoder().encode('attacker-data'),
+        });
+
+        expect(putResponse.status).toBe(400);
+        expect(existsSync(join(outsideDir, 'file.bin'))).toBe(false);
 
         rmSync(outsideDir, { recursive: true, force: true });
     });
