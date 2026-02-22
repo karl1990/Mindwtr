@@ -89,8 +89,7 @@ export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
                 key: 'content',
                 style: {
                     width: 'match_parent',
-                    flexGrow: 1,
-                    flexShrink: 1,
+                    flex: 1,
                 },
             },
             ...contentChildren
