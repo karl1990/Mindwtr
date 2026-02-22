@@ -27,6 +27,7 @@ const SYNC_CONFIG_CACHE_TTL_MS = 30_000;
 const SYNC_FILE_NAME = 'data.json';
 const syncConfigCache = new Map<string, { value: string | null; readAt: number }>();
 const IOS_TEMP_INBOX_PATH_PATTERN = /\/tmp\/[^/]*-Inbox\//i;
+const INVALID_CONFIG_CHAR_PATTERN = /[\u0000-\u001F\u007F]/;
 
 const decodeUriSafe = (value: string): string => {
   try {
@@ -43,6 +44,13 @@ const logSyncWarning = (message: string, error?: unknown) => {
 
 const logSyncInfo = (message: string, extra?: Record<string, string>) => {
   void logInfo(message, { scope: 'sync', extra });
+};
+
+const sanitizeConfigValue = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  if (!value) return null;
+  if (INVALID_CONFIG_CHAR_PATTERN.test(value)) return null;
+  return value;
 };
 
 const externalCalendarProvider = {
@@ -62,9 +70,9 @@ const getCachedConfigValue = async (key: string): Promise<string | null> => {
   const now = Date.now();
   const cached = syncConfigCache.get(key);
   if (cached && now - cached.readAt <= SYNC_CONFIG_CACHE_TTL_MS) {
-    return cached.value;
+    return sanitizeConfigValue(cached.value);
   }
-  const value = await AsyncStorage.getItem(key);
+  const value = sanitizeConfigValue(await AsyncStorage.getItem(key));
   syncConfigCache.set(key, { value, readAt: now });
   return value;
 };
@@ -138,7 +146,7 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
     return syncInFlight;
   }
   syncInFlight = (async () => {
-    const rawBackend = await getCachedConfigValue(SYNC_BACKEND_KEY);
+    const rawBackend = (await getCachedConfigValue(SYNC_BACKEND_KEY))?.trim() ?? null;
     const backend: SyncBackend = resolveBackend(rawBackend);
 
     if (backend === 'off') {
@@ -226,7 +234,8 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
       await flushPendingSave();
       localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
       if (backend === 'file') {
-        fileSyncPath = syncPathOverride || await getCachedConfigValue(SYNC_PATH_KEY);
+        const configuredSyncPath = (await getCachedConfigValue(SYNC_PATH_KEY))?.trim() ?? null;
+        fileSyncPath = syncPathOverride || configuredSyncPath;
         if (!fileSyncPath) {
           return { success: true };
         }
@@ -258,18 +267,18 @@ export async function performMobileSync(syncPathOverride?: string): Promise<{ su
         }
       }
       if (backend === 'webdav') {
-        const url = await getCachedConfigValue(WEBDAV_URL_KEY);
+        const url = (await getCachedConfigValue(WEBDAV_URL_KEY))?.trim() ?? null;
         if (!url) throw new Error('WebDAV URL not configured');
         syncUrl = normalizeWebdavUrl(url);
-        const username = (await getCachedConfigValue(WEBDAV_USERNAME_KEY)) || '';
-        const password = (await getCachedConfigValue(WEBDAV_PASSWORD_KEY)) || '';
+        const username = (await getCachedConfigValue(WEBDAV_USERNAME_KEY)) ?? '';
+        const password = (await getCachedConfigValue(WEBDAV_PASSWORD_KEY)) ?? '';
         webdavConfig = { url: syncUrl, username, password };
       }
       if (backend === 'cloud') {
-        const url = await getCachedConfigValue(CLOUD_URL_KEY);
+        const url = (await getCachedConfigValue(CLOUD_URL_KEY))?.trim() ?? null;
         if (!url) throw new Error('Self-hosted URL not configured');
         syncUrl = normalizeCloudUrl(url);
-        const token = (await getCachedConfigValue(CLOUD_TOKEN_KEY)) || '';
+        const token = (await getCachedConfigValue(CLOUD_TOKEN_KEY))?.trim() ?? '';
         cloudConfig = { url: syncUrl, token };
       }
 
