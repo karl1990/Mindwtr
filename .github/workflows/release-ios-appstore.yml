@@ -45,7 +45,7 @@ concurrency:
 
 jobs:
   ios-appstore:
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 90
     env:
       EXPECTED_TEAM_ID: 5X9JC5PL7T
@@ -66,9 +66,11 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          XCODE_26_PATH="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [ -n "${XCODE_26_PATH:-}" ]; then
-            sudo xcode-select -s "$XCODE_26_PATH"
+          XCODE_16_PATH="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -n "${XCODE_16_PATH:-}" ]; then
+            sudo xcode-select -s "$XCODE_16_PATH"
+          else
+            echo "::warning::No Xcode_16*.app found; using runner default Xcode."
           fi
           xcodebuild -version
           IOS_SDK_LINE="$(xcodebuild -showsdks | awk '/-sdk iphoneos/{line=$0} END{print line}')"
