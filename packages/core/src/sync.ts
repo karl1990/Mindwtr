@@ -767,7 +767,7 @@ const parseMergeTimestamp = (value: unknown): number => {
     return Number.isFinite(parsed) ? parsed : -1;
 };
 
-function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; deletedAt?: string }>(
+function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; deletedAt?: string; rev?: number; revBy?: string }>(
     local: T[],
     incoming: T[],
     mergeConflict?: (localItem: T, incomingItem: T, winner: T) => T
@@ -823,14 +823,14 @@ function mergeEntitiesWithStats<T extends { id: string; updatedAt: string; delet
 
         const safeLocalTime = parseMergeTimestamp(normalizedLocalItem.updatedAt);
         const safeIncomingTime = parseMergeTimestamp(normalizedIncomingItem.updatedAt);
-        const localRev = typeof (normalizedLocalItem as any).rev === 'number' && Number.isFinite((normalizedLocalItem as any).rev)
-            ? (normalizedLocalItem as any).rev as number
+        const localRev = typeof normalizedLocalItem.rev === 'number' && Number.isFinite(normalizedLocalItem.rev)
+            ? normalizedLocalItem.rev
             : 0;
-        const incomingRev = typeof (normalizedIncomingItem as any).rev === 'number' && Number.isFinite((normalizedIncomingItem as any).rev)
-            ? (normalizedIncomingItem as any).rev as number
+        const incomingRev = typeof normalizedIncomingItem.rev === 'number' && Number.isFinite(normalizedIncomingItem.rev)
+            ? normalizedIncomingItem.rev
             : 0;
-        const localRevBy = typeof (normalizedLocalItem as any).revBy === 'string' ? (normalizedLocalItem as any).revBy as string : '';
-        const incomingRevBy = typeof (normalizedIncomingItem as any).revBy === 'string' ? (normalizedIncomingItem as any).revBy as string : '';
+        const localRevBy = typeof normalizedLocalItem.revBy === 'string' ? normalizedLocalItem.revBy : '';
+        const incomingRevBy = typeof normalizedIncomingItem.revBy === 'string' ? normalizedIncomingItem.revBy : '';
         const hasRevision = localRev > 0 || incomingRev > 0 || !!localRevBy || !!incomingRevBy;
         const localDeleted = !!normalizedLocalItem.deletedAt;
         const incomingDeleted = !!normalizedIncomingItem.deletedAt;
