@@ -108,7 +108,9 @@
         "exclude": [
           "react-native-fs",
           "@fugood/react-native-audio-pcm-stream",
-          "whisper.rn"
+          "whisper.rn",
+          "react-native-widgetkit",
+          "react-native-alarm-notification"
         ]
       }
     }
