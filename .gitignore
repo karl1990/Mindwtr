@@ -68,6 +68,8 @@ apps/desktop/src-tauri/embedded.provisionprofile
 
 # Lock files (using bun)
 package-lock.json
+!apps/mobile/package-lock.json
+!packages/core/package-lock.json
 yarn.lock
 
 # AUR build artifacts

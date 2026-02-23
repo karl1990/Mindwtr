@@ -55,11 +55,11 @@ jobs:
 
       - name: Install core dependencies
         working-directory: packages/core
-        run: npm install --workspaces=false --legacy-peer-deps --no-audit --no-fund
+        run: npm ci --workspaces=false --legacy-peer-deps --no-audit --no-fund
 
       - name: Install mobile dependencies
         working-directory: apps/mobile
-        run: npm install --workspaces=false --legacy-peer-deps --no-audit --no-fund
+        run: npm ci --workspaces=false --legacy-peer-deps --no-audit --no-fund
 
       - name: Resolve version
         id: version
