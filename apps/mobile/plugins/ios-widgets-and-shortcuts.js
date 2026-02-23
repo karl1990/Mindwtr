@@ -37,6 +37,21 @@ const SHORTCUT_ITEMS = [
   },
 ];
 
+const escapeSwiftString = (value) =>
+  String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+const buildShortcutTypeToUrlMapLiteral = () => {
+  const lines = SHORTCUT_ITEMS
+    .map((item) => {
+      const type = item?.UIApplicationShortcutItemType;
+      const url = item?.UIApplicationShortcutItemUserInfo?.[SHORTCUT_URL_KEY];
+      if (typeof type !== 'string' || typeof url !== 'string') return null;
+      return `    "${escapeSwiftString(type)}": "${escapeSwiftString(url)}"`;
+    })
+    .filter(Boolean);
+  return lines.join(',\n');
+};
+
 const copyRecursive = (sourceDir, targetDir) => {
   fs.mkdirSync(targetDir, { recursive: true });
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
@@ -112,9 +127,10 @@ const addAppDelegateShortcutHandling = (config) =>
 
       const classHeader = 'public class AppDelegate: ExpoAppDelegate {';
       if (contents.includes(classHeader)) {
+        const quickActionMapLiteral = buildShortcutTypeToUrlMapLiteral();
         contents = contents.replace(
           classHeader,
-          `${classHeader}\n  private let quickActionTypeToUrl: [String: String] = [\n    "tech.dongdongbh.mindwtr.add_task": "mindwtr:///capture-quick?mode=text",\n    "tech.dongdongbh.mindwtr.open_focus": "mindwtr:///focus",\n    "tech.dongdongbh.mindwtr.open_calendar": "mindwtr:///calendar",\n  ]\n  private let quickActionUrlUserInfoKey = "${SHORTCUT_URL_KEY}"`
+          `${classHeader}\n  private let quickActionTypeToUrl: [String: String] = [\n${quickActionMapLiteral}\n  ]\n  private let quickActionUrlUserInfoKey = "${SHORTCUT_URL_KEY}"`
         );
       }
 
@@ -130,7 +146,7 @@ const addAppDelegateShortcutHandling = (config) =>
       if (contents.includes(marker)) {
         contents = contents.replace(
           marker,
-          `\n\n  public override func application(\n    _ application: UIApplication,\n    performActionFor shortcutItem: UIApplicationShortcutItem,\n    completionHandler: @escaping (Bool) -> Void\n  ) {\n    completionHandler(handleHomeScreenQuickAction(shortcutItem, application: application))\n  }\n\n  private func handleHomeScreenQuickAction(\n    _ shortcutItem: UIApplicationShortcutItem,\n    application: UIApplication\n  ) -> Bool {\n    guard let destinationUrl = quickActionUrl(shortcutItem) else {\n      return false\n    }\n\n    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {\n      _ = RCTLinkingManager.application(application, open: destinationUrl, options: [:])\n      application.open(destinationUrl, options: [:], completionHandler: nil)\n    }\n    return true\n  }\n\n  private func quickActionUrl(_ shortcutItem: UIApplicationShortcutItem) -> URL? {\n    if let userInfo = shortcutItem.userInfo,\n       let rawUrl = userInfo[quickActionUrlUserInfoKey] as? String,\n       let parsedUrl = URL(string: rawUrl) {\n      return parsedUrl\n    }\n    if let mappedUrl = quickActionTypeToUrl[shortcutItem.type] {\n      return URL(string: mappedUrl)\n    }\n    return nil\n  }\n}${marker}`
+          `\n\n  public override func application(\n    _ application: UIApplication,\n    performActionFor shortcutItem: UIApplicationShortcutItem,\n    completionHandler: @escaping (Bool) -> Void\n  ) {\n    completionHandler(handleHomeScreenQuickAction(shortcutItem, application: application))\n  }\n\n  private func handleHomeScreenQuickAction(\n    _ shortcutItem: UIApplicationShortcutItem,\n    application: UIApplication\n  ) -> Bool {\n    guard let destinationUrl = quickActionUrl(shortcutItem) else {\n      return false\n    }\n\n    // Give React Native routing a brief moment to initialize on cold launch.\n    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {\n      _ = RCTLinkingManager.application(application, open: destinationUrl, options: [:])\n      application.open(destinationUrl, options: [:], completionHandler: nil)\n    }\n    return true\n  }\n\n  private func quickActionUrl(_ shortcutItem: UIApplicationShortcutItem) -> URL? {\n    if let userInfo = shortcutItem.userInfo,\n       let rawUrl = userInfo[quickActionUrlUserInfoKey] as? String,\n       let parsedUrl = URL(string: rawUrl) {\n      return parsedUrl\n    }\n    if let mappedUrl = quickActionTypeToUrl[shortcutItem.type] {\n      return URL(string: mappedUrl)\n    }\n    return nil\n  }\n}${marker}`
         );
       }
 

@@ -15,6 +15,8 @@ export const WIDGET_LANGUAGE_KEY = 'mindwtr-language';
 export const IOS_WIDGET_APP_GROUP = 'group.tech.dongdongbh.mindwtr';
 export const IOS_WIDGET_PAYLOAD_KEY = 'mindwtr-ios-widget-payload';
 export const IOS_WIDGET_KIND = 'MindwtrTasksWidget';
+export const WIDGET_FOCUS_URI = 'mindwtr:///focus';
+export const WIDGET_QUICK_CAPTURE_URI = 'mindwtr:///capture-quick?mode=text';
 const DARK_THEME_MODES = new Set(['dark', 'material3-dark', 'nord', 'oled']);
 const LIGHT_THEME_MODES = new Set(['light', 'material3-light', 'eink', 'sepia']);
 
@@ -44,6 +46,8 @@ export interface TasksWidgetPayload {
     items: WidgetTaskItem[];
     emptyMessage: string;
     captureLabel: string;
+    focusUri: string;
+    quickCaptureUri: string;
     palette: WidgetPalette;
 }
 
@@ -138,6 +142,8 @@ export function buildWidgetPayload(
         items,
         emptyMessage: tr['agenda.noTasks'] ?? 'No tasks',
         captureLabel: tr['widget.capture'] ?? 'Quick capture',
+        focusUri: WIDGET_FOCUS_URI,
+        quickCaptureUri: WIDGET_QUICK_CAPTURE_URI,
         palette,
     };
 }

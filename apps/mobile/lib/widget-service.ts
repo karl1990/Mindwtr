@@ -158,7 +158,7 @@ async function updateIosWidgetFromPayload(payload: TasksWidgetPayload): Promise<
     }
 }
 
-export async function updateAndroidWidgetFromData(data: AppData): Promise<boolean> {
+export async function updateMobileWidgetFromData(data: AppData): Promise<boolean> {
     if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
     const payload = await buildPayloadFromData(data);
     if (Platform.OS === 'android') {
@@ -167,7 +167,7 @@ export async function updateAndroidWidgetFromData(data: AppData): Promise<boolea
     return await updateIosWidgetFromPayload(payload);
 }
 
-export async function updateAndroidWidgetFromStore(): Promise<boolean> {
+export async function updateMobileWidgetFromStore(): Promise<boolean> {
     if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
     const { _allTasks, _allProjects, _allSections, _allAreas, tasks, projects, sections, areas, settings } = useTaskStore.getState();
     const ensureArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
@@ -186,11 +186,12 @@ export async function updateAndroidWidgetFromStore(): Promise<boolean> {
         areas: allAreas.length ? allAreas : visibleAreas,
         settings: settings ?? {},
     };
-    return await updateAndroidWidgetFromData(data);
+    return await updateMobileWidgetFromData(data);
 }
 
-export const updateMobileWidgetFromData = updateAndroidWidgetFromData;
-export const updateMobileWidgetFromStore = updateAndroidWidgetFromStore;
+// Backwards-compatible aliases for older imports.
+export const updateAndroidWidgetFromData = updateMobileWidgetFromData;
+export const updateAndroidWidgetFromStore = updateMobileWidgetFromStore;
 
 export async function requestPinAndroidWidget(): Promise<boolean> {
     return false;

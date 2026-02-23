@@ -27,6 +27,8 @@ private struct MindwtrTasksWidgetPayload: Decodable {
     let items: [MindwtrWidgetTaskItem]
     let emptyMessage: String
     let captureLabel: String
+    let focusUri: String
+    let quickCaptureUri: String
     let palette: MindwtrWidgetPalette
 
     static var fallback: MindwtrTasksWidgetPayload {
@@ -36,6 +38,8 @@ private struct MindwtrTasksWidgetPayload: Decodable {
             items: [],
             emptyMessage: "No tasks",
             captureLabel: "Quick capture",
+            focusUri: "mindwtr:///focus",
+            quickCaptureUri: "mindwtr:///capture-quick?mode=text",
             palette: MindwtrWidgetPalette(
                 background: "#F8FAFC",
                 card: "#FFFFFF",
@@ -93,7 +97,7 @@ private struct MindwtrTasksWidgetView: View {
     var body: some View {
         let payload = entry.payload
         VStack(alignment: .leading, spacing: 8) {
-            Link(destination: URL(string: "mindwtr:///focus") ?? URL(fileURLWithPath: "/")) {
+            Link(destination: URL(string: payload.focusUri) ?? URL(fileURLWithPath: "/")) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(payload.headerTitle)
                         .font(.system(size: 14, weight: .semibold))
@@ -111,7 +115,8 @@ private struct MindwtrTasksWidgetView: View {
                     title: payload.emptyMessage,
                     textColor: payload.palette.mutedText,
                     cardColor: payload.palette.card,
-                    borderColor: payload.palette.border
+                    borderColor: payload.palette.border,
+                    focusUri: payload.focusUri
                 )
             } else {
                 ForEach(payload.items.prefix(3), id: \.id) { item in
@@ -119,14 +124,15 @@ private struct MindwtrTasksWidgetView: View {
                         title: "• \(item.title)",
                         textColor: payload.palette.text,
                         cardColor: payload.palette.card,
-                        borderColor: payload.palette.border
+                        borderColor: payload.palette.border,
+                        focusUri: payload.focusUri
                     )
                 }
             }
 
             Spacer(minLength: 0)
 
-            Link(destination: URL(string: "mindwtr:///capture-quick?mode=text") ?? URL(fileURLWithPath: "/")) {
+            Link(destination: URL(string: payload.quickCaptureUri) ?? URL(fileURLWithPath: "/")) {
                 Text(payload.captureLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(hexColor(payload.palette.onAccent))
@@ -147,9 +153,10 @@ private struct TaskLineView: View {
     let textColor: String
     let cardColor: String
     let borderColor: String
+    let focusUri: String
 
     var body: some View {
-        Link(destination: URL(string: "mindwtr:///focus") ?? URL(fileURLWithPath: "/")) {
+        Link(destination: URL(string: focusUri) ?? URL(fileURLWithPath: "/")) {
             Text(title)
                 .font(.system(size: 12))
                 .foregroundColor(hexColor(textColor))
@@ -175,14 +182,20 @@ private func hexColor(_ hex: String) -> Color {
     let r: UInt64
     let g: UInt64
     let b: UInt64
+    let a: UInt64
 
     switch cleaned.count {
     case 3:
-        (r, g, b) = ((int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        (r, g, b, a) = ((int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17, 255)
+    case 4:
+        (r, g, b, a) = ((int >> 12) * 17, (int >> 8 & 0xF) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
     case 6:
-        (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        (r, g, b, a) = (int >> 16, int >> 8 & 0xFF, int & 0xFF, 255)
+    case 8:
+        // Supports CSS-style #RRGGBBAA payload values.
+        (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
     default:
-        (r, g, b) = (15, 23, 42)
+        (r, g, b, a) = (15, 23, 42, 255)
     }
 
     return Color(
@@ -190,7 +203,7 @@ private func hexColor(_ hex: String) -> Color {
         red: Double(r) / 255,
         green: Double(g) / 255,
         blue: Double(b) / 255,
-        opacity: 1
+        opacity: Double(a) / 255
     )
 }
 

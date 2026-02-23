@@ -4,9 +4,7 @@ import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { TasksWidgetPayload } from '../lib/widget-data';
 
 export function buildTasksWidgetTree(payload: TasksWidgetPayload) {
-    const { headerTitle, subtitle, items, emptyMessage, captureLabel, palette } = payload;
-    const focusUri = 'mindwtr:///focus';
-    const quickCaptureUri = 'mindwtr:///capture-quick?mode=text';
+    const { headerTitle, subtitle, items, emptyMessage, captureLabel, focusUri, quickCaptureUri, palette } = payload;
     const contentChildren: React.ReactElement[] = [
         React.createElement(TextWidget, {
             key: 'header',
