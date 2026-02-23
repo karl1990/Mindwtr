@@ -3,11 +3,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type AppData, useTaskStore } from '@mindwtr/core';
 
 import { buildTasksWidgetTree } from '../components/TasksWidget';
-import { buildWidgetPayload, resolveWidgetLanguage, WIDGET_LANGUAGE_KEY } from './widget-data';
+import {
+    buildWidgetPayload,
+    IOS_WIDGET_APP_GROUP,
+    IOS_WIDGET_KIND,
+    IOS_WIDGET_PAYLOAD_KEY,
+    resolveWidgetLanguage,
+    type TasksWidgetPayload,
+    WIDGET_LANGUAGE_KEY,
+} from './widget-data';
 import { logError, logWarn } from './app-log';
 
 export function isAndroidWidgetSupported(): boolean {
     return Platform.OS === 'android';
+}
+
+export function isIosWidgetSupported(): boolean {
+    return Platform.OS === 'ios';
 }
 
 const getSystemColorScheme = (): 'light' | 'dark' | undefined => {
@@ -20,13 +32,26 @@ const getSystemColorScheme = (): 'light' | 'dark' | undefined => {
     }
 };
 
-async function getWidgetApi() {
+type AndroidWidgetApi = {
+    requestWidgetUpdate: (params: {
+        widgetName: string;
+        renderWidget: () => unknown;
+    }) => Promise<void>;
+};
+
+type IosWidgetApi = {
+    setItem: (key: string, value: string, appGroup: string) => Promise<void>;
+    reloadTimelines?: (ofKind: string) => void;
+    reloadAllTimelines?: () => void;
+};
+
+async function getAndroidWidgetApi(): Promise<AndroidWidgetApi | null> {
     if (Platform.OS !== 'android') return null;
     try {
         // Use require to avoid dynamic import issues in Hermes
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const api = require('react-native-android-widget');
-        return api;
+        return api as AndroidWidgetApi;
     } catch (error) {
         if (__DEV__) {
             void logWarn('[RNWidget] Android widget API unavailable', {
@@ -38,17 +63,37 @@ async function getWidgetApi() {
     }
 }
 
-export async function updateAndroidWidgetFromData(data: AppData): Promise<boolean> {
+async function getIosWidgetApi(): Promise<IosWidgetApi | null> {
+    if (Platform.OS !== 'ios') return null;
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const api = require('react-native-widgetkit');
+        return api as IosWidgetApi;
+    } catch (error) {
+        if (__DEV__) {
+            void logWarn('[RNWidget] iOS widget API unavailable', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
+        }
+        return null;
+    }
+}
+
+async function buildPayloadFromData(data: AppData): Promise<TasksWidgetPayload> {
+    const languageValue = await AsyncStorage.getItem(WIDGET_LANGUAGE_KEY);
+    const language = resolveWidgetLanguage(languageValue, data.settings?.language);
+    return buildWidgetPayload(data, language, {
+        systemColorScheme: getSystemColorScheme(),
+    });
+}
+
+async function updateAndroidWidgetFromPayload(payload: TasksWidgetPayload): Promise<boolean> {
     if (Platform.OS !== 'android') return false;
-    const widgetApi = await getWidgetApi();
+    const widgetApi = await getAndroidWidgetApi();
     if (!widgetApi) return false;
 
     try {
-        const languageValue = await AsyncStorage.getItem(WIDGET_LANGUAGE_KEY);
-        const language = resolveWidgetLanguage(languageValue, data.settings?.language);
-        const payload = buildWidgetPayload(data, language, {
-            systemColorScheme: getSystemColorScheme(),
-        });
         for (let attempt = 0; attempt < 2; attempt += 1) {
             try {
                 await widgetApi.requestWidgetUpdate({
@@ -84,8 +129,46 @@ export async function updateAndroidWidgetFromData(data: AppData): Promise<boolea
     }
 }
 
+async function updateIosWidgetFromPayload(payload: TasksWidgetPayload): Promise<boolean> {
+    if (Platform.OS !== 'ios') return false;
+    const widgetApi = await getIosWidgetApi();
+    if (!widgetApi) return false;
+
+    try {
+        await widgetApi.setItem(
+            IOS_WIDGET_PAYLOAD_KEY,
+            JSON.stringify(payload),
+            IOS_WIDGET_APP_GROUP,
+        );
+        if (typeof widgetApi.reloadTimelines === 'function') {
+            widgetApi.reloadTimelines(IOS_WIDGET_KIND);
+        } else if (typeof widgetApi.reloadAllTimelines === 'function') {
+            widgetApi.reloadAllTimelines();
+        }
+        return true;
+    } catch (error) {
+        if (__DEV__) {
+            void logWarn('[RNWidget] Failed to update iOS widget', {
+                scope: 'widget',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
+        }
+        void logError(error, { scope: 'widget', extra: { platform: 'ios' } });
+        return false;
+    }
+}
+
+export async function updateAndroidWidgetFromData(data: AppData): Promise<boolean> {
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
+    const payload = await buildPayloadFromData(data);
+    if (Platform.OS === 'android') {
+        return await updateAndroidWidgetFromPayload(payload);
+    }
+    return await updateIosWidgetFromPayload(payload);
+}
+
 export async function updateAndroidWidgetFromStore(): Promise<boolean> {
-    if (Platform.OS !== 'android') return false;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
     const { _allTasks, _allProjects, _allSections, _allAreas, tasks, projects, sections, areas, settings } = useTaskStore.getState();
     const ensureArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
     const allTasks = ensureArray<AppData['tasks'][number]>(_allTasks);
@@ -105,6 +188,9 @@ export async function updateAndroidWidgetFromStore(): Promise<boolean> {
     };
     return await updateAndroidWidgetFromData(data);
 }
+
+export const updateMobileWidgetFromData = updateAndroidWidgetFromData;
+export const updateMobileWidgetFromStore = updateAndroidWidgetFromStore;
 
 export async function requestPinAndroidWidget(): Promise<boolean> {
     return false;

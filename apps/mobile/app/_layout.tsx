@@ -28,7 +28,7 @@ import { setNotificationOpenHandler, startMobileNotifications, stopMobileNotific
 import { performMobileSync } from '../lib/sync-service';
 import { isLikelyOfflineSyncError, resolveBackend, type SyncBackend } from '../lib/sync-service-utils';
 import { SYNC_BACKEND_KEY } from '../lib/sync-constants';
-import { updateAndroidWidgetFromStore } from '../lib/widget-service';
+import { updateMobileWidgetFromStore } from '../lib/widget-service';
 import { markStartupPhase, measureStartupPhase } from '../lib/startup-profiler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { verifyPolyfills } from '../utils/verify-polyfills';
@@ -382,13 +382,13 @@ function RootLayoutContent() {
             }
           })
           .catch(logAppError);
-        updateAndroidWidgetFromStore().catch(logAppError);
+        updateMobileWidgetFromStore().catch(logAppError);
         if (widgetRefreshTimer.current) {
           clearTimeout(widgetRefreshTimer.current);
         }
         widgetRefreshTimer.current = setTimeout(() => {
           if (!isActive.current) return;
-          updateAndroidWidgetFromStore().catch(logAppError);
+          updateMobileWidgetFromStore().catch(logAppError);
         }, 800);
       }
       if (previousState === 'active' && nextInactiveOrBackground) {
@@ -493,13 +493,13 @@ function RootLayoutContent() {
         if (store.settings.notificationsEnabled !== false) {
           startMobileNotifications().catch(logAppError);
         }
-        updateAndroidWidgetFromStore().catch(logAppError);
+        updateMobileWidgetFromStore().catch(logAppError);
         if (widgetRefreshTimer.current) {
           clearTimeout(widgetRefreshTimer.current);
         }
         widgetRefreshTimer.current = setTimeout(() => {
           if (!isActive.current) return;
-          updateAndroidWidgetFromStore().catch(logAppError);
+          updateMobileWidgetFromStore().catch(logAppError);
         }, 800);
         // Initial sync after cold start
         if (!cancelled && isActive.current) {

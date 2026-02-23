@@ -106,6 +106,7 @@
           }
         }
       ],
+      "./plugins/ios-widgets-and-shortcuts",
       [
         "expo-calendar",
         {

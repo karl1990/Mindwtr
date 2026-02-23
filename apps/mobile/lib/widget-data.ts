@@ -12,6 +12,9 @@ import type { ColorProp } from 'react-native-android-widget';
 
 export const WIDGET_DATA_KEY = 'mindwtr-data';
 export const WIDGET_LANGUAGE_KEY = 'mindwtr-language';
+export const IOS_WIDGET_APP_GROUP = 'group.tech.dongdongbh.mindwtr';
+export const IOS_WIDGET_PAYLOAD_KEY = 'mindwtr-ios-widget-payload';
+export const IOS_WIDGET_KIND = 'MindwtrTasksWidget';
 const DARK_THEME_MODES = new Set(['dark', 'material3-dark', 'nord', 'oled']);
 const LIGHT_THEME_MODES = new Set(['light', 'material3-light', 'eink', 'sepia']);
 

@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 import { WIDGET_DATA_KEY } from './widget-data';
-import { updateAndroidWidgetFromData } from './widget-service';
+import { updateMobileWidgetFromData } from './widget-service';
 import { logError, logWarn } from './app-log';
 import { markStartupPhase, measureStartupPhase } from './startup-profiler';
 
@@ -374,8 +374,8 @@ const createStorage = (): StorageAdapter => {
                     try {
                         const data = JSON.parse(jsonValue) as AppData;
                         data.areas = Array.isArray(data.areas) ? data.areas : [];
-                        updateAndroidWidgetFromData(data).catch((error) => {
-                            logStorageWarn('[Widgets] Failed to update Android widget from backup', error);
+                        updateMobileWidgetFromData(data).catch((error) => {
+                            logStorageWarn('[Widgets] Failed to update mobile widget from backup', error);
                         });
                         return data;
                     } catch (parseError) {
@@ -415,8 +415,8 @@ const createStorage = (): StorageAdapter => {
                     )
                 );
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
-                updateAndroidWidgetFromData(data).catch((error) => {
-                    logStorageWarn('[Widgets] Failed to update Android widget from storage load', error);
+                updateMobileWidgetFromData(data).catch((error) => {
+                    logStorageWarn('[Widgets] Failed to update mobile widget from storage load', error);
                 });
                 markStartupPhase('mobile.storage.get_data.widget_update_dispatched');
                 clearPreferJsonBackup();
@@ -457,7 +457,7 @@ const createStorage = (): StorageAdapter => {
                     await measureStartupPhase('mobile.storage.save_data.asyncstorage_set', async () =>
                         AsyncStorage.setItem(DATA_KEY, jsonValue)
                     );
-                    await measureStartupPhase('mobile.storage.save_data.widget_update', async () => updateAndroidWidgetFromData(data));
+                    await measureStartupPhase('mobile.storage.save_data.widget_update', async () => updateMobileWidgetFromData(data));
                     markStartupPhase('mobile.storage.save_data.end');
                 } catch (e) {
                     markStartupPhase('mobile.storage.save_data.error');
