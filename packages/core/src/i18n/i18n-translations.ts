@@ -14,6 +14,7 @@ import { plOverrides } from './locales/pl';
 import { koOverrides } from './locales/ko';
 import { itOverrides } from './locales/it';
 import { trOverrides } from './locales/tr';
+import { nlOverrides } from './locales/nl';
 
 const buildTranslations = (overrides: Record<string, string>) => {
     const result: Record<string, string> = {};
@@ -35,6 +36,7 @@ const pl = buildTranslations(plOverrides);
 const ko = buildTranslations(koOverrides);
 const it = buildTranslations(itOverrides);
 const tr = buildTranslations(trOverrides);
+const nl = buildTranslations(nlOverrides);
 
 export const translations: Record<Language, Record<string, string>> = {
     en,
@@ -51,4 +53,5 @@ export const translations: Record<Language, Record<string, string>> = {
     ko,
     it,
     tr,
+    nl,
 };

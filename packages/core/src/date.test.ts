@@ -42,6 +42,7 @@ describe('date utils', () => {
         expect(resolveDateLocaleTag({ language: 'de', dateFormat: 'ymd', systemLocale: 'de-DE' })).toBe('de-DE');
         expect(resolveDateLocaleTag({ language: 'de', dateFormat: 'system', systemLocale: 'de-DE' })).toBe('de-DE');
         expect(resolveDateLocaleTag({ language: 'pl', dateFormat: 'system' })).toBe('pl-PL');
+        expect(resolveDateLocaleTag({ language: 'nl', dateFormat: 'system' })).toBe('nl-NL');
     });
 
     it('detects when a review date is due', () => {

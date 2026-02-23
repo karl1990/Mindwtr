@@ -133,6 +133,7 @@ const LANGUAGES: { id: Language; native: string }[] = [
     { id: 'fr', native: 'Français' },
     { id: 'pt', native: 'Português' },
     { id: 'pl', native: 'Polski' },
+    { id: 'nl', native: 'Nederlands' },
     { id: 'ko', native: '한국어' },
     { id: 'it', native: 'Italiano' },
     { id: 'tr', native: 'Türkçe' },
