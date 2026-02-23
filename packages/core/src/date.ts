@@ -167,9 +167,13 @@ export function safeParseDate(dateStr: string | undefined | null): Date | null {
                 const minute = match[5] ? Number(match[5]) : 0;
                 const second = match[6] ? Number(match[6]) : 0;
                 const ms = match[7] ? Number(match[7].padEnd(3, '0')) : 0;
-                // Date(year, ...) maps 0-99 to 1900-1999, so construct then overwrite full year.
-                const localDate = new Date(0, month, day, hour, minute, second, ms);
-                localDate.setFullYear(year);
+                const localDate = year >= 0 && year <= 99
+                    ? (() => {
+                        const d = new Date(2000, month, day, hour, minute, second, ms);
+                        d.setFullYear(year);
+                        return d;
+                    })()
+                    : new Date(year, month, day, hour, minute, second, ms);
                 return isValid(localDate) ? localDate : null;
             }
         }

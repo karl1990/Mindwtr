@@ -403,7 +403,11 @@ export function createNextRecurringTask(
     const nextReviewAt = task.reviewAt
         ? nextIsoFrom(strategy === 'fluid' ? completedAtIso : task.reviewAt, rule, completedAtDate, byDay, interval, byMonthDay)
         : undefined;
-    if (!nextStartTime) {
+    if (!nextStartTime && !nextDueDate && !nextReviewAt) {
+        // When recurrence exists but no schedule fields are set, defer the next instance
+        // from completion so it does not reappear in Next immediately.
+        nextStartTime = nextIsoFrom(completedAtIso, rule, completedAtDate, byDay, interval, byMonthDay);
+    } else if (!nextStartTime) {
         nextStartTime = nextDueDate ?? nextReviewAt;
     }
 

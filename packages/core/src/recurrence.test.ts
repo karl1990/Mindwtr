@@ -101,6 +101,24 @@ describe('recurrence', () => {
         expect(next?.startTime).toBe('2025-01-08T14:00:00.000Z');
     });
 
+    it('defers unscheduled fluid recurrence from completion date', () => {
+        const task: Task = {
+            id: 't2d',
+            title: 'Unscheduled recurring task',
+            status: 'next',
+            tags: [],
+            contexts: [],
+            recurrence: { rule: 'daily', strategy: 'fluid', rrule: 'FREQ=DAILY;INTERVAL=3' },
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2025-01-05T14:00:00.000Z', 'next');
+        expect(next?.dueDate).toBeUndefined();
+        expect(next?.startTime).toBe('2025-01-08T14:00:00.000Z');
+        expect(next?.status).toBe('next');
+    });
+
     it('falls back to weekly interval when BYDAY is empty', () => {
         const task: Task = {
             id: 't4',
