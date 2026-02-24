@@ -644,11 +644,6 @@ export const TaskItem = memo(function TaskItem({
         if (translated === 'task.waitingDuePromptDescription') return 'When do you want to follow up on this waiting task?';
         return translated;
     }, [t]);
-    const waitingDuePromptPlaceholder = useMemo(() => {
-        const translated = t('task.waitingDuePromptPlaceholder');
-        if (translated === 'task.waitingDuePromptPlaceholder') return 'e.g. next Monday 9am';
-        return translated;
-    }, [t]);
     const waitingDuePromptInvalid = useMemo(() => {
         const translated = t('task.waitingDuePromptInvalid');
         if (translated === 'task.waitingDuePromptInvalid') return 'Could not parse that date. Try formats like "tomorrow", "next Monday", or "2026-03-01".';
@@ -929,7 +924,7 @@ export const TaskItem = memo(function TaskItem({
                     isOpen={showWaitingDuePrompt}
                     title={waitingDuePromptTitle}
                     description={waitingDuePromptDescription}
-                    placeholder={waitingDuePromptPlaceholder}
+                    inputType="date"
                     defaultValue=""
                     confirmLabel={t('common.save')}
                     cancelLabel={t('common.cancel')}

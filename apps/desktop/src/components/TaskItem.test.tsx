@@ -98,13 +98,13 @@ describe('TaskItem', () => {
         expect(archivedOption).toBeTruthy();
     });
 
-    it('shows quick NEXT to WAITING action and opens due-date prompt', () => {
+    it('shows quick NEXT to WAITING action and opens due-date picker prompt', () => {
         const nextTask: Task = {
             ...mockTask,
             id: 'next-task',
             status: 'next',
         };
-        const { getByRole, getByText } = render(
+        const { getByRole, getByText, container } = render(
             <LanguageProvider>
                 <TaskItem task={nextTask} />
             </LanguageProvider>
@@ -112,5 +112,6 @@ describe('TaskItem', () => {
         const waitingButton = getByRole('button', { name: /move to waiting and set due date/i });
         fireEvent.click(waitingButton);
         expect(getByText('Set follow-up date')).toBeInTheDocument();
+        expect(container.querySelector('input[type="date"]')).toBeTruthy();
     });
 });

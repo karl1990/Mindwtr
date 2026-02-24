@@ -6,6 +6,7 @@ interface PromptModalProps {
     description?: string;
     placeholder?: string;
     defaultValue?: string;
+    inputType?: 'text' | 'date' | 'datetime-local';
     confirmLabel: string;
     cancelLabel: string;
     onConfirm: (value: string) => void;
@@ -18,6 +19,7 @@ export function PromptModal({
     description,
     placeholder,
     defaultValue,
+    inputType = 'text',
     confirmLabel,
     cancelLabel,
     onConfirm,
@@ -62,6 +64,7 @@ export function PromptModal({
                 <div className="p-4 space-y-3">
                     <input
                         ref={inputRef}
+                        type={inputType}
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         onKeyDown={(e) => {
