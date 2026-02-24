@@ -493,7 +493,9 @@ function TaskEditModalInner({ visible, task, onClose, onSave, onFocusMode, defau
         };
         updates.checklist = applyMarkdownChecklistToTask(resolvedDescription, updates.checklist);
         if (parsedProps.status) updates.status = parsedProps.status;
+        if (parsedProps.startTime) updates.startTime = parsedProps.startTime;
         if (parsedProps.dueDate) updates.dueDate = parsedProps.dueDate;
+        if (parsedProps.reviewAt) updates.reviewAt = parsedProps.reviewAt;
         if (hasProjectCommand && resolvedProjectId && resolvedProjectId !== existingProjectId) {
             updates.projectId = resolvedProjectId;
             updates.sectionId = undefined;

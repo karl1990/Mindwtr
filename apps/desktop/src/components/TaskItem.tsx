@@ -602,7 +602,7 @@ export const TaskItem = memo(function TaskItem({
             title: cleanedTitle,
             status: parsedProps.status || editStatus,
             dueDate: parsedProps.dueDate || editDueDate || undefined,
-            startTime: editStartTime || undefined,
+            startTime: parsedProps.startTime || editStartTime || undefined,
             projectId: resolvedProjectId,
             sectionId: resolvedSectionId,
             areaId: resolvedAreaId,
@@ -614,7 +614,7 @@ export const TaskItem = memo(function TaskItem({
             recurrence: recurrenceValue,
             timeEstimate: editTimeEstimate || undefined,
             priority: editPriority || undefined,
-            reviewAt: editReviewAt || undefined,
+            reviewAt: parsedProps.reviewAt || editReviewAt || undefined,
             attachments: editAttachments.length > 0 ? editAttachments : undefined,
         });
         setIsEditing(false);
