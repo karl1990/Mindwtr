@@ -3,6 +3,7 @@ import {
     type Language,
     type TaskSortBy,
     safeParseDate,
+    safeParseDueDate,
     SUPPORTED_LANGUAGES,
     getTranslationsSync,
     loadTranslations,
@@ -58,6 +59,45 @@ const resolveWidgetTaskSort = (data: AppData): TaskSortBy => {
     return TASK_SORT_OPTIONS.includes(sortBy as TaskSortBy) ? (sortBy as TaskSortBy) : 'default';
 };
 
+const buildSequentialFirstTaskIds = (
+    tasks: AppData['tasks'],
+    sequentialProjectIds: Set<string>
+): Set<string> => {
+    if (sequentialProjectIds.size === 0) return new Set<string>();
+
+    const tasksByProject = new Map<string, AppData['tasks']>();
+    tasks.forEach((task) => {
+        if (!task.projectId) return;
+        if (!sequentialProjectIds.has(task.projectId)) return;
+        const list = tasksByProject.get(task.projectId) ?? [];
+        list.push(task);
+        tasksByProject.set(task.projectId, list);
+    });
+
+    const firstIds = new Set<string>();
+    tasksByProject.forEach((projectTasks) => {
+        const hasOrder = projectTasks.some((task) => Number.isFinite(task.orderNum));
+        let firstId: string | null = null;
+        let bestKey = Number.POSITIVE_INFINITY;
+
+        projectTasks.forEach((task) => {
+            const orderKey = Number.isFinite(task.orderNum)
+                ? (task.orderNum as number)
+                : Number.POSITIVE_INFINITY;
+            const createdKey = safeParseDate(task.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+            const key = hasOrder ? orderKey : createdKey;
+            if (!firstId || key < bestKey) {
+                firstId = task.id;
+                bestKey = key;
+            }
+        });
+
+        if (firstId) firstIds.add(firstId);
+    });
+
+    return firstIds;
+};
+
 export function resolveWidgetLanguage(saved: string | null, setting?: string): Language {
     const candidate = setting && setting !== 'system' ? setting : saved;
     if (candidate && SUPPORTED_LANGUAGES.includes(candidate as Language)) return candidate as Language;
@@ -106,25 +146,55 @@ export function buildWidgetPayload(
     void loadTranslations(language);
     const tr = getTranslationsSync(language);
     const tasks = data.tasks || [];
+    const projects = data.projects || [];
     const now = new Date();
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const palette = resolveWidgetPalette(
         typeof data.settings?.theme === 'string' ? data.settings.theme : undefined,
         options?.systemColorScheme,
     );
 
+    const sequentialProjectIds = new Set(
+        projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id)
+    );
+
     const activeTasks = tasks.filter((task) => {
         if (task.deletedAt) return false;
         if (task.status === 'archived' || task.status === 'done' || task.status === 'reference') return false;
-        // Focused tasks should remain visible even if they have a future start time.
-        if (!task.isFocusedToday && task.startTime) {
-            const start = safeParseDate(task.startTime);
-            if (start && start > now) return false;
-        }
         return true;
     });
 
-    const focusedTasks = activeTasks.filter((task) => task.isFocusedToday);
-    const listSource = sortTasksBy(focusedTasks, resolveWidgetTaskSort(data));
+    const sequentialFirstTaskIds = buildSequentialFirstTaskIds(activeTasks, sequentialProjectIds);
+    const isSequentialBlocked = (task: AppData['tasks'][number]) => {
+        if (!task.projectId) return false;
+        if (!sequentialProjectIds.has(task.projectId)) return false;
+        return !sequentialFirstTaskIds.has(task.id);
+    };
+    const isPlannedForFuture = (task: AppData['tasks'][number]) => {
+        const start = safeParseDate(task.startTime);
+        return Boolean(start && start > endOfToday);
+    };
+
+    const scheduleTasks = activeTasks.filter((task) => {
+        if (isSequentialBlocked(task)) return false;
+        const due = safeParseDueDate(task.dueDate);
+        const start = safeParseDate(task.startTime);
+        const startReady = !start || start <= endOfToday;
+        return Boolean(task.isFocusedToday)
+            || (startReady && Boolean(due && due <= endOfToday))
+            || (startReady && Boolean(start && start <= endOfToday));
+    });
+
+    const scheduleTaskIds = new Set(scheduleTasks.map((task) => task.id));
+    const nextTasks = activeTasks.filter((task) => {
+        if (task.status !== 'next') return false;
+        if (isPlannedForFuture(task)) return false;
+        if (isSequentialBlocked(task)) return false;
+        return !scheduleTaskIds.has(task.id);
+    });
+
+    const focusTasks = [...scheduleTasks, ...nextTasks];
+    const listSource = sortTasksBy(focusTasks, resolveWidgetTaskSort(data));
 
     const items = listSource.slice(0, 3).map((task) => ({
         id: task.id,

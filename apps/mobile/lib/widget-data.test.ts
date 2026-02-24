@@ -17,7 +17,7 @@ describe('widget-data', () => {
         expect(resolveWidgetLanguage(null, 'es')).toBe('es');
     });
 
-    it('builds payload with focused tasks only and caps to three', () => {
+    it('builds payload with focus-list tasks and caps to three', () => {
         const now = new Date().toISOString();
         const data: AppData = {
             ...baseData,
@@ -37,10 +37,49 @@ describe('widget-data', () => {
         expect(payload.inboxCount).toBe(1);
     });
 
+    it('includes focus-page schedule/next tasks even when none are explicitly focused', () => {
+        const now = new Date().toISOString();
+        const data: AppData = {
+            ...baseData,
+            tasks: [
+                {
+                    id: 'inbox-due',
+                    title: 'Inbox due today',
+                    status: 'inbox',
+                    dueDate: '2000-01-01',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'next-now',
+                    title: 'Next action',
+                    status: 'next',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'next-future',
+                    title: 'Future next action',
+                    status: 'next',
+                    startTime: '2999-01-01T00:00:00.000Z',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+        };
+        const payload = buildWidgetPayload(data, 'en');
+        expect(payload.items.map((item) => item.id)).toEqual(['inbox-due', 'next-now']);
+    });
+
     it('keeps focused tasks even when start time is in the future', () => {
-        const now = new Date('2026-02-22T12:00:00.000Z');
-        const future = new Date('2026-02-23T09:00:00.000Z').toISOString();
-        const created = now.toISOString();
+        const created = new Date().toISOString();
+        const future = '2999-01-01T09:00:00.000Z';
         const data: AppData = {
             ...baseData,
             tasks: [
