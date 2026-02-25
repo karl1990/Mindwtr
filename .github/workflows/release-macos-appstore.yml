@@ -339,6 +339,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.MAS_SIGNING_IDENTITY }}
           VITE_ANALYTICS_HEARTBEAT_URL: ${{ secrets.ANALYTICS_HEARTBEAT_URL }}
           TAURI_LOG_LEVEL: debug
+          SOURCE_DATE_EPOCH: "1"
         run: |
           set -euo pipefail
           cd apps/desktop
