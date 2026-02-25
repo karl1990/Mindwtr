@@ -88,12 +88,6 @@ Legend: `✅` = yes, `❌` = no, `⚠️` = partial/limited support.
 
 *Checked against official product docs/pages on February 25, 2026. If any entry is outdated, feel free to open an issue/PR with sources.*
 
-## Support Mindwtr
-
-Keeping the iOS App Store version live requires an annual Apple Developer fee (see [Apple Developer Program](https://developer.apple.com/support/enrollment/)), currently paid out of pocket.
-
-If Mindwtr helps you, please support ongoing development via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
-
 ## Philosophy
 
 Mindwtr is built to be **simple by default and powerful when you need it**. We focus on reducing cognitive load, cutting the fat, and keeping you in flow. That means:
@@ -307,7 +301,9 @@ Other methods: APK from [GitHub Releases](https://github.com/dongdongbh/Mindwtr/
 Available on the App Store: [Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144).
 TestFlight beta: [Join the beta](https://testflight.apple.com/join/7SMJCTSR).
 
-Maintaining the iOS App Store version requires an annual Apple Developer fee (see [Apple Developer Program](https://developer.apple.com/support/enrollment/)). If you want to help, see [Support Mindwtr](#support-mindwtr).
+However, maintaining the iOS version on the App Store requires a substantial annual fee (see the [Apple Developer Program](https://developer.apple.com/support/enrollment/)), which I currently cover out of pocket.
+
+To ensure Mindwtr's continued existence and future development, your support is greatly appreciated! If you find value in the app, please consider supporting the project via [GitHub Sponsors](https://github.com/sponsors/dongdongbh) or [Ko-fi](https://ko-fi.com/D1D01T20WK).
 
 ### Docker (PWA + Cloud Sync)
 

@@ -88,12 +88,6 @@ Mindwtr 面向想要完整 GTD 且不被平台锁定的用户。下面是与主�
 
 *以上信息基于 2026 年 2 月 25 日官方产品页面/文档整理。如有变更，欢迎附来源提交 issue/PR。*
 
-## 支持 Mindwtr
-
-维护 iOS 版在 App Store 上线需要每年支付 Apple Developer 费用（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我个人承担。
-
-如果 Mindwtr 对你有帮助，欢迎通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持项目持续开发。
-
 ## 理念
 
 Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认知负担、删繁就简，让你保持顺畅的工作流：
@@ -307,7 +301,9 @@ brew install --cask mindwtr
 已上线 App Store：[Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144)。
 TestFlight 测试版：[加入测试版](https://testflight.apple.com/join/7SMJCTSR)。
 
-维护 iOS 版在 App Store 上线需要每年支付 Apple Developer 费用（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)）。如需支持项目，请见[支持 Mindwtr](#支持-mindwtr)。
+不过，维护 iOS 版上架 App Store 需要支付较高的年费（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我自费承担。
+
+为了让 Mindwtr 能持续发展和维护，非常感谢你的支持！如果你觉得这款应用有价值，欢迎通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持项目。
 
 ### Docker（PWA + 云同步）
 
