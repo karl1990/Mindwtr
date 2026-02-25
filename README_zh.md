@@ -6,9 +6,11 @@
 
 中文 | [English](./README.md)
 
-完整的 GTD（Getting Things Done）生产力系统，覆盖桌面与移动端。*Mind Like Water.*
+免费、开源、跨平台的 GTD 应用。本地优先，无需账号。*Mind Like Water.*
 
 *GTD 新手？可阅读 [15 分钟入门 GTD](https://hamberg.no/gtd)。*
+
+[立即安装](#安装) · [快速开始](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started) · [数据与同步](https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync)
 
 [![CI](https://github.com/dongdongbh/Mindwtr/actions/workflows/ci.yml/badge.svg)](https://github.com/dongdongbh/Mindwtr/actions/workflows/ci.yml)
 [![GitHub license](https://img.shields.io/github/license/dongdongbh/Mindwtr?color=brightgreen)](LICENSE)
@@ -86,6 +88,12 @@ Mindwtr 面向想要完整 GTD 且不被平台锁定的用户。下面是与主�
 
 *以上信息基于 2026 年 2 月 25 日官方产品页面/文档整理。如有变更，欢迎附来源提交 issue/PR。*
 
+## 支持 Mindwtr
+
+维护 iOS 版在 App Store 上线需要每年支付 Apple Developer 费用（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我个人承担。
+
+如果 Mindwtr 对你有帮助，欢迎通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持项目持续开发。
+
 ## 理念
 
 Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认知负担、删繁就简，让你保持顺畅的工作流：
@@ -97,6 +105,16 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 *我只是想骑车，不要给我驾驶舱。*
 
 ## 功能
+
+- 覆盖完整 GTD 流程：收集、澄清、组织、回顾、执行。
+- 聚焦视图整合时间日程与下一步行动。
+- 本地优先数据模型，支持灵活同步方案。
+- 可选 AI Copilot（BYOK + 本地/自托管兼容模型）。
+- 桌面端、移动端与 PWA 全平台可用。
+- 内置 CLI、REST API 与 MCP 自动化能力。
+
+<details>
+<summary>查看完整功能列表</summary>
 
 ### GTD 工作流
 - **收集** - 随时快速添加任务（全局快捷键、托盘、分享、语音）
@@ -154,6 +172,8 @@ Mindwtr **默认简单，需要时也足够强大**。我们专注于降低认�
 - 🎨 **主题** - 明/暗模式
 - 🌍 **国际化** - 英文、中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、波兰语、韩语、意大利语、土耳其语
 - 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
+
+</details>
 
 ## 安装
 
@@ -287,9 +307,7 @@ brew install --cask mindwtr
 已上线 App Store：[Mindwtr for iOS](https://apps.apple.com/app/mindwtr/id6758597144)。
 TestFlight 测试版：[加入测试版](https://testflight.apple.com/join/7SMJCTSR)。
 
-不过，维护 iOS 版上架 App Store 需要支付较高的年费（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)），目前由我自费承担。
-
-为了让 Mindwtr 能持续发展和维护，非常感谢你的支持！如果你觉得这款应用有价值，欢迎通过 [GitHub Sponsors](https://github.com/sponsors/dongdongbh) 或 [Ko-fi](https://ko-fi.com/D1D01T20WK) 支持项目。
+维护 iOS 版在 App Store 上线需要每年支付 Apple Developer 费用（参考 [Apple Developer Program](https://developer.apple.com/support/enrollment/)）。如需支持项目，请见[支持 Mindwtr](#支持-mindwtr)。
 
 ### Docker（PWA + 云同步）
 
