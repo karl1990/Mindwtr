@@ -207,7 +207,13 @@ export const createProjectActions = ({ set, get, debouncedSave }: ProjectActionC
         const changeAt = Date.now();
         const now = new Date().toISOString();
         let snapshot: AppData | null = null;
+        let missingProject = false;
         set((state) => {
+            const target = state._allProjects.find((project) => project.id === id && !project.deletedAt);
+            if (!target) {
+                missingProject = true;
+                return state;
+            }
             const deviceState = ensureDeviceId(state.settings);
             // Soft-delete project
             const newAllProjects = state._allProjects.map((project) =>
@@ -269,7 +275,7 @@ export const createProjectActions = ({ set, get, debouncedSave }: ProjectActionC
         });
         if (missingProject) {
             const message = 'Project not found';
-            console.warn(`[mindwtr] updateProject skipped: ${id} was not found`);
+            console.warn(`[mindwtr] deleteProject skipped: ${id} was not found`);
             set({ error: message });
             return;
         }
