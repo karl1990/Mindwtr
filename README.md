@@ -70,22 +70,23 @@ A complete Getting Things Done (GTD) productivity system for desktop and mobile.
 
 ## Why Mindwtr (Quick Comparison)
 
-Mindwtr is built for people who want a complete GTD system without lock-in. Here is a brief, respectful comparison with popular task apps.
+Mindwtr is built for people who want a complete GTD system without lock-in. Here is a brief, respectful comparison with mainstream task apps and GTD-focused alternatives.
 
-| Capability | Mindwtr | Todoist | Things 3 | TickTick |
-|---|---|---|---|---|
-| Local-first | ✅ | ❌ | ⚠️ | ❌ |
-| Open source | ✅ | ❌ | ❌ | ❌ |
-| Platforms | ✅ All major | ✅ All major | Apple only | ✅ All major |
-| GTD-first | ✅ | ◑ Adaptable | ◑ Adaptable | ◑ Adaptable |
-| Free to use | ✅ | ◑ Freemium | ❌ Paid | ◑ Freemium |
-| AI (BYOK + local LLM) | ✅ | ❌ | ❌ | ❌ |
-| Self-hosted sync | ✅ | ❌ | ❌ | ❌ |
-| No account required | ✅ | ❌ | ✅ | ⚠️ |
+| Capability | Mindwtr | Todoist | TickTick | Everdo | NirvanaHQ |
+|---|---|---|---|---|---|
+| Open source | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Local-first data ownership | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Desktop apps (Windows / macOS / Linux) | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Web app | ✅ | ✅ | ✅ | ❌ | ✅ |
+| GTD-native workflow | ✅ | ⚠️ | ⚠️ | ✅ | ✅ |
+| Free plan | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| Subscription model | ❌ | ✅ | ✅ | ⚠️ | ✅ |
+| One-time purchase option | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Sync without vendor cloud account | ✅ | ❌ | ❌ | ✅ | ❌ |
 
-Legend: `◑` = possible with setup/custom workflow, `⚠️` = partial/limited support.
+Legend: `✅` = yes, `❌` = no, `⚠️` = partial/limited support.
 
-*Checked against official product docs/pages on February 21, 2026. If any entry is outdated, feel free to open an issue/PR with sources.*
+*Checked against official product docs/pages on February 25, 2026. If any entry is outdated, feel free to open an issue/PR with sources.*
 
 ## Philosophy
 
@@ -156,25 +157,13 @@ Mindwtr is built to be **simple by default and powerful when you need it**. We f
 - 🌍 **i18n** - English, Chinese, Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese, Polish, Korean, Italian, Turkish
 - 🐳 **Docker** - Run the PWA + self-hosted sync server with Docker
 
-## Requirements
-
-### End Users
-- Desktop builds from package managers/app stores do not require Bun or Node.js.
-- Mobile users can install from App Store / Google Play directly.
-
-### Building From Source
-- **Bun**: `>= 1.1` (workspace install, scripts, tests)
-- **Node.js**: `>= 18` (recommended for tooling compatibility)
-- **Rust toolchain** + platform WebView dependencies (for Tauri desktop builds)
-- **Android Studio/SDK** and/or **Xcode** (for React Native mobile builds)
-
 ## Installation
 
 ### Desktop (Linux)
 
-**Arch Linux (AUR):**
+**Arch Linux (AUR, prebuilt recommended):**
 <a href="https://aur.archlinux.org/packages/mindwtr-bin">
-  <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=AUR" alt="AUR Version">
+  <img src="https://img.shields.io/aur/version/mindwtr-bin?logo=arch-linux&logoColor=white&color=1793d1&label=mindwtr-bin" alt="AUR mindwtr-bin Version">
 </a>
 
 ```bash
@@ -183,6 +172,19 @@ yay -S mindwtr-bin
 
 # Using paru
 paru -S mindwtr-bin
+```
+
+**Arch Linux (AUR, build from source):**
+<a href="https://aur.archlinux.org/packages/mindwtr">
+  <img src="https://img.shields.io/aur/version/mindwtr?logo=arch-linux&logoColor=white&color=1793d1&label=mindwtr" alt="AUR mindwtr Version">
+</a>
+
+```bash
+# Using yay
+yay -S mindwtr
+
+# Using paru
+paru -S mindwtr
 ```
 
 **Debian / Ubuntu (APT repo, recommended):**
