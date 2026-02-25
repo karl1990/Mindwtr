@@ -310,8 +310,7 @@ TestFlight 测试版：[加入测试版](https://testflight.apple.com/join/7SMJC
 使用 Docker 运行 Web 应用（PWA）和自托管同步服务：
 - 指南：[`docker/README.md`](docker/README.md)
 
-安装指南：
-- 🚀 [快速开始](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
+安装指南：🚀 [快速开始](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
 
 ## 社区
 

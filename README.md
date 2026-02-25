@@ -310,8 +310,7 @@ To ensure Mindwtr's continued existence and future development, your support is 
 Run the web app (PWA) and the self-hosted sync server with Docker:
 - Guide: [`docker/README.md`](docker/README.md)
 
-Install guides:
-- 🚀 [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
+Install guides: 🚀 [Getting Started](https://github.com/dongdongbh/Mindwtr/wiki/Getting-Started)
 
 ## Community
 
