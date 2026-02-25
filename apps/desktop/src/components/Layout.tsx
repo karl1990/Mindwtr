@@ -34,6 +34,9 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     };
     const [syncStatus, setSyncStatus] = useState(() => SyncService.getSyncStatus());
     const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+    const searchShortcutHint = useMemo(() => (
+        typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl+K'
+    ), []);
     const lastSyncAt = settings?.lastSyncAt;
     const lastSyncStatus = settings?.lastSyncStatus;
     const lastSyncAgeMs = lastSyncAt ? Math.max(0, Date.now() - Date.parse(lastSyncAt)) : Number.POSITIVE_INFINITY;
@@ -242,7 +245,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                     {!isCollapsed && (
                         <>
                             <span className="flex-1 text-left">{t('search.placeholder') || 'Search...'}</span>
-                            <span className="text-xs opacity-50">⌘K</span>
+                            <span className="text-xs opacity-50">{searchShortcutHint}</span>
                         </>
                     )}
                 </button>
