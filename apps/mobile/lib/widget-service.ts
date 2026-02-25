@@ -83,8 +83,10 @@ async function getIosWidgetApi(): Promise<IosWidgetApi | null> {
 async function buildPayloadFromData(data: AppData): Promise<TasksWidgetPayload> {
     const languageValue = await AsyncStorage.getItem(WIDGET_LANGUAGE_KEY);
     const language = resolveWidgetLanguage(languageValue, data.settings?.language);
+    const maxItems = Platform.OS === 'ios' ? 8 : undefined;
     return buildWidgetPayload(data, language, {
         systemColorScheme: getSystemColorScheme(),
+        maxItems,
     });
 }
 

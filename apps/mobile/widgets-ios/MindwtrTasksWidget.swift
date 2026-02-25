@@ -93,66 +93,87 @@ private struct MindwtrTasksWidgetProvider: TimelineProvider {
 
 private struct MindwtrTasksWidgetView: View {
     let entry: MindwtrTasksWidgetEntry
+    @Environment(\.widgetFamily) private var widgetFamily
 
     var body: some View {
         let payload = entry.payload
-        VStack(alignment: .leading, spacing: 8) {
-            Link(destination: URL(string: payload.focusUri) ?? URL(fileURLWithPath: "/")) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(payload.headerTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(hexColor(payload.palette.text))
-                        .lineLimit(1)
-                    Text(payload.subtitle)
-                        .font(.system(size: 11))
-                        .foregroundColor(hexColor(payload.palette.mutedText))
-                        .lineLimit(1)
+        GeometryReader { geometry in
+            let visibleTaskLimit = resolveTaskLimit(itemCount: payload.items.count, availableHeight: geometry.size.height)
+            VStack(alignment: .leading, spacing: 6) {
+                Link(destination: URL(string: payload.focusUri) ?? URL(fileURLWithPath: "/")) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(payload.headerTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(hexColor(payload.palette.text))
+                            .lineLimit(1)
+                        Text(payload.subtitle)
+                            .font(.system(size: 11))
+                            .foregroundColor(hexColor(payload.palette.mutedText))
+                            .lineLimit(1)
+                    }
                 }
-            }
 
-            if payload.items.isEmpty {
-                TaskLineView(
-                    title: payload.emptyMessage,
-                    textColor: payload.palette.mutedText,
-                    cardColor: payload.palette.card,
-                    borderColor: payload.palette.border,
-                    focusUri: payload.focusUri
-                )
-            } else {
-                ForEach(payload.items.prefix(3), id: \.id) { item in
+                if payload.items.isEmpty {
                     TaskLineView(
-                        title: "• \(item.title)",
-                        textColor: payload.palette.text,
-                        cardColor: payload.palette.card,
-                        borderColor: payload.palette.border,
+                        title: payload.emptyMessage,
+                        textColor: payload.palette.mutedText,
                         focusUri: payload.focusUri
                     )
+                } else {
+                    ForEach(payload.items.prefix(visibleTaskLimit), id: \.id) { item in
+                        TaskLineView(
+                            title: "• \(item.title)",
+                            textColor: payload.palette.text,
+                            focusUri: payload.focusUri
+                        )
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                Link(destination: URL(string: payload.quickCaptureUri) ?? URL(fileURLWithPath: "/")) {
+                    Text(payload.captureLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(hexColor(payload.palette.onAccent))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(hexColor(payload.palette.accent))
+                        .clipShape(Capsule())
                 }
             }
-
-            Spacer(minLength: 0)
-
-            Link(destination: URL(string: payload.quickCaptureUri) ?? URL(fileURLWithPath: "/")) {
-                Text(payload.captureLabel)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(hexColor(payload.palette.onAccent))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(hexColor(payload.palette.accent))
-                    .clipShape(Capsule())
-            }
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(hexColor(payload.palette.background))
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(hexColor(payload.palette.background))
+    }
+
+    private var familyTaskCap: Int {
+        switch widgetFamily {
+        case .systemLarge:
+            return 8
+        case .systemMedium:
+            return 5
+        default:
+            return 3
+        }
+    }
+
+    private func resolveTaskLimit(itemCount: Int, availableHeight: CGFloat) -> Int {
+        guard itemCount > 0 else { return 0 }
+        let minimumRows = min(3, itemCount)
+        let reservedHeight: CGFloat = 110
+        let rowHeight: CGFloat = 16
+        let fitRows = max(0, Int(floor((availableHeight - reservedHeight) / rowHeight)))
+        if fitRows >= minimumRows {
+            return min(itemCount, min(familyTaskCap, fitRows))
+        }
+        return min(itemCount, max(1, fitRows))
     }
 }
 
 private struct TaskLineView: View {
     let title: String
     let textColor: String
-    let cardColor: String
-    let borderColor: String
     let focusUri: String
 
     var body: some View {
@@ -161,15 +182,9 @@ private struct TaskLineView: View {
                 .font(.system(size: 12))
                 .foregroundColor(hexColor(textColor))
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 8)
-                .background(hexColor(cardColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(hexColor(borderColor), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.vertical, 1)
         }
     }
 }
