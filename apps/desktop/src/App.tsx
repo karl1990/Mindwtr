@@ -136,18 +136,6 @@ function App() {
         return value === key ? fallback : value;
     }, [t]);
 
-    useEffect(() => {
-        const handleDocumentMouseDown = (event: MouseEvent) => {
-            const active = document.activeElement;
-            if (!(active instanceof HTMLInputElement)) return;
-            if (!['date', 'datetime-local', 'time'].includes(active.type)) return;
-            if (event.target instanceof Node && active.contains(event.target)) return;
-            active.blur();
-        };
-        document.addEventListener('mousedown', handleDocumentMouseDown);
-        return () => document.removeEventListener('mousedown', handleDocumentMouseDown);
-    }, []);
-
     const hideToTray = useCallback(async () => {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const window = getCurrentWindow();
