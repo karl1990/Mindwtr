@@ -87,9 +87,13 @@ const rateLimitMaxKeysValue = Number(process.env.MINDWTR_CLOUD_RATE_MAX_KEYS || 
 const RATE_LIMIT_MAX_KEYS = Number.isFinite(rateLimitMaxKeysValue) && rateLimitMaxKeysValue > 0
     ? Math.floor(rateLimitMaxKeysValue)
     : 10_000;
+const authFailureRateMaxValue = Number(process.env.MINDWTR_CLOUD_AUTH_FAILURE_RATE_MAX || 30);
+const AUTH_FAILURE_RATE_MAX = Number.isFinite(authFailureRateMaxValue) && authFailureRateMaxValue > 0
+    ? Math.floor(authFailureRateMaxValue)
+    : 30;
 const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
 // Accept URL-safe and common base64 token alphabets to avoid breaking existing deployments.
-const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{8,512}$/;
+const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{20,512}$/;
 
 function decodeAttachmentPath(rawPath: string): string | null {
     try {
@@ -269,6 +273,19 @@ function getToken(req: Request): string | null {
 
 function tokenToKey(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+}
+
+function getClientIp(req: Request): string {
+    const forwarded = req.headers.get('x-forwarded-for');
+    if (forwarded) {
+        const first = forwarded.split(',')[0]?.trim();
+        if (first) return first;
+    }
+    const cfIp = req.headers.get('cf-connecting-ip')?.trim();
+    if (cfIp) return cfIp;
+    const realIp = req.headers.get('x-real-ip')?.trim();
+    if (realIp) return realIp;
+    return 'unknown';
 }
 
 function parseAllowedAuthTokens(rawValue?: string): Set<string> | null {
@@ -596,6 +613,14 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         rateLimits.set(rateKey, { count: 1, resetAt: now + windowMs });
         return null;
     };
+    const unauthorizedResponse = (req: Request): Response => {
+        const authRateKey = `auth-failure:${getClientIp(req)}`;
+        const authRateLimitResponse = checkRateLimit(authRateKey, AUTH_FAILURE_RATE_MAX);
+        if (authRateLimitResponse) {
+            return authRateLimitResponse;
+        }
+        return errorResponse('Unauthorized', 401);
+    };
     const cleanupTimer = setInterval(() => {
         pruneExpiredRateLimits(Date.now());
     }, rateLimitCleanupMs);
@@ -643,8 +668,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 pathname.startsWith('/v1/tasks/')
             ) {
                 const token = getToken(req);
-                if (!token) return errorResponse('Unauthorized', 401);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
+                if (!token) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
                 const key = tokenToKey(token);
                 const routeKey = toRateLimitRoute(pathname);
                 const rateKey = `${key}:${req.method}:${routeKey}`;
@@ -847,8 +872,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
             if (pathname === '/v1/data') {
                 const token = getToken(req);
-                if (!token) return errorResponse('Unauthorized', 401);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
+                if (!token) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
                 const key = tokenToKey(token);
                 const dataRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const dataRateLimitResponse = checkRateLimit(dataRateKey, maxPerWindow);
@@ -892,8 +917,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
             if (pathname.startsWith('/v1/attachments/')) {
                 const token = getToken(req);
-                if (!token) return errorResponse('Unauthorized', 401);
-                if (!isAuthorizedToken(token, allowedAuthTokens)) return errorResponse('Unauthorized', 401);
+                if (!token) return unauthorizedResponse(req);
+                if (!isAuthorizedToken(token, allowedAuthTokens)) return unauthorizedResponse(req);
                 const key = tokenToKey(token);
                 const attachmentRateKey = `${key}:${req.method}:${toRateLimitRoute(pathname)}`;
                 const attachmentRateLimitResponse = checkRateLimit(attachmentRateKey, maxAttachmentPerWindow);

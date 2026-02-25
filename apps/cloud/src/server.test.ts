@@ -7,10 +7,10 @@ import { __cloudTestUtils, startCloudServer } from './server';
 describe('cloud server utils', () => {
     test('parses bearer token and hashes it', () => {
         const req = new Request('http://localhost/v1/data', {
-            headers: { Authorization: 'Bearer demo-token' },
+            headers: { Authorization: 'Bearer demo-token-1234567890' },
         });
         const token = __cloudTestUtils.getToken(req);
-        expect(token).toBe('demo-token');
+        expect(token).toBe('demo-token-1234567890');
         expect(__cloudTestUtils.tokenToKey(token!)).toHaveLength(64);
 
         const base64TokenReq = new Request('http://localhost/v1/data', {
@@ -203,8 +203,9 @@ describe('cloud server api', () => {
     let baseUrl = '';
     let stopServer: (() => void) | null = null;
 
+    const integrationToken = 'integration-token-1234567890';
     const authHeaders = {
-        Authorization: 'Bearer integration-token',
+        Authorization: `Bearer ${integrationToken}`,
     };
 
     beforeEach(async () => {
@@ -216,7 +217,7 @@ describe('cloud server api', () => {
             windowMs: 10_000,
             maxPerWindow: 1_000,
             maxAttachmentPerWindow: 1_000,
-            allowedAuthTokens: new Set(['integration-token']),
+            allowedAuthTokens: new Set([integrationToken]),
         });
         baseUrl = `http://127.0.0.1:${server.port}`;
         stopServer = server.stop;
@@ -310,7 +311,7 @@ describe('cloud server api', () => {
     });
 
     test('rejects attachment uploads when target path is a symlink', async () => {
-        const token = 'integration-token';
+        const token = integrationToken;
         const key = __cloudTestUtils.tokenToKey(token);
         const attachmentDir = join(dataDir, key, 'attachments', 'folder');
         mkdirSync(attachmentDir, { recursive: true });
@@ -333,7 +334,7 @@ describe('cloud server api', () => {
     });
 
     test('rejects attachment uploads when parent directory is a symlink', async () => {
-        const token = 'integration-token';
+        const token = integrationToken;
         const key = __cloudTestUtils.tokenToKey(token);
         const attachmentRoot = join(dataDir, key, 'attachments');
         mkdirSync(attachmentRoot, { recursive: true });
@@ -363,7 +364,7 @@ describe('cloud server api', () => {
             windowMs: 60_000,
             maxPerWindow: 1_000,
             maxAttachmentPerWindow: 1,
-            allowedAuthTokens: new Set(['integration-token']),
+            allowedAuthTokens: new Set([integrationToken]),
         });
         baseUrl = `http://127.0.0.1:${server.port}`;
         stopServer = server.stop;
@@ -391,7 +392,7 @@ describe('cloud server api', () => {
             dataDir,
             windowMs: 60_000,
             maxPerWindow: 1,
-            allowedAuthTokens: new Set(['integration-token']),
+            allowedAuthTokens: new Set([integrationToken]),
         });
         baseUrl = `http://127.0.0.1:${server.port}`;
         stopServer = server.stop;
@@ -448,6 +449,23 @@ describe('cloud server api', () => {
         for (const id of createdIds) {
             expect(taskIds.has(id)).toBe(true);
         }
+    });
+
+    test('rate limits repeated unauthorized requests per client', async () => {
+        let lastStatus = 0;
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+            const response = await fetch(`${baseUrl}/v1/data`, {
+                headers: {
+                    Authorization: 'Bearer invalid-token-1234567890',
+                },
+            });
+            lastStatus = response.status;
+            if (lastStatus === 429) {
+                break;
+            }
+            expect(lastStatus).toBe(401);
+        }
+        expect(lastStatus).toBe(429);
     });
 
     test('merges /v1/data payload with existing server state', async () => {
