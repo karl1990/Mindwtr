@@ -1,5 +1,6 @@
 import {
   requestLocalNotificationPermission,
+  sendLocalMobileNotification,
   setLocalNotificationOpenHandler,
   startLocalMobileNotifications,
   stopLocalMobileNotifications,
@@ -34,4 +35,12 @@ export async function startMobileNotifications(): Promise<void> {
 
 export async function stopMobileNotifications(): Promise<void> {
   await stopLocalMobileNotifications();
+}
+
+export async function sendMobileImmediateNotification(
+  title: string,
+  message?: string,
+  data?: Record<string, string>
+): Promise<void> {
+  await sendLocalMobileNotification(title, message, data);
 }

@@ -81,6 +81,14 @@ export async function requestDesktopNotificationPermission() {
     await loadTauriNotificationApi();
 }
 
+export async function sendDesktopImmediateNotification(title: string, body?: string) {
+    const { settings } = useTaskStore.getState();
+    if (settings.notificationsEnabled === false) return;
+    await ensurePermission();
+    await loadTauriNotificationApi();
+    sendNotification(title, body);
+}
+
 function sendNotification(title: string, body?: string) {
     if (tauriNotificationApi?.sendNotification) {
         tauriNotificationApi.sendNotification({ title, body });

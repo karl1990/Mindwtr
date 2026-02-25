@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { Task } from '@mindwtr/core';
 import {
+  type Task,
   createPomodoroState,
   DEFAULT_POMODORO_DURATIONS,
   formatPomodoroClock,
@@ -9,10 +9,12 @@ import {
   type PomodoroDurations,
   resetPomodoroState,
   tickPomodoroState,
+  useTaskStore,
 } from '@mindwtr/core';
 
 import { useLanguage } from '../contexts/language-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { sendMobileImmediateNotification } from '../lib/notification-service';
 
 type PomodoroEvent = 'focus-finished' | 'break-finished' | null;
 
@@ -25,10 +27,12 @@ export function PomodoroPanel({
 }) {
   const { t } = useLanguage();
   const tc = useThemeColors();
+  const notificationsEnabled = useTaskStore((state) => state.settings.notificationsEnabled !== false);
   const [durations, setDurations] = useState<PomodoroDurations>(DEFAULT_POMODORO_DURATIONS);
   const [timerState, setTimerState] = useState(() => createPomodoroState(DEFAULT_POMODORO_DURATIONS));
   const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(undefined);
   const [lastEvent, setLastEvent] = useState<PomodoroEvent>(null);
+  const previousEventRef = useRef<PomodoroEvent>(null);
 
   useEffect(() => {
     if (tasks.length === 0) {
@@ -70,6 +74,17 @@ export function PomodoroPanel({
   const phaseLabel = phaseRaw.startsWith('pomodoro.') ? (timerState.phase === 'focus' ? 'Focus session' : 'Break') : phaseRaw;
   const noTaskRaw = t('pomodoro.noTask');
   const noTaskLabel = noTaskRaw.startsWith('pomodoro.') ? 'No available focus task' : noTaskRaw;
+
+  useEffect(() => {
+    const previous = previousEventRef.current;
+    if (lastEvent && lastEvent !== previous && notificationsEnabled) {
+      const message = lastEvent === 'focus-finished' ? focusDoneLabel : breakDoneLabel;
+      void sendMobileImmediateNotification(cardTitle, message, {
+        phase: lastEvent === 'focus-finished' ? 'focus-complete' : 'break-complete',
+      });
+    }
+    previousEventRef.current = lastEvent;
+  }, [breakDoneLabel, cardTitle, focusDoneLabel, lastEvent, notificationsEnabled]);
 
   const handleApplyPreset = (focusMinutes: number, breakMinutes: number) => {
     const nextDurations = { focusMinutes, breakMinutes };

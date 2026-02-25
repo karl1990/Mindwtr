@@ -501,6 +501,40 @@ export async function requestLocalNotificationPermission(): Promise<Notification
   }
 }
 
+export async function sendLocalMobileNotification(
+  title: string,
+  message?: string,
+  data?: Record<string, string>
+): Promise<void> {
+  const trimmedTitle = String(title || '').trim();
+  if (!trimmedTitle) return;
+
+  const api = await loadAlarmApi();
+  if (!api) return;
+
+  const permission = await requestLocalNotificationPermission();
+  if (!permission.granted) return;
+
+  try {
+    await api.scheduleAlarm({
+      title: trimmedTitle,
+      message: String(message || '').trim(),
+      channel: LOCAL_ALARM_CHANNEL,
+      small_icon: LOCAL_SMALL_ICON,
+      color: LOCAL_NOTIFICATION_COLOR,
+      fire_date: api.parseDate(new Date(Date.now() + 2000)),
+      schedule_type: 'once',
+      has_button: true,
+      data: {
+        kind: 'pomodoro',
+        ...(data ?? {}),
+      },
+    });
+  } catch (error) {
+    logNotificationError('Failed to send local mobile notification', error);
+  }
+}
+
 export async function startLocalMobileNotifications(): Promise<void> {
   if (started) return;
   started = true;

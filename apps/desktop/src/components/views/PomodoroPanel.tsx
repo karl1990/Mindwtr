@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     createPomodoroState,
     DEFAULT_POMODORO_DURATIONS,
@@ -14,6 +14,7 @@ import {
 import { Play, Pause, RotateCcw, TimerReset, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/language-context';
+import { sendDesktopImmediateNotification } from '../../lib/notification-service';
 
 interface PomodoroPanelProps {
     tasks: Task[];
@@ -74,6 +75,7 @@ let persistedSnapshot: PomodoroSnapshot = createInitialSnapshot();
 
 export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     const updateTask = useTaskStore((state) => state.updateTask);
+    const notificationsEnabled = useTaskStore((state) => state.settings.notificationsEnabled !== false);
     const { t } = useLanguage();
     const resolveText = useCallback((key: string, fallback: string) => {
         const value = t(key);
@@ -83,6 +85,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
         persistedSnapshot = reconcileSnapshot(persistedSnapshot, Date.now());
         return persistedSnapshot;
     });
+    const previousEventRef = useRef<PomodoroEvent>(snapshot.lastEvent);
 
     const commitSnapshot = useCallback((updater: (prev: PomodoroSnapshot) => PomodoroSnapshot) => {
         setSnapshot((prev) => {
@@ -138,6 +141,15 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     const focusDoneLabel = focusDoneRaw.startsWith('pomodoro.') ? 'Focus session complete. Take a short break.' : focusDoneRaw;
     const breakDoneRaw = t('pomodoro.breakComplete');
     const breakDoneLabel = breakDoneRaw.startsWith('pomodoro.') ? 'Break complete. Ready for the next focus session.' : breakDoneRaw;
+
+    useEffect(() => {
+        const previous = previousEventRef.current;
+        if (lastEvent && lastEvent !== previous && notificationsEnabled) {
+            const message = lastEvent === 'focus-finished' ? focusDoneLabel : breakDoneLabel;
+            void sendDesktopImmediateNotification(cardTitle, message);
+        }
+        previousEventRef.current = lastEvent;
+    }, [breakDoneLabel, cardTitle, focusDoneLabel, lastEvent, notificationsEnabled]);
 
     const handleApplyPreset = (focusMinutes: number, breakMinutes: number) => {
         const nextDurations = { focusMinutes, breakMinutes };
