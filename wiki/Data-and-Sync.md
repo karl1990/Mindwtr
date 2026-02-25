@@ -192,6 +192,7 @@ Available options include:
 - **AI settings** (models/providers)
 
 > API keys and local model paths are never synced.
+> Settings conflict resolution is group-based. If two devices edit different fields in the same settings group at nearly the same time, the newer group update can overwrite the older one.
 
 ### Merge Strategy
 

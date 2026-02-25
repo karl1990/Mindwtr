@@ -23,6 +23,8 @@ Mindwtr uses local-first synchronization with deterministic conflict handling.
 6. Attachments are merged per attachment `id` with the same LWW rules.
 7. Settings merge by sync preferences:
    - Appearance/language/external calendars/AI can be merged independently.
+   - Conflict resolution uses group-level timestamps (`appearance`, `language`, `externalCalendars`, `ai`).
+   - Concurrent edits to different fields inside the same group can still collapse to the newer group update.
    - Secrets (API keys, local model paths) are never synced.
 
 ## Pseudocode
