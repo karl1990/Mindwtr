@@ -357,6 +357,17 @@ struct AudioCaptureResult {
     size: usize,
 }
 
+fn default_global_quick_add_shortcut() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        GLOBAL_QUICK_ADD_SHORTCUT_LEGACY
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        GLOBAL_QUICK_ADD_SHORTCUT_DEFAULT
+    }
+}
+
 #[tauri::command]
 fn consume_quick_add_pending(state: tauri::State<'_, QuickAddPending>) -> bool {
     state.0.swap(false, Ordering::SeqCst)
@@ -365,7 +376,7 @@ fn consume_quick_add_pending(state: tauri::State<'_, QuickAddPending>) -> bool {
 fn normalize_global_quick_add_shortcut(shortcut: Option<&str>) -> Result<Option<String>, String> {
     let trimmed = shortcut.map(str::trim).unwrap_or("");
     if trimmed.is_empty() {
-        return Ok(Some(GLOBAL_QUICK_ADD_SHORTCUT_DEFAULT.to_string()));
+        return Ok(Some(default_global_quick_add_shortcut().to_string()));
     }
 
     if trimmed.eq_ignore_ascii_case(GLOBAL_QUICK_ADD_SHORTCUT_DISABLED) {
@@ -421,6 +432,13 @@ fn set_global_quick_add_shortcut(
     state: tauri::State<'_, GlobalQuickAddShortcutState>,
     shortcut: Option<String>,
 ) -> Result<String, String> {
+    if is_windows_store_install() {
+        return apply_global_quick_add_shortcut(
+            &app,
+            &state,
+            Some(GLOBAL_QUICK_ADD_SHORTCUT_DISABLED),
+        );
+    }
     apply_global_quick_add_shortcut(&app, &state, shortcut.as_deref())
 }
 
@@ -4025,7 +4043,7 @@ pub fn run() {
                 if let Err(error) = apply_global_quick_add_shortcut(
                     &handle,
                     &shortcut_state,
-                    Some(GLOBAL_QUICK_ADD_SHORTCUT_DEFAULT),
+                    Some(default_global_quick_add_shortcut()),
                 ) {
                     log::warn!("Failed to register global quick add shortcut: {error}");
                 }

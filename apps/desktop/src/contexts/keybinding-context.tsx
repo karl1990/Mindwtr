@@ -102,6 +102,7 @@ export function KeybindingProvider({
     onNavigate: (view: string) => void;
 }) {
     const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test';
+    const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.userAgent);
     const { settings, updateSettings } = useTaskStore(
         (state) => ({
             settings: state.settings,
@@ -115,6 +116,7 @@ export function KeybindingProvider({
     const setListOptions = useUiStore((state) => state.setListOptions);
     const editingTaskId = useUiStore((state) => state.editingTaskId);
     const editingTaskIdRef = useRef<string | null>(editingTaskId);
+    const [isWindowsStoreInstall, setIsWindowsStoreInstall] = useState<boolean>(false);
 
     const initialStyle: KeybindingStyle =
         settings.keybindingStyle === 'vim' || settings.keybindingStyle === 'emacs'
@@ -123,9 +125,33 @@ export function KeybindingProvider({
     const [style, setStyleState] = useState<KeybindingStyle>(initialStyle);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const quickAddShortcut = useMemo(
-        () => normalizeGlobalQuickAddShortcut(settings.globalQuickAddShortcut),
-        [settings.globalQuickAddShortcut]
+        () => normalizeGlobalQuickAddShortcut(settings.globalQuickAddShortcut, {
+            isWindows,
+            isWindowsStore: isWindowsStoreInstall,
+        }),
+        [isWindows, isWindowsStoreInstall, settings.globalQuickAddShortcut]
     );
+
+    useEffect(() => {
+        if (isTest || !isWindows || !isTauriRuntime()) return;
+        let cancelled = false;
+        import('@tauri-apps/api/core')
+            .then(({ invoke }) => invoke<boolean>('is_windows_store_install'))
+            .then((isStore) => {
+                if (!cancelled) {
+                    setIsWindowsStoreInstall(Boolean(isStore));
+                }
+            })
+            .catch((error) => {
+                if (!cancelled) {
+                    reportError('Failed to detect Microsoft Store install', error);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isTest, isWindows]);
 
     const isSidebarCollapsed = settings.sidebarCollapsed ?? false;
     const toggleSidebar = useCallback(() => {

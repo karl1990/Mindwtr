@@ -936,6 +936,7 @@ export function SettingsView() {
                     showTrayToggle={isTauri && !isFlatpak}
                     trayVisible={trayVisible}
                     onTrayVisibleChange={handleTrayVisibleChange}
+                    isWindowsStoreInstall={installSource === 'microsoft-store'}
                 />
             );
         }

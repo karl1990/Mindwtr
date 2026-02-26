@@ -76,6 +76,7 @@ type SettingsMainPageProps = {
     showTrayToggle?: boolean;
     trayVisible?: boolean;
     onTrayVisibleChange?: (visible: boolean) => void;
+    isWindowsStoreInstall?: boolean;
 };
 
 const selectCls =
@@ -155,10 +156,16 @@ export function SettingsMainPage({
     showTrayToggle = false,
     trayVisible = true,
     onTrayVisibleChange,
+    isWindowsStoreInstall = false,
 }: SettingsMainPageProps) {
     const hasWindowSection = showWindowDecorations || showCloseBehavior || showTrayToggle;
     const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
-    const globalQuickAddOptions = getGlobalQuickAddShortcutOptions(isMac);
+    const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.userAgent);
+    const globalQuickAddOptions = getGlobalQuickAddShortcutOptions({
+        isMac,
+        isWindows,
+        isWindowsStore: isWindowsStoreInstall,
+    });
 
     return (
         <div className="space-y-5">
