@@ -19,7 +19,6 @@ type ShortcutOption = {
 type GlobalQuickAddShortcutPlatform = {
     isMac?: boolean;
     isWindows?: boolean;
-    isWindowsStore?: boolean;
 };
 
 const ALLOWED_SHORTCUTS = new Set<GlobalQuickAddShortcutSetting>([
@@ -33,11 +32,8 @@ const ALLOWED_SHORTCUTS = new Set<GlobalQuickAddShortcutSetting>([
 export function getDefaultGlobalQuickAddShortcut(
     platform: GlobalQuickAddShortcutPlatform = {}
 ): GlobalQuickAddShortcutSetting {
-    if (platform.isWindowsStore) {
-        return GLOBAL_QUICK_ADD_SHORTCUT_DISABLED;
-    }
     if (platform.isWindows) {
-        return GLOBAL_QUICK_ADD_SHORTCUT_LEGACY;
+        return GLOBAL_QUICK_ADD_SHORTCUT_DISABLED;
     }
     return GLOBAL_QUICK_ADD_SHORTCUT_DEFAULT;
 }
@@ -56,10 +52,19 @@ export function normalizeGlobalQuickAddShortcut(
 
 export function getGlobalQuickAddShortcutOptions(platform: GlobalQuickAddShortcutPlatform = {}): ShortcutOption[] {
     const isMac = platform.isMac === true;
+    const isWindows = platform.isWindows === true;
     const defaultShortcut = getDefaultGlobalQuickAddShortcut(platform);
     const legacyLabel = isMac ? 'Cmd+Shift+A' : 'Ctrl+Shift+A';
-    const legacySuffix = defaultShortcut === GLOBAL_QUICK_ADD_SHORTCUT_LEGACY ? ' (recommended)' : ' (legacy)';
-    const disabledLabel = defaultShortcut === GLOBAL_QUICK_ADD_SHORTCUT_DISABLED ? 'Disabled (recommended)' : 'Disabled';
+    const legacySuffix = isWindows
+        ? ' (recommended)'
+        : defaultShortcut === GLOBAL_QUICK_ADD_SHORTCUT_LEGACY
+            ? ' (recommended)'
+            : ' (legacy)';
+    const disabledLabel = isWindows
+        ? 'Disabled (default)'
+        : defaultShortcut === GLOBAL_QUICK_ADD_SHORTCUT_DISABLED
+            ? 'Disabled (recommended)'
+            : 'Disabled';
 
     return [
         {

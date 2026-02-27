@@ -35,6 +35,11 @@ interface KeybindingContextType {
     openHelp: () => void;
 }
 
+type GlobalQuickAddShortcutApplyResult = {
+    shortcut?: string | null;
+    warning?: string | null;
+};
+
 const KeybindingContext = createContext<KeybindingContextType | undefined>(undefined);
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -112,11 +117,11 @@ export function KeybindingProvider({
     );
     const { t } = useLanguage();
     const toggleFocusMode = useUiStore((state) => state.toggleFocusMode);
+    const showToast = useUiStore((state) => state.showToast);
     const listOptions = useUiStore((state) => state.listOptions);
     const setListOptions = useUiStore((state) => state.setListOptions);
     const editingTaskId = useUiStore((state) => state.editingTaskId);
     const editingTaskIdRef = useRef<string | null>(editingTaskId);
-    const [isWindowsStoreInstall, setIsWindowsStoreInstall] = useState<boolean>(false);
 
     const initialStyle: KeybindingStyle =
         settings.keybindingStyle === 'vim' || settings.keybindingStyle === 'emacs'
@@ -127,31 +132,9 @@ export function KeybindingProvider({
     const quickAddShortcut = useMemo(
         () => normalizeGlobalQuickAddShortcut(settings.globalQuickAddShortcut, {
             isWindows,
-            isWindowsStore: isWindowsStoreInstall,
         }),
-        [isWindows, isWindowsStoreInstall, settings.globalQuickAddShortcut]
+        [isWindows, settings.globalQuickAddShortcut]
     );
-
-    useEffect(() => {
-        if (isTest || !isWindows || !isTauriRuntime()) return;
-        let cancelled = false;
-        import('@tauri-apps/api/core')
-            .then(({ invoke }) => invoke<boolean>('is_windows_store_install'))
-            .then((isStore) => {
-                if (!cancelled) {
-                    setIsWindowsStoreInstall(Boolean(isStore));
-                }
-            })
-            .catch((error) => {
-                if (!cancelled) {
-                    reportError('Failed to detect Microsoft Store install', error);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [isTest, isWindows]);
 
     const isSidebarCollapsed = settings.sidebarCollapsed ?? false;
     const toggleSidebar = useCallback(() => {
@@ -505,7 +488,20 @@ export function KeybindingProvider({
         if (isTest || !isTauriRuntime()) return;
         let cancelled = false;
         import('@tauri-apps/api/core')
-            .then(({ invoke }) => invoke('set_global_quick_add_shortcut', { shortcut: quickAddShortcut }))
+            .then(({ invoke }) =>
+                invoke<GlobalQuickAddShortcutApplyResult>('set_global_quick_add_shortcut', { shortcut: quickAddShortcut })
+            )
+            .then((result) => {
+                if (cancelled) return;
+                const appliedShortcut = normalizeGlobalQuickAddShortcut(result?.shortcut, { isWindows });
+                if (result?.warning) {
+                    showToast(result.warning, 'info', 6000);
+                }
+                if (appliedShortcut !== quickAddShortcut) {
+                    updateSettings({ globalQuickAddShortcut: appliedShortcut })
+                        .catch((error) => reportError('Failed to persist quick add shortcut fallback', error));
+                }
+            })
             .catch((error) => {
                 if (cancelled) return;
                 reportError('Failed to apply global quick add shortcut', error);
@@ -513,7 +509,7 @@ export function KeybindingProvider({
         return () => {
             cancelled = true;
         };
-    }, [isTest, quickAddShortcut]);
+    }, [isTest, isWindows, quickAddShortcut, showToast, updateSettings]);
 
     const contextValue = useMemo<KeybindingContextType>(() => ({
         style,

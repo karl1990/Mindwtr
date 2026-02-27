@@ -357,10 +357,17 @@ struct AudioCaptureResult {
     size: usize,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GlobalQuickAddShortcutApplyResult {
+    shortcut: String,
+    warning: Option<String>,
+}
+
 fn default_global_quick_add_shortcut() -> &'static str {
     #[cfg(target_os = "windows")]
     {
-        GLOBAL_QUICK_ADD_SHORTCUT_LEGACY
+        GLOBAL_QUICK_ADD_SHORTCUT_DISABLED
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -431,15 +438,28 @@ fn set_global_quick_add_shortcut(
     app: tauri::AppHandle,
     state: tauri::State<'_, GlobalQuickAddShortcutState>,
     shortcut: Option<String>,
-) -> Result<String, String> {
-    if is_windows_store_install() {
-        return apply_global_quick_add_shortcut(
-            &app,
-            &state,
-            Some(GLOBAL_QUICK_ADD_SHORTCUT_DISABLED),
-        );
+) -> Result<GlobalQuickAddShortcutApplyResult, String> {
+    match apply_global_quick_add_shortcut(&app, &state, shortcut.as_deref()) {
+        Ok(applied) => Ok(GlobalQuickAddShortcutApplyResult {
+            shortcut: applied,
+            warning: None,
+        }),
+        Err(error) => {
+            log::warn!("Failed to apply global quick add shortcut; falling back to disabled: {error}");
+            let disabled = apply_global_quick_add_shortcut(
+                &app,
+                &state,
+                Some(GLOBAL_QUICK_ADD_SHORTCUT_DISABLED),
+            )?;
+            Ok(GlobalQuickAddShortcutApplyResult {
+                shortcut: disabled,
+                warning: Some(
+                    "Global quick add shortcut is unavailable (likely already used by another app), so it was disabled."
+                        .to_string(),
+                ),
+            })
+        }
     }
-    apply_global_quick_add_shortcut(&app, &state, shortcut.as_deref())
 }
 
 #[tauri::command]
@@ -4030,17 +4050,13 @@ pub fn run() {
             }
 
             // Global hotkey for Quick Add.
-            if !is_windows_store {
-                let shortcut_state = app.state::<GlobalQuickAddShortcutState>();
-                if let Err(error) = apply_global_quick_add_shortcut(
-                    &handle,
-                    &shortcut_state,
-                    Some(default_global_quick_add_shortcut()),
-                ) {
-                    log::warn!("Failed to register global quick add shortcut: {error}");
-                }
-            } else {
-                log::info!("Global quick add shortcut disabled for Microsoft Store install.");
+            let shortcut_state = app.state::<GlobalQuickAddShortcutState>();
+            if let Err(error) = apply_global_quick_add_shortcut(
+                &handle,
+                &shortcut_state,
+                Some(default_global_quick_add_shortcut()),
+            ) {
+                log::warn!("Failed to register global quick add shortcut: {error}");
             }
             
             if cfg!(debug_assertions) || diagnostics_enabled {

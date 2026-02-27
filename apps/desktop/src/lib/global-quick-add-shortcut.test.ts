@@ -19,9 +19,6 @@ describe('global quick add shortcut', () => {
             GLOBAL_QUICK_ADD_SHORTCUT_ALTERNATE_N
         );
         expect(normalizeGlobalQuickAddShortcut(undefined, { isWindows: true })).toBe(
-            GLOBAL_QUICK_ADD_SHORTCUT_LEGACY
-        );
-        expect(normalizeGlobalQuickAddShortcut(undefined, { isWindows: true, isWindowsStore: true })).toBe(
             GLOBAL_QUICK_ADD_SHORTCUT_DISABLED
         );
     });
@@ -67,22 +64,15 @@ describe('global quick add shortcut', () => {
         const macLabels = getGlobalQuickAddShortcutOptions({ isMac: true }).map((option) => option.label);
         const nonMacLabels = getGlobalQuickAddShortcutOptions({ isMac: false }).map((option) => option.label);
         const windowsLabels = getGlobalQuickAddShortcutOptions({ isWindows: true }).map((option) => option.label);
-        const windowsStoreLabels = getGlobalQuickAddShortcutOptions({
-            isWindows: true,
-            isWindowsStore: true,
-        }).map((option) => option.label);
 
         expect(macLabels).toContain('Ctrl+Option+M (recommended)');
         expect(nonMacLabels).toContain('Ctrl+Alt+M (recommended)');
         expect(windowsLabels).toContain('Ctrl+Shift+A (recommended)');
-        expect(windowsStoreLabels).toContain('Disabled (recommended)');
+        expect(windowsLabels).toContain('Disabled (default)');
     });
 
     it('resolves platform defaults', () => {
         expect(getDefaultGlobalQuickAddShortcut()).toBe(GLOBAL_QUICK_ADD_SHORTCUT_DEFAULT);
-        expect(getDefaultGlobalQuickAddShortcut({ isWindows: true })).toBe(GLOBAL_QUICK_ADD_SHORTCUT_LEGACY);
-        expect(getDefaultGlobalQuickAddShortcut({ isWindows: true, isWindowsStore: true })).toBe(
-            GLOBAL_QUICK_ADD_SHORTCUT_DISABLED
-        );
+        expect(getDefaultGlobalQuickAddShortcut({ isWindows: true })).toBe(GLOBAL_QUICK_ADD_SHORTCUT_DISABLED);
     });
 });
