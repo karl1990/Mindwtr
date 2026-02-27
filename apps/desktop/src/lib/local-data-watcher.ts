@@ -1,15 +1,9 @@
-/**
- * Watches the local data.json file for external modifications (e.g. from the CLI)
- * and merges them into the running desktop app using the existing mergeAppData infrastructure.
- *
- * This solves the problem where CLI-added tasks get overwritten because the desktop app
- * uses SQLite as its primary store and never re-reads data.json after startup.
- */
 import {
     type AppData,
+    flushPendingSave,
+    getInMemoryAppDataSnapshot,
     mergeAppData,
     normalizeAppData,
-    getInMemoryAppDataSnapshot,
     useTaskStore,
 } from '@mindwtr/core';
 import { invoke } from '@tauri-apps/api/core';
@@ -17,123 +11,241 @@ import { isTauriRuntime } from './runtime';
 import { hashString, toStableJson } from './sync-service-utils';
 import { logInfo, logWarn } from './app-log';
 
-/** How long to ignore file events after we write data.json ourselves (ms). */
 const IGNORE_WINDOW_MS = 2000;
-/** Debounce delay before processing an external change (ms). */
 const DEBOUNCE_MS = 750;
+const IGNORE_DRAIN_PADDING_MS = 25;
 
+type FsEvent = {
+    path?: string;
+    paths?: string[];
+};
+
+type LocalDataWatcherDependencies = {
+    readDataJson: () => Promise<AppData>;
+    watchFile: (path: string, callback: (event: FsEvent) => void) => Promise<unknown>;
+    now: () => number;
+    schedule: typeof setTimeout;
+    cancelSchedule: typeof clearTimeout;
+    hashPayload: (payload: string) => Promise<string>;
+    normalize: (data: AppData) => AppData;
+    merge: (local: AppData, incoming: AppData) => AppData;
+    getSnapshot: () => AppData;
+    persistMergedData: (merged: AppData) => Promise<void>;
+    logInfo: (message: string) => void;
+    logWarn: (message: string) => void;
+};
+
+const persistMergedDataThroughStore = async (merged: AppData): Promise<void> => {
+    const allTasks = Array.isArray(merged.tasks) ? merged.tasks : [];
+    const allProjects = Array.isArray(merged.projects) ? merged.projects : [];
+    const allSections = Array.isArray(merged.sections) ? merged.sections : [];
+    const allAreas = Array.isArray(merged.areas) ? merged.areas : [];
+
+    useTaskStore.setState((state) => ({
+        tasks: allTasks.filter((task) => !task.deletedAt && task.status !== 'archived'),
+        projects: allProjects.filter((project) => !project.deletedAt),
+        sections: allSections.filter((section) => !section.deletedAt),
+        areas: allAreas.filter((area) => !area.deletedAt),
+        _allTasks: allTasks,
+        _allProjects: allProjects,
+        _allSections: allSections,
+        _allAreas: allAreas,
+        settings: merged.settings ?? state.settings,
+        lastDataChangeAt: Date.now(),
+    }));
+
+    await useTaskStore.getState().persistSnapshot();
+    await flushPendingSave();
+};
+
+const defaultDependencies: LocalDataWatcherDependencies = {
+    readDataJson: () => invoke<AppData>('read_data_json' as any),
+    watchFile: async (path, callback) => {
+        const { watch } = await import('@tauri-apps/plugin-fs');
+        return watch(path, callback);
+    },
+    now: () => Date.now(),
+    schedule: setTimeout,
+    cancelSchedule: clearTimeout,
+    hashPayload: hashString,
+    normalize: normalizeAppData,
+    merge: mergeAppData,
+    getSnapshot: getInMemoryAppDataSnapshot,
+    persistMergedData: persistMergedDataThroughStore,
+    logInfo: (message) => logInfo(message),
+    logWarn: (message) => logWarn(message),
+};
+
+let localDataWatcherDependencies: LocalDataWatcherDependencies = { ...defaultDependencies };
 let unwatchFn: (() => void) | null = null;
 let ignoreUntil = 0;
 let lastKnownHash = '';
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let ignoreDrainTimer: ReturnType<typeof setTimeout> | null = null;
+let hasPendingChangeDuringIgnore = false;
+let pendingExternalData: AppData | null = null;
+let mergeInFlight: Promise<void> | null = null;
 
-/**
- * Call this right before (or right after) the app writes to data.json itself,
- * so the watcher knows to ignore that particular file-change event.
- */
-export function markLocalWrite(): void {
-    ignoreUntil = Date.now() + IGNORE_WINDOW_MS;
-}
+const normalizePathsFromEvent = (event: FsEvent): string[] => {
+    if (Array.isArray(event?.paths)) return event.paths;
+    if (typeof event?.path === 'string' && event.path.length > 0) return [event.path];
+    return [];
+};
 
-/**
- * Start watching data.json for external changes.
- * @param dataPath - absolute path to the data.json file (from get_data_path_cmd)
- */
-export async function start(dataPath: string): Promise<void> {
-    if (!isTauriRuntime()) return;
+const resolveUnwatch = (unwatch: unknown): (() => void) | null => {
+    if (typeof unwatch === 'function') return unwatch as () => void;
+    if (unwatch && typeof (unwatch as any).stop === 'function') {
+        return () => (unwatch as any).stop();
+    }
+    if (unwatch && typeof (unwatch as any).unwatch === 'function') {
+        return () => (unwatch as any).unwatch();
+    }
+    return null;
+};
 
-    // Don't double-start
-    if (unwatchFn) return;
+const scheduleIgnoreDrain = () => {
+    if (!hasPendingChangeDuringIgnore) return;
+    if (ignoreDrainTimer) {
+        localDataWatcherDependencies.cancelSchedule(ignoreDrainTimer);
+        ignoreDrainTimer = null;
+    }
+    const remainingMs = Math.max(0, ignoreUntil - localDataWatcherDependencies.now());
+    ignoreDrainTimer = localDataWatcherDependencies.schedule(() => {
+        ignoreDrainTimer = null;
+        if (!hasPendingChangeDuringIgnore) return;
+        hasPendingChangeDuringIgnore = false;
+        void handleExternalChange();
+    }, remainingMs + IGNORE_DRAIN_PADDING_MS);
+};
 
+const runPendingMerge = () => {
+    if (mergeInFlight) return;
+
+    mergeInFlight = (async () => {
+        while (pendingExternalData) {
+            const externalData = pendingExternalData;
+            pendingExternalData = null;
+            await mergeExternalData(externalData);
+        }
+    })().finally(() => {
+        mergeInFlight = null;
+        if (pendingExternalData) {
+            runPendingMerge();
+        }
+    });
+};
+
+async function mergeExternalData(externalData: AppData): Promise<void> {
     try {
-        const { watch } = await import('@tauri-apps/plugin-fs');
-        const unwatch = await watch(dataPath, (event: any) => {
-            // The watch callback fires on any FS event for the watched path.
-            const paths: string[] = Array.isArray(event?.paths)
-                ? event.paths
-                : event?.path
-                  ? [event.path]
-                  : [];
-            if (paths.length === 0) return;
+        await flushPendingSave();
 
-            void handleExternalChange();
-        });
+        const localSnapshot = localDataWatcherDependencies.getSnapshot();
+        const normalizedLocal = localDataWatcherDependencies.normalize(localSnapshot);
+        const merged = localDataWatcherDependencies.merge(normalizedLocal, externalData);
+        const normalizedMerged = localDataWatcherDependencies.normalize(merged);
 
-        // Resolve the unwatch handle (same pattern as SyncService.resolveUnwatch)
-        if (typeof unwatch === 'function') {
-            unwatchFn = unwatch as () => void;
-        } else if (unwatch && typeof (unwatch as any).stop === 'function') {
-            unwatchFn = () => (unwatch as any).stop();
-        } else if (unwatch && typeof (unwatch as any).unwatch === 'function') {
-            unwatchFn = () => (unwatch as any).unwatch();
+        const localHash = await localDataWatcherDependencies.hashPayload(toStableJson(normalizedLocal));
+        const mergedHash = await localDataWatcherDependencies.hashPayload(toStableJson(normalizedMerged));
+
+        if (mergedHash === localHash) {
+            lastKnownHash = mergedHash;
+            return;
         }
 
-        logInfo('[local-data-watcher] Started watching ' + dataPath);
+        await localDataWatcherDependencies.persistMergedData(normalizedMerged);
+        lastKnownHash = mergedHash;
+        localDataWatcherDependencies.logInfo('[local-data-watcher] Merged external data.json changes');
     } catch (error) {
-        logWarn('[local-data-watcher] Failed to start watcher: ' + String(error));
+        localDataWatcherDependencies.logWarn('[local-data-watcher] Failed to merge external data: ' + String(error));
     }
 }
 
-/** Stop watching. Safe to call even if not started. */
-export function stop(): void {
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-        debounceTimer = null;
-    }
-    if (unwatchFn) {
-        unwatchFn();
-        unwatchFn = null;
-        logInfo('[local-data-watcher] Stopped');
-    }
-}
-
-/**
- * Called when the OS reports a change to data.json.
- * Skips if within the ignore window (our own save), deduplicates via hash,
- * and debounces before merging.
- */
 async function handleExternalChange(): Promise<void> {
-    // Skip events caused by our own writes
-    if (Date.now() < ignoreUntil) return;
+    if (localDataWatcherDependencies.now() < ignoreUntil) {
+        hasPendingChangeDuringIgnore = true;
+        scheduleIgnoreDrain();
+        return;
+    }
 
     try {
-        // Read the file the CLI (or other external tool) wrote
-        const rawData = await invoke<AppData>('read_data_json' as any);
-        const normalized = normalizeAppData(rawData);
+        const rawData = await localDataWatcherDependencies.readDataJson();
+        const normalized = localDataWatcherDependencies.normalize(rawData);
+        const hash = await localDataWatcherDependencies.hashPayload(toStableJson(normalized));
 
-        // Hash to detect actual changes (skip if file content hasn't changed)
-        const hash = await hashString(toStableJson(normalized));
         if (hash === lastKnownHash) return;
         lastKnownHash = hash;
 
-        // Debounce — wait a moment in case multiple rapid writes happen
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            void mergeExternalData(normalized);
+        if (debounceTimer) {
+            localDataWatcherDependencies.cancelSchedule(debounceTimer);
+            debounceTimer = null;
+        }
+
+        pendingExternalData = normalized;
+        debounceTimer = localDataWatcherDependencies.schedule(() => {
+            debounceTimer = null;
+            runPendingMerge();
         }, DEBOUNCE_MS);
     } catch (error) {
-        logWarn('[local-data-watcher] Failed to read external change: ' + String(error));
+        localDataWatcherDependencies.logWarn('[local-data-watcher] Failed to read external change: ' + String(error));
     }
 }
 
-/**
- * Merge the externally-modified data.json into the running app's store.
- * This uses the same mergeAppData function that the sync service uses.
- */
-async function mergeExternalData(externalData: AppData): Promise<void> {
+export function markLocalWrite(): void {
+    ignoreUntil = localDataWatcherDependencies.now() + IGNORE_WINDOW_MS;
+    scheduleIgnoreDrain();
+}
+
+export async function start(dataPath: string): Promise<void> {
+    if (!isTauriRuntime()) return;
+    if (unwatchFn) return;
+
     try {
-        const localSnapshot = getInMemoryAppDataSnapshot();
-        const merged = mergeAppData(localSnapshot, externalData);
+        const unwatch = await localDataWatcherDependencies.watchFile(dataPath, (event) => {
+            if (normalizePathsFromEvent(event).length === 0) return;
+            void handleExternalChange();
+        });
 
-        // Persist merged result back to SQLite + data.json
-        markLocalWrite(); // So we don't re-trigger on our own save
-        await invoke('save_data' as any, { data: merged });
-
-        // Refresh the UI store so components re-render with the new data
-        await useTaskStore.getState().fetchData({ silent: true });
-
-        logInfo('[local-data-watcher] Merged external data.json changes');
+        unwatchFn = resolveUnwatch(unwatch);
+        localDataWatcherDependencies.logInfo('[local-data-watcher] Started watching ' + dataPath);
     } catch (error) {
-        logWarn('[local-data-watcher] Failed to merge external data: ' + String(error));
+        localDataWatcherDependencies.logWarn('[local-data-watcher] Failed to start watcher: ' + String(error));
     }
 }
+
+export function stop(): void {
+    if (debounceTimer) {
+        localDataWatcherDependencies.cancelSchedule(debounceTimer);
+        debounceTimer = null;
+    }
+    if (ignoreDrainTimer) {
+        localDataWatcherDependencies.cancelSchedule(ignoreDrainTimer);
+        ignoreDrainTimer = null;
+    }
+    hasPendingChangeDuringIgnore = false;
+    pendingExternalData = null;
+
+    if (unwatchFn) {
+        unwatchFn();
+        unwatchFn = null;
+        localDataWatcherDependencies.logInfo('[local-data-watcher] Stopped');
+    }
+}
+
+export const __localDataWatcherTestUtils = {
+    setDependenciesForTests(overrides: Partial<LocalDataWatcherDependencies>) {
+        localDataWatcherDependencies = {
+            ...localDataWatcherDependencies,
+            ...overrides,
+        };
+    },
+    async triggerChangeForTests() {
+        await handleExternalChange();
+    },
+    resetForTests() {
+        stop();
+        localDataWatcherDependencies = { ...defaultDependencies };
+        ignoreUntil = 0;
+        lastKnownHash = '';
+        mergeInFlight = null;
+    },
+};
