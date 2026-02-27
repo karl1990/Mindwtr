@@ -53,14 +53,14 @@ function DraggableTask({
   projectColor,
   timeEstimatesEnabled,
 }: DraggableTaskProps) {
-  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const zIndex = useSharedValue(1);
   const isDragging = useSharedValue(false);
 
-  const handleDropFromGesture = useCallback((taskId: string, translationX: number) => {
+  const handleDropFromGesture = useCallback((taskId: string, translationYDelta: number) => {
     const nextIndex = resolveBoardDropColumnIndex({
-      translationX,
+      translationX: translationYDelta,
       currentColumnIndex,
       columnCount: COLUMNS.length,
     });
@@ -75,24 +75,24 @@ function DraggableTask({
       runOnJS(onTap)(task);
     });
 
-  // Horizontal status drag avoids conflicts with vertical board scrolling.
+  // On mobile the board columns are stacked vertically, so status drag is vertical.
   const panGesture = Gesture.Pan()
     .activateAfterLongPress(180)
-    .activeOffsetX([-12, 12])
-    .failOffsetY([-24, 24])
+    .activeOffsetY([-12, 12])
+    .failOffsetX([-24, 24])
     .onStart(() => {
       isDragging.value = true;
       scale.value = withSpring(1.05);
       zIndex.value = 1000;
     })
     .onUpdate((event) => {
-      translateX.value = event.translationX;
+      translateY.value = event.translationY;
     })
     .onEnd((event) => {
       isDragging.value = false;
-      runOnJS(handleDropFromGesture)(task.id, event.translationX);
+      runOnJS(handleDropFromGesture)(task.id, event.translationY);
 
-      translateX.value = withSpring(0);
+      translateY.value = withSpring(0);
       scale.value = withSpring(1);
       zIndex.value = 1;
     });
@@ -105,7 +105,7 @@ function DraggableTask({
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
+      { translateY: translateY.value },
       { scale: scale.value },
     ],
     zIndex: zIndex.value,
