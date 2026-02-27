@@ -15,7 +15,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { TaskEditModal } from '../task-edit-modal';
-import { resolveBoardDropColumnIndex } from './board-view.utils';
+import { resolveBoardDropColumnIndex, resolveBoardDropColumnIndexFromY } from './board-view.utils';
 
 const COLUMNS: { id: TaskStatus; label: string; labelKey: string; color: string }[] = [
   { id: 'inbox', label: 'Inbox', labelKey: 'status.inbox', color: '#6B7280' },
@@ -24,6 +24,23 @@ const COLUMNS: { id: TaskStatus; label: string; labelKey: string; color: string 
   { id: 'someday', label: 'Someday', labelKey: 'status.someday', color: '#8B5CF6' },
   { id: 'done', label: 'Done', labelKey: 'status.done', color: '#10B981' },
 ];
+
+type RelativeTaskLayout = {
+  columnIndex: number;
+  y: number;
+  height: number;
+};
+
+type ColumnLayout = {
+  y: number;
+  height: number;
+};
+
+type DragStartMetrics = {
+  taskId: string;
+  topY: number;
+  height: number;
+};
 
 interface DraggableTaskProps {
   task: Task;
@@ -43,6 +60,7 @@ interface DraggableTaskProps {
   projectTitle?: string;
   projectColor?: string;
   timeEstimatesEnabled: boolean;
+  onLayout: (taskId: string, columnIndex: number, y: number, height: number) => void;
 }
 
 function DraggableTask({
@@ -63,6 +81,7 @@ function DraggableTask({
   projectTitle,
   projectColor,
   timeEstimatesEnabled,
+  onLayout,
 }: DraggableTaskProps) {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -135,10 +154,16 @@ function DraggableTask({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[
-        styles.taskCardContainer,
-        animatedStyle
-      ]}>
+      <Animated.View
+        style={[
+          styles.taskCardContainer,
+          animatedStyle,
+        ]}
+        onLayout={(event) => {
+          const { y, height } = event.nativeEvent.layout;
+          onLayout(task.id, currentColumnIndex, y, height);
+        }}
+      >
         <Swipeable
           renderLeftActions={() => (
             <View style={styles.duplicateAction}>
@@ -226,6 +251,9 @@ interface ColumnProps {
   dragScrollCompensation: SharedValue<number>;
   projectById: Record<string, { title: string; color?: string }>;
   timeEstimatesEnabled: boolean;
+  onColumnLayout: (columnIndex: number, y: number, height: number) => void;
+  onColumnContentLayout: (columnIndex: number, y: number) => void;
+  onTaskLayout: (taskId: string, columnIndex: number, y: number, height: number) => void;
 }
 
 function Column({
@@ -249,20 +277,32 @@ function Column({
   dragScrollCompensation,
   projectById,
   timeEstimatesEnabled,
+  onColumnLayout,
+  onColumnContentLayout,
+  onTaskLayout,
 }: ColumnProps) {
   return (
     <View style={[
       styles.column,
       isDragSourceColumn ? styles.columnDragSource : null,
       { borderTopColor: color, backgroundColor: isDark ? '#1F2937' : '#F3F4F6' },
-    ]}>
+    ]}
+    onLayout={(event) => {
+      const { y, height } = event.nativeEvent.layout;
+      onColumnLayout(columnIndex, y, height);
+    }}>
       <View style={[styles.columnHeader, { borderBottomColor: isDark ? '#374151' : '#E5E7EB' }]}>
         <Text style={[styles.columnTitle, { color: isDark ? '#FFFFFF' : '#111827' }]}>{label}</Text>
         <View style={[styles.badge, { backgroundColor: color }]}>
           <Text style={styles.badgeText}>{tasks.length}</Text>
         </View>
       </View>
-      <View style={styles.columnContent}>
+      <View
+        style={styles.columnContent}
+        onLayout={(event) => {
+          onColumnContentLayout(columnIndex, event.nativeEvent.layout.y);
+        }}
+      >
         {tasks.map((task) => (
           <DraggableTask
             key={task.id}
@@ -283,6 +323,7 @@ function Column({
             projectTitle={task.projectId ? projectById[task.projectId]?.title : undefined}
             projectColor={task.projectId ? projectById[task.projectId]?.color : undefined}
             timeEstimatesEnabled={timeEstimatesEnabled}
+            onLayout={onTaskLayout}
           />
         ))}
         {tasks.length === 0 && (
@@ -318,6 +359,10 @@ export function BoardView() {
   const dragScrollCompensationSv = useSharedValue(0);
   const autoScrollDirectionRef = useRef<-1 | 0 | 1>(0);
   const autoScrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const columnLayoutsRef = useRef<Record<number, ColumnLayout>>({});
+  const columnContentOffsetRef = useRef<Record<number, number>>({});
+  const taskLayoutsRef = useRef<Record<string, RelativeTaskLayout>>({});
+  const dragStartMetricsRef = useRef<DragStartMetrics | null>(null);
 
   const navBarInset = Platform.OS === 'android' && insets.bottom >= 24 ? insets.bottom : 0;
   const boardContentStyle = useMemo(
@@ -344,22 +389,78 @@ export function BoardView() {
     return grouped;
   }, [tasks]);
 
+  const getTaskTopInContent = useCallback((taskId: string): number | null => {
+    const taskLayout = taskLayoutsRef.current[taskId];
+    if (!taskLayout) return null;
+    const columnLayout = columnLayoutsRef.current[taskLayout.columnIndex];
+    if (!columnLayout) return null;
+    const columnContentOffset = columnContentOffsetRef.current[taskLayout.columnIndex] ?? 0;
+    return columnLayout.y + columnContentOffset + taskLayout.y;
+  }, []);
+
+  const getColumnBounds = useCallback(() => {
+    const bounds = COLUMNS.map((_, index) => {
+      const layout = columnLayoutsRef.current[index];
+      if (!layout) return null;
+      return {
+        index,
+        top: layout.y,
+        bottom: layout.y + layout.height,
+      };
+    }).filter((item): item is { index: number; top: number; bottom: number } => item !== null);
+    return bounds;
+  }, []);
+
+  const handleColumnLayout = useCallback((columnIndex: number, y: number, height: number) => {
+    columnLayoutsRef.current[columnIndex] = { y, height };
+  }, []);
+
+  const handleColumnContentLayout = useCallback((columnIndex: number, y: number) => {
+    columnContentOffsetRef.current[columnIndex] = y;
+  }, []);
+
+  const handleTaskLayout = useCallback((taskId: string, columnIndex: number, y: number, height: number) => {
+    taskLayoutsRef.current[taskId] = { columnIndex, y, height };
+  }, []);
+
   const handleDrop = useCallback((taskId: string, translationYDelta: number) => {
     const effectiveTranslationY = translationYDelta + dragScrollCompensationRef.current;
     const currentTask = tasks.find((item) => item.id === taskId);
     const currentStatus = currentTask?.status;
     const currentColumnIndex = COLUMNS.findIndex((column) => column.id === currentStatus);
     if (currentColumnIndex < 0) return;
-    const newColumnIndex = resolveBoardDropColumnIndex({
-      translationX: effectiveTranslationY,
-      currentColumnIndex,
-      columnCount: COLUMNS.length,
-    });
+
+    let newColumnIndex = currentColumnIndex;
+    const dragStartMetrics = dragStartMetricsRef.current;
+    if (dragStartMetrics?.taskId === taskId) {
+      const dragCenterY = dragStartMetrics.topY + effectiveTranslationY + (dragStartMetrics.height / 2);
+      const columnBounds = getColumnBounds();
+      if (columnBounds.length > 0) {
+        newColumnIndex = resolveBoardDropColumnIndexFromY({
+          dragCenterY,
+          currentColumnIndex,
+          columnBounds,
+        });
+      } else {
+        newColumnIndex = resolveBoardDropColumnIndex({
+          translationX: effectiveTranslationY,
+          currentColumnIndex,
+          columnCount: COLUMNS.length,
+        });
+      }
+    } else {
+      newColumnIndex = resolveBoardDropColumnIndex({
+        translationX: effectiveTranslationY,
+        currentColumnIndex,
+        columnCount: COLUMNS.length,
+      });
+    }
+
     if (newColumnIndex >= 0 && newColumnIndex < COLUMNS.length) {
       const newStatus = COLUMNS[newColumnIndex].id;
       updateTask(taskId, { status: newStatus });
     }
-  }, [tasks, updateTask]);
+  }, [getColumnBounds, tasks, updateTask]);
 
   const handleTap = useCallback((task: Task) => {
     setEditingTask(task);
@@ -422,8 +523,24 @@ export function BoardView() {
     currentDragTranslationYRef.current = 0;
     dragScrollCompensationRef.current = 0;
     dragScrollCompensationSv.value = 0;
+    const dragTaskHeight = taskLayoutsRef.current[taskId]?.height;
+    const dragTaskTopY = getTaskTopInContent(taskId);
+    if (
+      dragTaskTopY !== null &&
+      Number.isFinite(dragTaskHeight) &&
+      typeof dragTaskHeight === 'number' &&
+      dragTaskHeight > 0
+    ) {
+      dragStartMetricsRef.current = {
+        taskId,
+        topY: dragTaskTopY,
+        height: dragTaskHeight,
+      };
+    } else {
+      dragStartMetricsRef.current = null;
+    }
     stopAutoScroll();
-  }, [dragScrollCompensationSv, stopAutoScroll]);
+  }, [dragScrollCompensationSv, getTaskTopInContent, stopAutoScroll]);
 
   const handleDragMove = useCallback((absoluteY: number, translationY: number) => {
     currentDragTranslationYRef.current = translationY;
@@ -448,6 +565,7 @@ export function BoardView() {
     currentDragTranslationYRef.current = 0;
     dragScrollCompensationRef.current = 0;
     dragScrollCompensationSv.value = 0;
+    dragStartMetricsRef.current = null;
     stopAutoScroll();
   }, [dragScrollCompensationSv, stopAutoScroll]);
 
@@ -456,6 +574,18 @@ export function BoardView() {
       stopAutoScroll();
     };
   }, [stopAutoScroll]);
+
+  useEffect(() => {
+    const liveTaskIds = new Set(tasks.map((task) => task.id));
+    for (const taskId of Object.keys(taskLayoutsRef.current)) {
+      if (!liveTaskIds.has(taskId)) {
+        delete taskLayoutsRef.current[taskId];
+      }
+    }
+    if (dragStartMetricsRef.current && !liveTaskIds.has(dragStartMetricsRef.current.taskId)) {
+      dragStartMetricsRef.current = null;
+    }
+  }, [tasks]);
 
   return (
     <View style={[styles.container, { backgroundColor: tc.bg }]}>
@@ -504,6 +634,9 @@ export function BoardView() {
             dragScrollCompensation={dragScrollCompensationSv}
             projectById={projectById}
             timeEstimatesEnabled={timeEstimatesEnabled}
+            onColumnLayout={handleColumnLayout}
+            onColumnContentLayout={handleColumnContentLayout}
+            onTaskLayout={handleTaskLayout}
           />
         ))}
       </ScrollView>

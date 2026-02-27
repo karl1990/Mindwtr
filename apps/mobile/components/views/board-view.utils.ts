@@ -36,3 +36,51 @@ export const resolveBoardDropColumnIndex = ({
     const nextIndex = currentColumnIndex + columnsMoved;
     return clamp(nextIndex, 0, columnCount - 1);
 };
+
+type BoardColumnBounds = {
+    index: number;
+    top: number;
+    bottom: number;
+};
+
+type ResolveBoardDropColumnIndexFromYArgs = {
+    dragCenterY: number;
+    currentColumnIndex: number;
+    columnBounds: BoardColumnBounds[];
+};
+
+export const resolveBoardDropColumnIndexFromY = ({
+    dragCenterY,
+    currentColumnIndex,
+    columnBounds,
+}: ResolveBoardDropColumnIndexFromYArgs): number => {
+    if (!Number.isFinite(dragCenterY) || columnBounds.length === 0) {
+        return currentColumnIndex;
+    }
+
+    const sortedBounds = [...columnBounds]
+        .filter((item) => Number.isFinite(item.top) && Number.isFinite(item.bottom) && item.bottom >= item.top)
+        .sort((a, b) => a.top - b.top);
+
+    if (sortedBounds.length === 0) {
+        return currentColumnIndex;
+    }
+
+    const directMatch = sortedBounds.find((item) => dragCenterY >= item.top && dragCenterY <= item.bottom);
+    if (directMatch) {
+        return directMatch.index;
+    }
+
+    let nearest = sortedBounds[0];
+    let nearestDistance = dragCenterY < nearest.top ? nearest.top - dragCenterY : dragCenterY - nearest.bottom;
+    for (let i = 1; i < sortedBounds.length; i += 1) {
+        const candidate = sortedBounds[i];
+        const distance = dragCenterY < candidate.top ? candidate.top - dragCenterY : dragCenterY - candidate.bottom;
+        if (distance < nearestDistance) {
+            nearest = candidate;
+            nearestDistance = distance;
+        }
+    }
+
+    return nearest.index;
+};
